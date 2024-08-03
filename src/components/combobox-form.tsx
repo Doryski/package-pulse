@@ -5,6 +5,7 @@ import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import fetchNPMDownloads from "@/api/fetchNPMDownloads";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
 import {
   Form,
@@ -20,10 +21,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
-import useBooleanState from "@/hooks/useBooleanState";
-import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import useBooleanState from "@/lib/hooks/useBooleanState";
+import { cn } from "@/lib/utils/cn";
+import getChartConfig from "@/lib/utils/getChartConfig";
+import { groupStats } from "@/lib/utils/groupByPeriod";
+import prepareChartData from "@/lib/utils/prepareChartData";
+import sortByDate from "@/lib/utils/sortByDate";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
+import MultipleLineChart from "./ui/line-chart";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./ui/list";
 
 const FormSchema = z.object({
@@ -48,11 +54,26 @@ export function ComboboxForm() {
   const search = form.watch("search");
   const projects = useQuery({
     queryKey: ["projects", search],
-    queryFn: async () => {
-      return searchNPMRegistry(search);
-    },
+    queryFn: () => searchNPMRegistry(search),
   });
   const selectedProjects = form.watch("projects");
+  const selectedProjectsStats = useQueries({
+    queries: selectedProjects.map((projectName) => {
+      return {
+        queryKey: ["project-stats", projectName],
+        queryFn: async () => {
+          const groupedDownloads = groupStats(
+            sortByDate(await fetchNPMDownloads(projectName)),
+          );
+
+          return {
+            projectName,
+            data: groupedDownloads.byWeeks,
+          };
+        },
+      };
+    }),
+  });
 
   function onSubmit(data: ComboboxFormValues) {
     toast({
@@ -69,125 +90,142 @@ export function ComboboxForm() {
     if (selectedProjects.includes(projectName)) {
       form.setValue(
         "projects",
-        selectedProjects.filter((project) => project !== projectName)
+        selectedProjects.filter((project) => project !== projectName),
       );
     } else {
       form.setValue("projects", [...selectedProjects, projectName]);
     }
   }
 
+  const chartConfig = getChartConfig(selectedProjectsStats);
+
+  const processedProjectsStats = prepareChartData(selectedProjectsStats);
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="search"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <Popover
-                open={isInputFocused}
-                onOpenChange={(isOpen) => (isOpen ? focusInput() : blurInput())}
-              >
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <div className="relative">
-                      <FormLabel
-                        className={cn(
-                          "absolute -top-3 left-2 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
-                          field.value ? "opacity-100" : "opacity-0"
-                        )}
-                      >
-                        Search project...
-                      </FormLabel>
-                      <Input
-                        role="combobox"
-                        placeholder="Search project..."
-                        autoComplete="off"
-                        className={cn(
-                          "w-[200px] justify-between",
-                          !field.value && "text-muted-foreground"
-                        )}
-                        onChangeCapture={() => field.value && focusInput()}
-                        {...field}
-                      />
-                    </div>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[200px] p-0"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+          <FormField
+            control={form.control}
+            name="search"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <Popover
+                  open={isInputFocused}
+                  onOpenChange={(isOpen) =>
+                    isOpen ? focusInput() : blurInput()
+                  }
                 >
-                  <ListGroup>
-                    <ListEmpty
-                      className={
-                        projects.data?.length === 0 ? "block" : "hidden"
-                      }
-                    >
-                      No project found.
-                    </ListEmpty>
-                    <ListLoading
-                      className={projects.isLoading ? "block" : "hidden"}
-                    />
-                    <List>
-                      {projects.data?.map((project) => (
-                        <ListItem
-                          key={project.package.name}
-                          onClick={() =>
-                            handleComboboxItemClick(project.package.name)
-                          }
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <div className="relative">
+                        <FormLabel
+                          className={cn(
+                            "absolute -top-3 left-2 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
+                            field.value ? "opacity-100" : "opacity-0",
+                          )}
+                          htmlFor={field.name}
                         >
-                          {project.package.name}
-                          <CheckIcon
-                            className={cn(
-                              "ml-auto h-4 w-4",
-                              form
-                                .watch("projects")
-                                .includes(project.package.name)
-                                ? "opacity-100"
-                                : "opacity-0"
-                            )}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </ListGroup>
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="projects"
-          render={({ field }) => {
-            console.log(field.value);
-            return (
-              <FormItem>
-                <div className="flex flex-wrap gap-2">
-                  {field.value?.map((project) => (
-                    <div
-                      key={project}
-                      className="flex items-center px-2 py-1 bg-accent text-sm text-accent-foreground rounded-md"
-                    >
-                      {project}
-                      <Cross1Icon
-                        className="h-3 w-3 ml-2 cursor-pointer"
-                        onClick={() =>
-                          form.setValue(
-                            "projects",
-                            field.value.filter((p) => p !== project)
-                          )
+                          Search project...
+                        </FormLabel>
+                        <Input
+                          {...field}
+                          id={field.name}
+                          role="combobox"
+                          placeholder="Search project..."
+                          autoComplete="off"
+                          className={cn(
+                            "w-[200px] justify-between",
+                            !field.value && "text-muted-foreground",
+                          )}
+                          onChangeCapture={() => field.value && focusInput()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Tab") {
+                              blurInput();
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[200px] p-0"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <ListGroup>
+                      <ListEmpty
+                        className={
+                          projects.data?.length === 0 ? "block" : "hidden"
                         }
+                      >
+                        No project found.
+                      </ListEmpty>
+                      <ListLoading
+                        className={projects.isLoading ? "block" : "hidden"}
                       />
-                    </div>
-                  ))}
-                </div>
+                      <List>
+                        {projects.data?.map((project) => (
+                          <ListItem
+                            key={project.package.name}
+                            onClick={() =>
+                              handleComboboxItemClick(project.package.name)
+                            }
+                          >
+                            {project.package.name}
+                            <CheckIcon
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                form
+                                  .watch("projects")
+                                  .includes(project.package.name)
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </ListGroup>
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
               </FormItem>
-            );
-          }}
-        />
-      </form>
-    </Form>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="projects"
+            render={({ field }) => {
+              return (
+                <FormItem>
+                  <div className="flex flex-wrap gap-2">
+                    {field.value?.map((project) => (
+                      <div
+                        key={project}
+                        className="flex items-center px-2 py-1 bg-accent text-sm text-accent-foreground rounded-md"
+                      >
+                        {project}
+                        <Cross1Icon
+                          className="h-3 w-3 ml-2 cursor-pointer"
+                          onClick={() =>
+                            form.setValue(
+                              "projects",
+                              field.value.filter((p) => p !== project),
+                            )
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </FormItem>
+              );
+            }}
+          />
+        </form>
+      </Form>
+      <div className="w-full h-[400px] mt-8">
+        <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
+      </div>
+    </>
   );
 }

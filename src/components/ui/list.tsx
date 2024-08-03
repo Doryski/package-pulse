@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/cn";
 import { ClassValue } from "class-variance-authority/types";
 import * as React from "react";
 import { Skeleton } from "./skeleton";
