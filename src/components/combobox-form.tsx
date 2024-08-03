@@ -5,7 +5,7 @@ import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import fetchNPMDownloads from "@/api/fetchNPMDownloads";
+import fetchNPMDownloads, { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
 import {
   Form,
@@ -22,12 +22,15 @@ import {
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
 import useBooleanState from "@/lib/hooks/useBooleanState";
+import useDebounce from "@/lib/hooks/useDebounce";
 import { cn } from "@/lib/utils/cn";
 import getChartConfig from "@/lib/utils/getChartConfig";
-import { groupStats } from "@/lib/utils/groupByPeriod";
+import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import prepareChartData from "@/lib/utils/prepareChartData";
 import sortByDate from "@/lib/utils/sortByDate";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useMemo } from "react";
 import { Input } from "./ui/input";
 import MultipleLineChart from "./ui/line-chart";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./ui/list";
@@ -52,23 +55,31 @@ export function ComboboxForm() {
     }),
   });
   const search = form.watch("search");
+  const debouncedSearch = useDebounce(search, 400);
   const projects = useQuery({
-    queryKey: ["projects", search],
-    queryFn: () => searchNPMRegistry(search),
+    queryKey: ["projects", debouncedSearch],
+    queryFn: () => searchNPMRegistry(debouncedSearch),
+    enabled: !!debouncedSearch,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
   const selectedProjects = form.watch("projects");
   const selectedProjectsStats = useQueries({
     queries: selectedProjects.map((projectName) => {
       return {
-        queryKey: ["project-stats", projectName],
+        queryKey: [
+          "project-stats",
+          projectName,
+          format(new Date(), DATE_FORMAT),
+        ],
         queryFn: async () => {
-          const groupedDownloads = groupStats(
-            sortByDate(await fetchNPMDownloads(projectName)),
+          const groupedDownloads = groupByWeeks(
+            sortByDate(await fetchNPMDownloads(projectName)).slice(0, -1),
           );
 
           return {
             projectName,
-            data: groupedDownloads.byWeeks,
+            data: groupedDownloads,
           };
         },
       };
@@ -97,101 +108,121 @@ export function ComboboxForm() {
     }
   }
 
-  const chartConfig = getChartConfig(selectedProjectsStats);
+  const chartConfig = useMemo(
+    () => getChartConfig(selectedProjectsStats),
+    [selectedProjectsStats],
+  );
 
-  const processedProjectsStats = prepareChartData(selectedProjectsStats);
+  const processedProjectsStats = useMemo(
+    () => prepareChartData(selectedProjectsStats),
+    [selectedProjectsStats],
+  );
+  const hasExceededSelectedProjectsLimit = selectedProjects.length >= 10;
 
   return (
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-          <FormField
-            control={form.control}
-            name="search"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <Popover
-                  open={isInputFocused}
-                  onOpenChange={(isOpen) =>
-                    isOpen ? focusInput() : blurInput()
-                  }
-                >
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <div className="relative">
-                        <FormLabel
-                          className={cn(
-                            "absolute -top-3 left-2 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
-                            field.value ? "opacity-100" : "opacity-0",
-                          )}
-                          htmlFor={field.name}
-                        >
-                          Search project...
-                        </FormLabel>
-                        <Input
-                          {...field}
-                          id={field.name}
-                          role="combobox"
-                          placeholder="Search project..."
-                          autoComplete="off"
-                          className={cn(
-                            "w-[200px] justify-between",
-                            !field.value && "text-muted-foreground",
-                          )}
-                          onChangeCapture={() => field.value && focusInput()}
-                          onKeyDown={(e) => {
-                            if (e.key === "Tab") {
-                              blurInput();
-                            }
-                          }}
-                        />
-                      </div>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[200px] p-0"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
+          <div className="flex gap-2 items-center">
+            <FormField
+              control={form.control}
+              name="search"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <Popover
+                    open={isInputFocused}
+                    onOpenChange={(isOpen) =>
+                      isOpen ? focusInput() : blurInput()
+                    }
                   >
-                    <ListGroup>
-                      <ListEmpty
-                        className={
-                          projects.data?.length === 0 ? "block" : "hidden"
-                        }
-                      >
-                        No project found.
-                      </ListEmpty>
-                      <ListLoading
-                        className={projects.isLoading ? "block" : "hidden"}
-                      />
-                      <List>
-                        {projects.data?.map((project) => (
-                          <ListItem
-                            key={project.package.name}
-                            onClick={() =>
-                              handleComboboxItemClick(project.package.name)
-                            }
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <div className="relative">
+                          <FormLabel
+                            className={cn(
+                              "absolute -top-3 left-2 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
+                              field.value ? "opacity-100" : "opacity-0",
+                            )}
+                            htmlFor={field.name}
                           >
-                            {project.package.name}
-                            <CheckIcon
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                form
-                                  .watch("projects")
-                                  .includes(project.package.name)
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </ListGroup>
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
+                            Search project...
+                          </FormLabel>
+                          <Input
+                            {...field}
+                            id={field.name}
+                            role="combobox"
+                            placeholder="Search project..."
+                            autoComplete="off"
+                            className={cn(
+                              "w-[200px] justify-between",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            onChangeCapture={() => field.value && focusInput()}
+                            onKeyDown={(e) => {
+                              if (e.key === "Tab") {
+                                blurInput();
+                              }
+                            }}
+                            disabled={hasExceededSelectedProjectsLimit}
+                          />
+                        </div>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className={cn(
+                        "w-[200px] p-0",
+                        !debouncedSearch && "hidden",
+                      )}
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <ListGroup>
+                        <ListEmpty
+                          className={
+                            projects.data?.length === 0 ? "block" : "hidden"
+                          }
+                        >
+                          No project found.
+                        </ListEmpty>
+                        <ListLoading
+                          className={projects.isLoading ? "block" : "hidden"}
+                        />
+                        <List>
+                          {projects.data?.map((project) => (
+                            <ListItem
+                              key={project.package.name}
+                              onClick={() =>
+                                handleComboboxItemClick(project.package.name)
+                              }
+                            >
+                              {project.package.name}
+                              <CheckIcon
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  form
+                                    .watch("projects")
+                                    .includes(project.package.name)
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </ListGroup>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* message "You cannot select more than 10 projects" */}
+            {hasExceededSelectedProjectsLimit && (
+              <FormMessage className="text-xs text-destructive">
+                You cannot select more than 10 projects
+              </FormMessage>
             )}
-          />
+          </div>
+
           <FormField
             control={form.control}
             name="projects"
@@ -202,11 +233,10 @@ export function ComboboxForm() {
                     {field.value?.map((project) => (
                       <div
                         key={project}
-                        className="flex items-center px-2 py-1 bg-accent text-sm text-accent-foreground rounded-md"
+                        className="flex gap-2 items-center px-2 py-1 bg-accent text-sm text-accent-foreground rounded-md"
                       >
-                        {project}
                         <Cross1Icon
-                          className="h-3 w-3 ml-2 cursor-pointer"
+                          className="h-3 w-3 cursor-pointer"
                           onClick={() =>
                             form.setValue(
                               "projects",
@@ -214,6 +244,7 @@ export function ComboboxForm() {
                             )
                           }
                         />
+                        {project}
                       </div>
                     ))}
                   </div>
@@ -223,7 +254,8 @@ export function ComboboxForm() {
           />
         </form>
       </Form>
-      <div className="w-full h-[400px] mt-8">
+
+      <div className="w-full h-full mt-8">
         <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
       </div>
     </>

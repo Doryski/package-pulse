@@ -10,6 +10,21 @@ import {
   startOfWeek,
 } from "date-fns";
 
+export function groupByWeeks<
+  T extends {
+    date: string;
+    count: number;
+  }[],
+>(stats: T) {
+  return groupByPeriod(
+    stats,
+    1,
+    addWeeks,
+    differenceInCalendarWeeks,
+    startOfWeek,
+  );
+}
+
 export function groupStats<
   T extends {
     date: string;
@@ -17,14 +32,9 @@ export function groupStats<
   },
 >(stats: T[]) {
   return {
+    byDay: stats,
     byThreeDays: groupByPeriod(stats, 3, addDays, differenceInCalendarDays),
-    byWeeks: groupByPeriod(
-      stats,
-      1,
-      addWeeks,
-      differenceInCalendarWeeks,
-      startOfWeek,
-    ),
+    byWeeks: groupByWeeks(stats),
     byMonths: groupByPeriod(
       stats,
       1,
