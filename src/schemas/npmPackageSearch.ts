@@ -22,7 +22,7 @@ export const NPMPackageSearchItemSchema = z.object({
       z.object({
         username: z.string(),
         email: z.string(),
-      })
+      }),
     ),
   }),
   score: z.object({

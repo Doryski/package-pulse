@@ -4,12 +4,12 @@ import {
 } from "../schemas/npmPackageSearch";
 
 export default async function searchNPMRegistry(
-  search: string
+  search: string,
 ): Promise<NPMPackageSearch["objects"]> {
   if (!search) return [];
   try {
     const res = await fetch(
-      `https://registry.npmjs.org/-/v1/search?text=${search}&size=10`
+      `https://registry.npmjs.org/-/v1/search?text=${search}&size=10`,
     );
     const data = await res.json();
     try {

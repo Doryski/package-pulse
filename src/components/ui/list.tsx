@@ -32,7 +32,7 @@ const ListGroup = ({ className, ...props }: ListGroupProps) => (
   <div
     className={cn(
       "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
-      className
+      className,
     )}
     {...props}
   />
@@ -57,7 +57,7 @@ const ListItem = ({ className, ...props }: ListItemProps) => (
       aria-selected:bg-accent aria-selected:text-accent-foreground
       data-[disabled]:pointer-events-none data-[disabled]:opacity-50
       hover:bg-accent hover:text-accent-foreground`,
-      className
+      className,
     )}
     {...props}
   />

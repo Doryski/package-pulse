@@ -1,0 +1,10 @@
+{
+  "prettier.configPath": "package.json",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.removeUnusedImports": "explicit",
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit",
+    "source.addMissingImports.ts": "explicit"
+  }
+}
