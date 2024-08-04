@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/chart";
 import TimePeriod from "@/lib/enums/TimePeriod";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
+import { cn } from "@/lib/utils/cn";
 import { format, isAfter, subMonths, subYears } from "date-fns";
 import { memo, useCallback, useEffect, useState, useTransition } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
@@ -89,7 +90,12 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           </SelectContent>
         </Select>
       </div>
-      <div className="relative mx-auto w-full h-full max-w-[900px] max-h-[600px]">
+      <div
+        className={cn(
+          "relative mx-auto w-full h-full max-w-[900px] max-h-[600px]",
+          data.length === 0 && "hidden",
+        )}
+      >
         <ChartContainer config={config}>
           <LineChart
             accessibilityLayer
