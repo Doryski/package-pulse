@@ -2,12 +2,15 @@ import {
   addDays,
   addMonths,
   addWeeks,
+  addYears,
   differenceInCalendarDays,
   differenceInCalendarMonths,
   differenceInCalendarWeeks,
+  differenceInCalendarYears,
   format,
   startOfMonth,
   startOfWeek,
+  startOfYear,
 } from "date-fns";
 
 export function groupByWeeks<
@@ -32,7 +35,7 @@ export function groupStats<
   },
 >(stats: T[]) {
   return {
-    byDay: stats,
+    byDays: stats,
     byThreeDays: groupByPeriod(stats, 3, addDays, differenceInCalendarDays),
     byWeeks: groupByWeeks(stats),
     byMonths: groupByPeriod(
@@ -41,6 +44,13 @@ export function groupStats<
       addMonths,
       differenceInCalendarMonths,
       startOfMonth,
+    ),
+    byYears: groupByPeriod(
+      stats,
+      1,
+      addYears,
+      differenceInCalendarYears,
+      startOfYear,
     ),
   };
 }

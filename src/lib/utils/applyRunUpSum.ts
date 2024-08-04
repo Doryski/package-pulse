@@ -1,4 +1,4 @@
-import { NumericKeys } from "@/lib/types/SpecificKeys";
+import { NumericKeys } from "@/lib/types/utils/SpecificKeys";
 import { capitalize } from "lodash";
 
 export type RunUpProperty<T> = Record<

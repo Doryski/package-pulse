@@ -1,17 +1,6 @@
-import { UseQueryResult } from "@tanstack/react-query";
+import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
 
-export default function getChartConfig(
-  stats: UseQueryResult<
-    {
-      projectName: string;
-      data: {
-        date: string;
-        count: number;
-      }[];
-    },
-    Error
-  >[],
-) {
+export default function getChartConfig(stats: SelectedProjectsStatsQueries) {
   return stats.reduce((acc, query, index) => {
     const projectName = query.data?.projectName;
     if (!projectName) {

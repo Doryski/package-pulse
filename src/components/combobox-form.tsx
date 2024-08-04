@@ -21,10 +21,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
+import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useDebounce from "@/lib/hooks/useDebounce";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { cn } from "@/lib/utils/cn";
+import formatCellValue from "@/lib/utils/formatCellValue";
+import formatInteger from "@/lib/utils/formatNominal";
+import formatPercentage from "@/lib/utils/formatPercentage";
 import getChartConfig from "@/lib/utils/getChartConfig";
+import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
+import getStatsMatrix from "@/lib/utils/getStatsMatrix";
 import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import prepareChartData from "@/lib/utils/prepareChartData";
 import sortByDate from "@/lib/utils/sortByDate";
@@ -34,6 +41,14 @@ import { useMemo } from "react";
 import { Input } from "./ui/input";
 import MultipleLineChart from "./ui/line-chart";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./ui/list";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 const FormSchema = z.object({
   search: z
@@ -46,12 +61,15 @@ const FormSchema = z.object({
 
 type ComboboxFormValues = z.infer<typeof FormSchema>;
 export function ComboboxForm() {
-  const [isInputFocused, focusInput, blurInput] = useBooleanState(false);
+  const [isPopoverOpen, openPopover, closePopover] = useBooleanState(false);
   const form = useForm<ComboboxFormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: FormSchema.parse({
       search: "",
-      projects: [],
+      projects: getLocalStorageValue(
+        LocalStorageKey.SELECTED_PROJECTS,
+        FormSchema.shape.projects,
+      ),
     }),
   });
   const search = form.watch("search");
@@ -64,6 +82,8 @@ export function ComboboxForm() {
   });
 
   const selectedProjects = form.watch("projects");
+  useLocalStorage(LocalStorageKey.SELECTED_PROJECTS, selectedProjects);
+
   const selectedProjectsStats = useQueries({
     queries: selectedProjects.map((projectName) => {
       return {
@@ -73,13 +93,15 @@ export function ComboboxForm() {
           format(new Date(), DATE_FORMAT),
         ],
         queryFn: async () => {
-          const groupedDownloads = groupByWeeks(
-            sortByDate(await fetchNPMDownloads(projectName)).slice(0, -1),
-          );
+          const sortedDownloads = sortByDate(
+            await fetchNPMDownloads(projectName),
+          ).slice(0, -1);
+          const groupedDownloads = groupByWeeks(sortedDownloads);
 
           return {
             projectName,
-            data: groupedDownloads,
+            groupedByWeekData: groupedDownloads,
+            rawSortedData: sortedDownloads,
           };
         },
       };
@@ -106,6 +128,7 @@ export function ComboboxForm() {
     } else {
       form.setValue("projects", [...selectedProjects, projectName]);
     }
+    form.setFocus("search");
   }
 
   const chartConfig = useMemo(
@@ -119,6 +142,11 @@ export function ComboboxForm() {
   );
   const hasExceededSelectedProjectsLimit = selectedProjects.length >= 10;
 
+  const processedProjectsTableStats = useMemo(
+    () => getStatsMatrix(selectedProjectsStats),
+    [selectedProjectsStats],
+  );
+
   return (
     <>
       <Form {...form}>
@@ -130,9 +158,9 @@ export function ComboboxForm() {
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <Popover
-                    open={isInputFocused}
+                    open={isPopoverOpen}
                     onOpenChange={(isOpen) =>
-                      isOpen ? focusInput() : blurInput()
+                      isOpen ? openPopover() : closePopover()
                     }
                   >
                     <PopoverTrigger asChild>
@@ -140,7 +168,7 @@ export function ComboboxForm() {
                         <div className="relative">
                           <FormLabel
                             className={cn(
-                              "absolute -top-3 left-2 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
+                              "absolute -top-3 left-2 z-10 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
                               field.value ? "opacity-100" : "opacity-0",
                             )}
                             htmlFor={field.name}
@@ -157,10 +185,16 @@ export function ComboboxForm() {
                               "w-[200px] justify-between",
                               !field.value && "text-muted-foreground",
                             )}
-                            onChangeCapture={() => field.value && focusInput()}
+                            autoFocus
+                            onChangeCapture={() => {
+                              if (field.value) {
+                                form.setFocus("search");
+                                openPopover();
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Tab") {
-                                blurInput();
+                                closePopover();
                               }
                             }}
                             disabled={hasExceededSelectedProjectsLimit}
@@ -257,6 +291,92 @@ export function ComboboxForm() {
 
       <div className="w-full h-full mt-8">
         <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
+      </div>
+
+      <div className="w-full h-full mt-8">
+        <h3 className="text-center">NPM downloads change by project</h3>
+        <div className="mt-2">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px]">Project name</TableHead>
+                <TableHead className="text-center">Weekly</TableHead>
+                <TableHead className="text-center">Monthly</TableHead>
+                <TableHead className="text-center">Yearly</TableHead>
+                <TableHead className="text-center">
+                  Today vs a year ago
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {processedProjectsTableStats.map((projectStats) => (
+                <TableRow key={projectStats.projectName}>
+                  <TableCell>{projectStats.projectName}</TableCell>
+                  <TableCell className="text-center">
+                    <span>
+                      {formatCellValue(
+                        projectStats.weeklyChange?.nominal,
+                        formatInteger,
+                      )}
+                    </span>
+                    <br />
+                    <span>
+                      {formatCellValue(
+                        projectStats.weeklyChange?.percentage,
+                        formatPercentage,
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span>
+                      {formatCellValue(
+                        projectStats.monthlyChange?.nominal,
+                        formatInteger,
+                      )}
+                    </span>
+                    <br />
+                    <span>
+                      {formatCellValue(
+                        projectStats.monthlyChange?.percentage,
+                        formatPercentage,
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span>
+                      {formatCellValue(
+                        projectStats.yearlyChange?.nominal,
+                        formatInteger,
+                      )}
+                    </span>
+                    <br />
+                    <span>
+                      {formatCellValue(
+                        projectStats.yearlyChange?.percentage,
+                        formatPercentage,
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span>
+                      {formatCellValue(
+                        projectStats.oneYearAgoChange?.nominal,
+                        formatInteger,
+                      )}
+                    </span>
+                    <br />
+                    <span>
+                      {formatCellValue(
+                        projectStats.oneYearAgoChange?.percentage,
+                        formatPercentage,
+                      )}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </>
   );
