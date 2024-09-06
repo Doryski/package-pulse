@@ -1,6 +1,9 @@
+import { ChartConfig } from "@/components/ui/chart";
 import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
 
-export default function getChartConfig(stats: SelectedProjectsStatsQueries) {
+export default function getChartConfig(
+  stats: SelectedProjectsStatsQueries,
+): ChartConfig {
   return stats.reduce((acc, query, index) => {
     const projectName = query.data?.projectName;
     if (!projectName) {

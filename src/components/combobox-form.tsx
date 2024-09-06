@@ -13,12 +13,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useDebounce from "@/lib/hooks/useDebounce";
 import { cn } from "@/lib/utils/cn";
-import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
+import { CheckIcon } from "@radix-ui/react-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useFormContext } from "react-hook-form";
+import ClientOnly from "./client-only";
+import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/utils";
 import { Input } from "./ui/input";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./ui/list";
@@ -52,7 +55,8 @@ export function ComboboxForm() {
     form.setFocus("search");
   }
 
-  const hasExceededSelectedProjectsLimit = selectedProjects.length >= 10;
+  const hasExceededSelectedProjectsLimit =
+    selectedProjects.length >= MAX_SELECTED_PROJECTS;
 
   return (
     <>
@@ -158,7 +162,7 @@ export function ComboboxForm() {
             />
             {hasExceededSelectedProjectsLimit && (
               <FormMessage className="text-xs text-destructive">
-                You cannot select more than 10 projects
+                You cannot select more than {MAX_SELECTED_PROJECTS} projects
               </FormMessage>
             )}
           </div>
@@ -170,22 +174,19 @@ export function ComboboxForm() {
               return (
                 <FormItem>
                   <div className="flex flex-wrap gap-2">
-                    {field.value?.map((project) => (
-                      <div
-                        key={project}
-                        className="flex gap-2 items-center px-2 py-1 bg-accent text-sm text-accent-foreground rounded-md"
-                      >
-                        <Cross1Icon
-                          className="h-3 w-3 cursor-pointer"
-                          onClick={() =>
+                    {field.value.map((project, idx) => (
+                      <ClientOnly key={project}>
+                        <ProjectTag
+                          project={project}
+                          colorIndex={idx + 1}
+                          onRemove={() =>
                             form.setValue(
                               "projects",
                               field.value.filter((p) => p !== project),
                             )
                           }
                         />
-                        {project}
-                      </div>
+                      </ClientOnly>
                     ))}
                   </div>
                 </FormItem>
