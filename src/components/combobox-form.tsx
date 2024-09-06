@@ -13,7 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { toast } from "@/components/ui/use-toast";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useDebounce from "@/lib/hooks/useDebounce";
 import { cn } from "@/lib/utils/cn";
@@ -39,16 +38,7 @@ export function ComboboxForm() {
 
   const selectedProjects = form.watch("projects");
 
-  function onSubmit(data: ProjectsSearchFormValues) {
-    toast({
-      title: "You submitted the following values:",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
-  }
+  function onSubmit(_data: ProjectsSearchFormValues) {}
 
   function handleComboboxItemClick(projectName: string) {
     if (selectedProjects.includes(projectName)) {

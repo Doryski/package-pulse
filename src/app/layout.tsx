@@ -1,4 +1,5 @@
 import Footer from "@/components/footer";
+import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -29,6 +30,7 @@ export default function RootLayout({
           <Providers>
             <main className="flex flex-col flex-grow">{children}</main>
             <Footer />
+            <Toaster />
           </Providers>
         </div>
       </body>
