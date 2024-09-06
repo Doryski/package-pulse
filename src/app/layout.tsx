@@ -1,3 +1,4 @@
+import Footer from "@/components/footer";
 import { cn } from "@/lib/utils/cn";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -24,7 +25,12 @@ export default function RootLayout({
           inter.className,
         )}
       >
-        <Providers>{children}</Providers>
+        <div className="flex flex-col min-h-screen p-8">
+          <Providers>
+            <main className="flex flex-col flex-grow">{children}</main>
+            <Footer />
+          </Providers>
+        </div>
       </body>
     </html>
   );

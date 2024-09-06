@@ -1,11 +1,4 @@
 "use client";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-import fetchNPMDownloads, { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
 import {
   Form,
@@ -21,57 +14,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
-import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useDebounce from "@/lib/hooks/useDebounce";
-import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { cn } from "@/lib/utils/cn";
-import formatCellValue from "@/lib/utils/formatCellValue";
-import formatInteger from "@/lib/utils/formatNominal";
-import formatPercentage from "@/lib/utils/formatPercentage";
-import getChartConfig from "@/lib/utils/getChartConfig";
-import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
-import getStatsMatrix from "@/lib/utils/getStatsMatrix";
-import { groupByWeeks } from "@/lib/utils/groupByPeriod";
-import prepareChartData from "@/lib/utils/prepareChartData";
-import sortByDate from "@/lib/utils/sortByDate";
-import { useQueries, useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { useMemo } from "react";
+import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
+import { useQuery } from "@tanstack/react-query";
+import { useFormContext } from "react-hook-form";
+import { ProjectsSearchFormValues } from "./projects-form/utils";
 import { Input } from "./ui/input";
-import MultipleLineChart from "./ui/line-chart";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./ui/list";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
 
-const FormSchema = z.object({
-  search: z
-    .string({
-      required_error: "Please enter a project.",
-    })
-    .default(""),
-  projects: z.array(z.string()).default([]),
-});
-
-type ComboboxFormValues = z.infer<typeof FormSchema>;
 export function ComboboxForm() {
+  const form = useFormContext<ProjectsSearchFormValues>();
   const [isPopoverOpen, openPopover, closePopover] = useBooleanState(false);
-  const form = useForm<ComboboxFormValues>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: FormSchema.parse({
-      search: "",
-      projects: getLocalStorageValue(
-        LocalStorageKey.SELECTED_PROJECTS,
-        FormSchema.shape.projects,
-      ),
-    }),
-  });
+
   const search = form.watch("search");
   const debouncedSearch = useDebounce(search, 400);
   const projects = useQuery({
@@ -82,33 +38,8 @@ export function ComboboxForm() {
   });
 
   const selectedProjects = form.watch("projects");
-  useLocalStorage(LocalStorageKey.SELECTED_PROJECTS, selectedProjects);
 
-  const selectedProjectsStats = useQueries({
-    queries: selectedProjects.map((projectName) => {
-      return {
-        queryKey: [
-          "project-stats",
-          projectName,
-          format(new Date(), DATE_FORMAT),
-        ],
-        queryFn: async () => {
-          const sortedDownloads = sortByDate(
-            await fetchNPMDownloads(projectName),
-          ).slice(0, -1);
-          const groupedDownloads = groupByWeeks(sortedDownloads);
-
-          return {
-            projectName,
-            groupedByWeekData: groupedDownloads,
-            rawSortedData: sortedDownloads,
-          };
-        },
-      };
-    }),
-  });
-
-  function onSubmit(data: ComboboxFormValues) {
+  function onSubmit(data: ProjectsSearchFormValues) {
     toast({
       title: "You submitted the following values:",
       description: (
@@ -131,21 +62,7 @@ export function ComboboxForm() {
     form.setFocus("search");
   }
 
-  const chartConfig = useMemo(
-    () => getChartConfig(selectedProjectsStats),
-    [selectedProjectsStats],
-  );
-
-  const processedProjectsStats = useMemo(
-    () => prepareChartData(selectedProjectsStats),
-    [selectedProjectsStats],
-  );
   const hasExceededSelectedProjectsLimit = selectedProjects.length >= 10;
-
-  const processedProjectsTableStats = useMemo(
-    () => getStatsMatrix(selectedProjectsStats),
-    [selectedProjectsStats],
-  );
 
   return (
     <>
@@ -249,7 +166,6 @@ export function ComboboxForm() {
                 </FormItem>
               )}
             />
-            {/* message "You cannot select more than 10 projects" */}
             {hasExceededSelectedProjectsLimit && (
               <FormMessage className="text-xs text-destructive">
                 You cannot select more than 10 projects
@@ -288,96 +204,6 @@ export function ComboboxForm() {
           />
         </form>
       </Form>
-
-      <div className="w-full h-full mt-8">
-        <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
-      </div>
-
-      <div className="w-full h-full mt-8">
-        <h3 className="text-center">NPM downloads change by project</h3>
-        <div className="mt-2">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[150px]">Project name</TableHead>
-                <TableHead className="text-center">Weekly</TableHead>
-                <TableHead className="text-center">Monthly</TableHead>
-                <TableHead className="text-center">Yearly</TableHead>
-                <TableHead className="text-center">
-                  Today vs a year ago
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {processedProjectsTableStats.map((projectStats) => (
-                <TableRow key={projectStats.projectName}>
-                  <TableCell>{projectStats.projectName}</TableCell>
-                  <TableCell className="text-center">
-                    <span>
-                      {formatCellValue(
-                        projectStats.weeklyChange?.nominal,
-                        formatInteger,
-                      )}
-                    </span>
-                    <br />
-                    <span>
-                      {formatCellValue(
-                        projectStats.weeklyChange?.percentage,
-                        formatPercentage,
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span>
-                      {formatCellValue(
-                        projectStats.monthlyChange?.nominal,
-                        formatInteger,
-                      )}
-                    </span>
-                    <br />
-                    <span>
-                      {formatCellValue(
-                        projectStats.monthlyChange?.percentage,
-                        formatPercentage,
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span>
-                      {formatCellValue(
-                        projectStats.yearlyChange?.nominal,
-                        formatInteger,
-                      )}
-                    </span>
-                    <br />
-                    <span>
-                      {formatCellValue(
-                        projectStats.yearlyChange?.percentage,
-                        formatPercentage,
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span>
-                      {formatCellValue(
-                        projectStats.oneYearAgoChange?.nominal,
-                        formatInteger,
-                      )}
-                    </span>
-                    <br />
-                    <span>
-                      {formatCellValue(
-                        projectStats.oneYearAgoChange?.percentage,
-                        formatPercentage,
-                      )}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
     </>
   );
 }
