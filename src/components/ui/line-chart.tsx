@@ -70,7 +70,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
   }, [handleTimePeriodChange, timePeriod]);
 
   return (
-    <div className="h-full w-full space-y-2">
+    <div className="size-full space-y-2">
       <div>
         <Select
           value={timePeriod}
@@ -139,7 +139,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
         </ChartContainer>
         {isPending && (
           <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+            <div className="size-12 animate-spin rounded-full border-y-2 border-primary" />
           </div>
         )}
       </div>

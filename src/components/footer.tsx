@@ -3,9 +3,9 @@ import TextLink from "./ui/text-link";
 
 const Footer = () => {
   return (
-    <footer className="flex items-center justify-between border-t border-gray-200 py-8">
-      <div className="flex flex-col">
-        <span className="flex items-center">
+    <footer className="flex flex-col items-center gap-6 border-t border-gray-200 px-4 py-8 md:flex-row md:justify-between">
+      <div className="flex w-1/2 flex-col text-center md:text-left">
+        <span className="flex flex-wrap items-center justify-center md:justify-start">
           Created by Dominik Rycharski (
           <TextLink
             href="https://github.com/Doryski"
@@ -16,7 +16,7 @@ const Footer = () => {
           </TextLink>
           ).
         </span>
-        <span className="flex items-center">
+        <span className="flex flex-wrap items-center justify-center md:justify-start">
           For any questions, bugs or feature requests, please contact me through
           the contact form at{" "}
           <TextLink
@@ -37,14 +37,14 @@ const Footer = () => {
           .
         </span>
       </div>
-      <div className="flex flex-col items-end">
-        <span className="mb-2">If you find this project helpful:</span>
+      <div className="flex w-1/2 items-center gap-2">
+        <span>If you find this project helpful, consider:</span>
         <TextLink
           href="https://www.buymeacoffee.com/doryski"
           outside
-          className="inline-flex items-center bg-yellow-400 text-black px-4 py-2 rounded font-bold"
+          className="inline-flex items-center rounded bg-yellow-400 px-4 py-2 font-bold text-black"
         >
-          Buy me a coffee ☕
+          Buying me a coffee ☕
         </TextLink>
       </div>
     </footer>

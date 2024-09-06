@@ -27,8 +27,8 @@ export default function RootLayout({
         )}
       >
         <Providers>
-          <div className="flex flex-col min-h-screen px-8">
-            <main className="flex flex-col flex-grow py-8">{children}</main>
+          <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-8">
+            <main className="flex grow flex-col py-8">{children}</main>
             <Footer />
           </div>
           <Toaster />

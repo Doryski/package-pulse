@@ -34,7 +34,7 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
   );
 
   return (
-    <div className="w-full h-full mt-8">
+    <div className="mt-8 size-full">
       <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
     </div>
   );

@@ -5,7 +5,7 @@ type DotIndicatorProps = {
 const DotIndicator = ({ color }: DotIndicatorProps) => {
   return (
     <span
-      className={"h-2 w-2 rounded-full"}
+      className={"size-2 rounded-full"}
       style={{ backgroundColor: color }}
     />
   );

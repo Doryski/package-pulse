@@ -60,69 +60,71 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   );
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortableTableHead
-            className="w-[250px]"
-            column="projectName"
-            isSorted={sortColumn === "projectName"}
-            sortDirection={sortDirection}
-            handleSort={handleSort}
-          >
-            Project name
-          </SortableTableHead>
-          <SortableTableHead
-            column="weekly"
-            isSorted={sortColumn === "weekly"}
-            sortDirection={sortDirection}
-            handleSort={handleSort}
-          >
-            Weekly
-          </SortableTableHead>
-          <SortableTableHead
-            column="monthly"
-            isSorted={sortColumn === "monthly"}
-            sortDirection={sortDirection}
-            handleSort={handleSort}
-          >
-            Monthly
-          </SortableTableHead>
-          <SortableTableHead
-            column="yearly"
-            isSorted={sortColumn === "yearly"}
-            sortDirection={sortDirection}
-            handleSort={handleSort}
-          >
-            Yearly
-          </SortableTableHead>
-          <SortableTableHead
-            column="oneYearAgo"
-            isSorted={sortColumn === "oneYearAgo"}
-            sortDirection={sortDirection}
-            handleSort={handleSort}
-          >
-            Today vs a year ago
-          </SortableTableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {processedProjectsTableStats.map((projectStats) => (
-          <TableRow key={projectStats.projectName}>
-            <TableCell className="table-cell">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">{projectStats.projectName}</span>
-                <DotIndicator color={projectStats.color} />
-              </div>
-            </TableCell>
-            <TableCellWithStats change={projectStats.weeklyChange} />
-            <TableCellWithStats change={projectStats.monthlyChange} />
-            <TableCellWithStats change={projectStats.yearlyChange} />
-            <TableCellWithStats change={projectStats.oneYearAgoChange} />
+    <div className="relative overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SortableTableHead
+              className="sticky left-0 z-20 w-[250px] min-w-[150px] bg-background"
+              column="projectName"
+              isSorted={sortColumn === "projectName"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Project name
+            </SortableTableHead>
+            <SortableTableHead
+              column="weekly"
+              isSorted={sortColumn === "weekly"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Weekly
+            </SortableTableHead>
+            <SortableTableHead
+              column="monthly"
+              isSorted={sortColumn === "monthly"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Monthly
+            </SortableTableHead>
+            <SortableTableHead
+              column="yearly"
+              isSorted={sortColumn === "yearly"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Yearly
+            </SortableTableHead>
+            <SortableTableHead
+              column="oneYearAgo"
+              isSorted={sortColumn === "oneYearAgo"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Today vs a year ago
+            </SortableTableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {processedProjectsTableStats.map((projectStats) => (
+            <TableRow key={projectStats.projectName}>
+              <TableCell className="sticky left-0 z-10 table-cell bg-background">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{projectStats.projectName}</span>
+                  <DotIndicator color={projectStats.color} />
+                </div>
+              </TableCell>
+              <TableCellWithStats change={projectStats.weeklyChange} />
+              <TableCellWithStats change={projectStats.monthlyChange} />
+              <TableCellWithStats change={projectStats.yearlyChange} />
+              <TableCellWithStats change={projectStats.oneYearAgoChange} />
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 

@@ -16,7 +16,7 @@ const Tag = ({ children, onRemove, ...props }: TagProps) => {
         props.className,
       )}
     >
-      <Cross1Icon className="h-3 w-3 cursor-pointer" onClick={onRemove} />
+      <Cross1Icon className="size-3 cursor-pointer" onClick={onRemove} />
       {children}
     </div>
   );

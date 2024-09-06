@@ -21,7 +21,7 @@ type TableSectionProps = {
 
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
   return (
-    <div className="w-full h-full mt-8">
+    <div className="mt-8 size-full">
       <h3 className="text-center">NPM downloads change by project</h3>
       <div className="mt-2">
         <ProjectsStatsTable projectsStats={projectsStats} />

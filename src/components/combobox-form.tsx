@@ -63,14 +63,14 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-        <div className="flex gap-2 items-center">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
           <FormField
             control={form.control}
             name="search"
             disabled={hasExceededSelectedProjectsLimit}
             render={({ field }) => (
-              <FormItem className="flex flex-col">
+              <FormItem className="w-full grow sm:w-auto sm:flex-initial">
                 <Popover
                   open={isPopoverOpen}
                   onOpenChange={(isOpen) =>
@@ -79,7 +79,7 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
                 >
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <div className="relative">
+                      <div className="relative w-full sm:w-[200px]">
                         <FormLabel
                           className={cn(
                             "absolute -top-3 left-2 z-10 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
@@ -117,7 +117,7 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
                   </PopoverTrigger>
                   <PopoverContent
                     className={cn(
-                      "w-[200px] p-0",
+                      "w-full sm:w-[200px] p-0",
                       !debouncedSearch && "hidden",
                     )}
                     onOpenAutoFocus={(e) => e.preventDefault()}
