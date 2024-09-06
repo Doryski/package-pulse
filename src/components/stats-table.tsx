@@ -3,7 +3,10 @@ import formatInteger from "@/lib/utils/formatNominal";
 import formatPercentage from "@/lib/utils/formatPercentage";
 import getStatsMatrix from "@/lib/utils/getStatsMatrix";
 import { UseQueryResult } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { useMemo } from "react";
+import ArrowIndicator from "./ui/arrow-indicator";
+import DotIndicator from "./ui/dot-indicator";
 import {
   Table,
   TableBody,
@@ -31,9 +34,10 @@ type ProjectStats = UseQueryResult<
 type ProjectsStatsTableProps = { projectsStats: ProjectStats[] };
 
 const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
+  const { theme } = useTheme();
   const processedProjectsTableStats = useMemo(
-    () => getStatsMatrix(projectsStats),
-    [projectsStats],
+    () => getStatsMatrix(projectsStats, theme),
+    [projectsStats, theme],
   );
 
   return (
@@ -50,66 +54,89 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
       <TableBody>
         {processedProjectsTableStats.map((projectStats) => (
           <TableRow key={projectStats.projectName}>
-            <TableCell>{projectStats.projectName}</TableCell>
-            <TableCell className="text-center">
-              <span>
-                {formatCellValue(
-                  projectStats.weeklyChange?.nominal,
-                  formatInteger,
-                )}
-              </span>
-              <br />
-              <span>
-                {formatCellValue(
-                  projectStats.weeklyChange?.percentage,
-                  formatPercentage,
-                )}
-              </span>
+            <TableCell className="table-cell">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{projectStats.projectName}</span>
+                <DotIndicator color={projectStats.color} />
+              </div>
             </TableCell>
-            <TableCell className="text-center">
-              <span>
-                {formatCellValue(
-                  projectStats.monthlyChange?.nominal,
-                  formatInteger,
-                )}
-              </span>
-              <br />
-              <span>
-                {formatCellValue(
-                  projectStats.monthlyChange?.percentage,
-                  formatPercentage,
-                )}
-              </span>
+            <TableCell className="table-cell text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col">
+                  <span>
+                    {formatCellValue(
+                      projectStats.weeklyChange?.nominal,
+                      formatInteger,
+                    )}
+                  </span>
+                  <span>
+                    {formatCellValue(
+                      projectStats.weeklyChange?.percentage,
+                      formatPercentage,
+                    )}
+                  </span>
+                </div>
+                <ArrowIndicator value={projectStats.weeklyChange?.nominal} />
+              </div>
             </TableCell>
-            <TableCell className="text-center">
-              <span>
-                {formatCellValue(
-                  projectStats.yearlyChange?.nominal,
-                  formatInteger,
-                )}
-              </span>
-              <br />
-              <span>
-                {formatCellValue(
-                  projectStats.yearlyChange?.percentage,
-                  formatPercentage,
-                )}
-              </span>
+            <TableCell className="table-cell text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col">
+                  <span>
+                    {formatCellValue(
+                      projectStats.monthlyChange?.nominal,
+                      formatInteger,
+                    )}
+                  </span>
+                  <span>
+                    {formatCellValue(
+                      projectStats.monthlyChange?.percentage,
+                      formatPercentage,
+                    )}
+                  </span>
+                </div>
+                <ArrowIndicator value={projectStats.monthlyChange?.nominal} />
+              </div>
             </TableCell>
-            <TableCell className="text-center">
-              <span>
-                {formatCellValue(
-                  projectStats.oneYearAgoChange?.nominal,
-                  formatInteger,
-                )}
-              </span>
-              <br />
-              <span>
-                {formatCellValue(
-                  projectStats.oneYearAgoChange?.percentage,
-                  formatPercentage,
-                )}
-              </span>
+            <TableCell className="table-cell text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col">
+                  <span>
+                    {formatCellValue(
+                      projectStats.yearlyChange?.nominal,
+                      formatInteger,
+                    )}
+                  </span>
+                  <span>
+                    {formatCellValue(
+                      projectStats.yearlyChange?.percentage,
+                      formatPercentage,
+                    )}
+                  </span>
+                </div>
+                <ArrowIndicator value={projectStats.yearlyChange?.nominal} />
+              </div>
+            </TableCell>
+            <TableCell className="table-cell text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col">
+                  <span>
+                    {formatCellValue(
+                      projectStats.oneYearAgoChange?.nominal,
+                      formatInteger,
+                    )}
+                  </span>
+                  <span>
+                    {formatCellValue(
+                      projectStats.oneYearAgoChange?.percentage,
+                      formatPercentage,
+                    )}
+                  </span>
+                </div>
+                <ArrowIndicator
+                  value={projectStats.oneYearAgoChange?.nominal}
+                />
+              </div>
             </TableCell>
           </TableRow>
         ))}

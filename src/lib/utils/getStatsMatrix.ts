@@ -1,6 +1,7 @@
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import { format } from "date-fns";
 import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
+import getChartColor from "./getChartColor";
 import getLastYearsMostAdequateDay from "./getLastYearsMostAdequateDay";
 import getPercentChange from "./getPercentChange";
 import { groupStats } from "./groupByPeriod";
@@ -11,6 +12,7 @@ type StatChange = {
 };
 type StatsRow = {
   projectName: string;
+  color: string | undefined;
   weeklyChange: StatChange | null;
   monthlyChange: StatChange | null;
   yearlyChange: StatChange | null;
@@ -21,12 +23,16 @@ type StatsRow = {
       })
     | null;
 };
-export default function getStatsMatrix(stats: SelectedProjectsStatsQueries) {
-  return stats.reduce<StatsRow[]>((acc, query) => {
+export default function getStatsMatrix(
+  stats: SelectedProjectsStatsQueries,
+  theme: string | undefined,
+) {
+  return stats.reduce<StatsRow[]>((acc, query, index) => {
     const projectName = query.data?.projectName;
     if (!projectName || !query.data) {
       return acc;
     }
+    const color = getChartColor(theme, index);
     const groupedStats = groupStats(query.data?.rawSortedData);
     const currentFullWeek = groupedStats.byWeeks.slice(-2)[0];
     const previousFullWeek = groupedStats.byWeeks.slice(-3)[0];
@@ -101,6 +107,7 @@ export default function getStatsMatrix(stats: SelectedProjectsStatsQueries) {
       monthlyChange,
       yearlyChange,
       oneYearAgoChange,
+      color,
     });
     return acc;
   }, []);
