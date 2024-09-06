@@ -1,6 +1,6 @@
 import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils/cn";
-import { PropsWithChildren } from "react";
+import { memo, PropsWithChildren } from "react";
 
 export type SortColumn =
   | "projectName"
@@ -19,28 +19,32 @@ type SortableTableHeadProps = PropsWithChildren<
   } & React.ThHTMLAttributes<HTMLTableCellElement>
 >;
 
-const SortableTableHead = ({
-  column,
-  children,
-  handleSort,
-  isSorted,
-  sortDirection,
-  ...props
-}: SortableTableHeadProps) => {
-  return (
-    <TableHead
-      className={cn("text-center cursor-pointer", props.className)}
-      onClick={() => handleSort(column)}
-      {...props}
-    >
-      <div className="flex items-center justify-center gap-2">
-        {children}
-        <span className="text-sm">
-          {isSorted && (sortDirection === "desc" ? "▼" : "▲")}
-        </span>
-      </div>
-    </TableHead>
-  );
-};
+const SortableTableHead = memo(
+  ({
+    column,
+    children,
+    handleSort,
+    isSorted,
+    sortDirection,
+    ...props
+  }: SortableTableHeadProps) => {
+    return (
+      <TableHead
+        className={cn("text-center cursor-pointer", props.className)}
+        onClick={() => handleSort(column)}
+        {...props}
+      >
+        <div className="flex items-center justify-center gap-2">
+          {children}
+          <span className="text-sm">
+            {isSorted && (sortDirection === "desc" ? "▼" : "▲")}
+          </span>
+        </div>
+      </TableHead>
+    );
+  },
+);
+
+SortableTableHead.displayName = "SortableTableHead";
 
 export default SortableTableHead;

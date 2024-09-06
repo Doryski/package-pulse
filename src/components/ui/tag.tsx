@@ -7,8 +7,6 @@ type TagProps = {
 } & React.HTMLAttributes<HTMLDivElement>;
 
 const Tag = ({ children, onRemove, ...props }: TagProps) => {
-  console.log(props.style?.border);
-
   return (
     <div
       {...props}

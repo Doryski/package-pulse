@@ -6,7 +6,7 @@ import getLastYearsMostAdequateDay from "./getLastYearsMostAdequateDay";
 import getPercentChange from "./getPercentChange";
 import { groupStats } from "./groupByPeriod";
 
-type StatChange = {
+export type StatChange = {
   nominal: number;
   percentage: number;
 };
