@@ -37,6 +37,16 @@ const Footer = () => {
           .
         </span>
       </div>
+      <div className="flex flex-col items-end">
+        <span className="mb-2">If you find this project helpful:</span>
+        <TextLink
+          href="https://www.buymeacoffee.com/doryski"
+          outside
+          className="inline-flex items-center bg-yellow-400 text-black px-4 py-2 rounded font-bold"
+        >
+          Buy me a coffee ☕
+        </TextLink>
+      </div>
     </footer>
   );
 };
