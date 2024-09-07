@@ -10,11 +10,11 @@ export default function prepareChartData(stats: SelectedProjectsStatsQueries) {
         if (existingData) {
           existingData[project.data.projectName] = data.count;
         } else {
-          // @ts-ignore
-          acc.push({
+          const newData = {
             time: data.date,
             [project.data.projectName]: data.count,
-          });
+          } as ChartData;
+          acc.push(newData);
         }
       });
     }

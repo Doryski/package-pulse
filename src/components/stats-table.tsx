@@ -29,7 +29,7 @@ type ProjectsStatsTableProps = { projectsStats: ProjectStats[] };
 
 const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   const { theme } = useTheme();
-  const [sortColumn, setSortColumn] = useState<SortColumn>("weekly");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("oneYearAgo");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const processedProjectsTableStats = useMemo(() => {
@@ -65,7 +65,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableHeader>
           <TableRow>
             <SortableTableHead
-              className="sticky left-0 z-20 w-[250px] min-w-[150px] bg-background"
+              className="sticky left-0 z-20 w-[250px] min-w-[150px] cursor-pointer"
               column="projectName"
               isSorted={sortColumn === "projectName"}
               sortDirection={sortDirection}
@@ -110,7 +110,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableBody>
           {processedProjectsTableStats.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
-              <TableCell className="sticky left-0 z-10 table-cell bg-background">
+              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">{projectStats.projectName}</span>
                   <DotIndicator color={projectStats.color} />
