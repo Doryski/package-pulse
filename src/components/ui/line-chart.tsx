@@ -10,6 +10,7 @@ import {
 import TimePeriod from "@/lib/enums/TimePeriod";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
+import normalizeProjectName from "@/lib/utils/normalizeProjectName";
 import { format, isAfter, subMonths, subYears } from "date-fns";
 import { memo, useCallback, useEffect, useState, useTransition } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
@@ -125,16 +126,19 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
               data[0] &&
               Object.keys(data[0])
                 .filter((key) => key !== "time")
-                .map((key) => (
-                  <Line
-                    key={key}
-                    dataKey={key}
-                    type="monotone"
-                    stroke={`var(--color-${key})`}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                ))}
+                .map((key) => {
+                  const normalizedKey = normalizeProjectName(key);
+                  return (
+                    <Line
+                      key={normalizedKey}
+                      dataKey={normalizedKey}
+                      type="monotone"
+                      stroke={`var(--color-${normalizedKey})`}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  );
+                })}
           </LineChart>
         </ChartContainer>
         {isPending && (
