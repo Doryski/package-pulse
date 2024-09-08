@@ -1,14 +1,20 @@
-import getStatsMatrix from "@/lib/utils/getStatsMatrix";
+import DotIndicator from "@/components/ui/dot-indicator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import TableCellWithStats from "@/components/ui/table-cell-with-stats";
+import TableHeadSortable, {
+  SortColumn,
+  SortDirection,
+} from "@/components/ui/table-head-sortable";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useCallback, useMemo, useState } from "react";
-import SortableTableHead, {
-  SortColumn,
-  SortDirection,
-} from "./sortable-table-head";
-import TableCellWithStats from "./table-cell-with-stats";
-import DotIndicator from "./ui/dot-indicator";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "./ui/table";
+import getStatsMatrix from "../utils/getStatsMatrix";
 
 type ProjectStats = UseQueryResult<
   {
@@ -64,7 +70,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableTableHead
+            <TableHeadSortable
               className="sticky left-0 z-20 w-[250px] min-w-[150px] cursor-pointer"
               column="projectName"
               isSorted={sortColumn === "projectName"}
@@ -72,39 +78,39 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
               handleSort={handleSort}
             >
               Project name
-            </SortableTableHead>
-            <SortableTableHead
+            </TableHeadSortable>
+            <TableHeadSortable
               column="weekly"
               isSorted={sortColumn === "weekly"}
               sortDirection={sortDirection}
               handleSort={handleSort}
             >
               Weekly
-            </SortableTableHead>
-            <SortableTableHead
+            </TableHeadSortable>
+            <TableHeadSortable
               column="monthly"
               isSorted={sortColumn === "monthly"}
               sortDirection={sortDirection}
               handleSort={handleSort}
             >
               Monthly
-            </SortableTableHead>
-            <SortableTableHead
+            </TableHeadSortable>
+            <TableHeadSortable
               column="yearly"
               isSorted={sortColumn === "yearly"}
               sortDirection={sortDirection}
               handleSort={handleSort}
             >
               Yearly
-            </SortableTableHead>
-            <SortableTableHead
+            </TableHeadSortable>
+            <TableHeadSortable
               column="oneYearAgo"
               isSorted={sortColumn === "oneYearAgo"}
               sortDirection={sortDirection}
               handleSort={handleSort}
             >
               Today vs a year ago
-            </SortableTableHead>
+            </TableHeadSortable>
           </TableRow>
         </TableHeader>
         <TableBody>

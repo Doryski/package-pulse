@@ -1,6 +1,7 @@
 "use client";
 
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
+import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   ChartConfig,
   ChartContainer,
@@ -10,7 +11,6 @@ import {
 import TimePeriod from "@/lib/enums/TimePeriod";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
-import normalizeProjectName from "@/lib/utils/normalizeProjectName";
 import { format, isAfter, subMonths, subYears } from "date-fns";
 import { memo, useCallback, useEffect, useState, useTransition } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";

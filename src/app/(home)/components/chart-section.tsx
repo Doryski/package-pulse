@@ -1,9 +1,9 @@
 "use client";
-import getChartConfig from "@/lib/utils/getChartConfig";
-import prepareChartData from "@/lib/utils/prepareChartData";
+import getChartConfig from "@/app/(home)/utils/getChartConfig";
+import MultipleLineChart from "@/components/ui/line-chart";
 import { UseQueryResult } from "@tanstack/react-query";
 import { memo, useMemo } from "react";
-import MultipleLineChart from "./ui/line-chart";
+import prepareChartData from "../utils/prepareChartData";
 
 type ChartSectionProps = {
   projectStats: UseQueryResult<

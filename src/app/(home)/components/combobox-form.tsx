@@ -1,11 +1,11 @@
 "use client";
+import ClientOnly from "@/components/ui/client-only";
+import { Combobox } from "@/components/ui/combobox";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
 import { UseFormReturn } from "react-hook-form";
-import ClientOnly from "./client-only";
 import ProjectTag from "./project-tag";
-import { ProjectsSearchFormValues } from "./projects-form/utils";
-import { Combobox } from "./ui/combobox";
+import { ProjectsSearchFormValues } from "./projects-form/schema";
 
 type ComboboxFormProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;

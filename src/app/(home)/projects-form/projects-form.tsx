@@ -4,12 +4,12 @@ import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { ComboboxForm } from "./combobox-form";
+import { ComboboxForm } from "../components/combobox-form";
 import {
   ProjectsSearchFormSchema,
   ProjectsSearchFormValues,
-} from "./projects-form/utils";
-import StatsSection from "./stats-section";
+} from "../components/projects-form/schema";
+import StatsSection from "../components/stats-section";
 
 const ProjectsForm = () => {
   const projectsSearchForm = useForm<ProjectsSearchFormValues>({

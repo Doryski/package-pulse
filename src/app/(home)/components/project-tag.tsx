@@ -1,6 +1,6 @@
+import Tag from "@/components/ui/tag";
 import getChartColor from "@/lib/utils/getChartColor";
 import { useTheme } from "next-themes";
-import Tag from "./ui/tag";
 
 type ProjectTagProps = {
   project: string;

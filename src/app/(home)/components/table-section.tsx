@@ -1,6 +1,6 @@
 import { UseQueryResult } from "@tanstack/react-query";
 import { memo } from "react";
-import ProjectsStatsTable from "./stats-table";
+import ProjectsStatsTable from "./projects-stats-table";
 
 type TableSectionProps = {
   projectsStats: UseQueryResult<

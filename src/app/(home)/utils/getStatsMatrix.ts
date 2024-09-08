@@ -1,10 +1,10 @@
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import { format } from "date-fns";
+import getChartColor from "../../../lib/utils/getChartColor";
+import getLastYearsMostAdequateDay from "../../../lib/utils/getLastYearsMostAdequateDay";
+import getPercentChange from "../../../lib/utils/getPercentChange";
+import { groupStats } from "../../../lib/utils/groupByPeriod";
 import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
-import getChartColor from "./getChartColor";
-import getLastYearsMostAdequateDay from "./getLastYearsMostAdequateDay";
-import getPercentChange from "./getPercentChange";
-import { groupStats } from "./groupByPeriod";
 
 export type StatChange = {
   nominal: number;

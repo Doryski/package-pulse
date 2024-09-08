@@ -1,10 +1,10 @@
+import { StatChange } from "@/app/(home)/utils/getStatsMatrix";
 import formatCellValue from "@/lib/utils/formatCellValue";
-import formatInteger from "@/lib/utils/formatNominal";
+import formatInteger from "@/lib/utils/formatInteger";
 import formatPercentage from "@/lib/utils/formatPercentage";
-import { StatChange } from "@/lib/utils/getStatsMatrix";
 import { memo } from "react";
-import ArrowIndicator from "./ui/arrow-indicator";
-import { TableCell } from "./ui/table";
+import ArrowIndicator from "./arrow-indicator";
+import { TableCell } from "./table";
 
 type TableCellWithStatsProps = {
   change: StatChange | null;

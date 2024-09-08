@@ -10,7 +10,7 @@ export type SortColumn =
   | "oneYearAgo";
 export type SortDirection = "asc" | "desc";
 
-type SortableTableHeadProps = PropsWithChildren<
+type TableHeadSortableProps = PropsWithChildren<
   {
     column: SortColumn;
     handleSort: (column: SortColumn) => void;
@@ -19,7 +19,7 @@ type SortableTableHeadProps = PropsWithChildren<
   } & React.ThHTMLAttributes<HTMLTableCellElement>
 >;
 
-const SortableTableHead = memo(
+const TableHeadSortable = memo(
   ({
     column,
     children,
@@ -27,7 +27,7 @@ const SortableTableHead = memo(
     isSorted,
     sortDirection,
     ...props
-  }: SortableTableHeadProps) => {
+  }: TableHeadSortableProps) => {
     return (
       <TableHead
         className={cn("text-center cursor-pointer", props.className)}
@@ -45,6 +45,6 @@ const SortableTableHead = memo(
   },
 );
 
-SortableTableHead.displayName = "SortableTableHead";
+TableHeadSortable.displayName = "SortableTableHead";
 
-export default SortableTableHead;
+export default TableHeadSortable;

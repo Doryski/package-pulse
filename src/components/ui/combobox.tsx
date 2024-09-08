@@ -1,5 +1,6 @@
 "use client";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
+import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
 import {
   FormControl,
   FormField,
@@ -18,7 +19,6 @@ import { cn } from "@/lib/utils/cn";
 import { CheckIcon } from "@radix-ui/react-icons";
 import { useQuery } from "@tanstack/react-query";
 import { UseFormReturn } from "react-hook-form";
-import { ProjectsSearchFormValues } from "../projects-form/utils";
 import { Input } from "./input";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./list";
 
