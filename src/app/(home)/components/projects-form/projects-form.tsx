@@ -1,6 +1,7 @@
 "use client";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import { cn } from "@/lib/utils/cn";
 import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -8,7 +9,7 @@ import {
   useInitialProjectsFromSearchParams,
   useUpdateSearchParams,
 } from "../../utils/search-params";
-import { ComboboxForm } from "../combobox-form";
+import ComboboxForm from "../combobox-form";
 import StatsSection from "../stats-section";
 import { ProjectsSearchFormSchema, ProjectsSearchFormValues } from "./schema";
 
@@ -38,10 +39,16 @@ const ProjectsForm = () => {
   useUpdateSearchParams(selectedProjects, PROJECTS_URL_DELIMITER);
 
   return (
-    <>
+    <div
+      className={cn(
+        "flex flex-col py-16",
+        selectedProjects.length === 0 &&
+          "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+      )}
+    >
       <ComboboxForm form={projectsSearchForm} />
       <StatsSection selectedProjects={selectedProjects} />
-    </>
+    </div>
   );
 };
 

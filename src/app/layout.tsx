@@ -1,8 +1,9 @@
-import Footer from "@/components/footer";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Footer from "./(footer)/footer";
+import Header from "./(header)/header";
 import "./globals.css";
 import Providers from "./providers";
 
@@ -28,7 +29,8 @@ export default function RootLayout({
       >
         <Providers>
           <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-8">
-            <main className="flex grow flex-col py-8">{children}</main>
+            <Header />
+            <main className="relative flex grow flex-col">{children}</main>
             <Footer />
           </div>
           <Toaster />

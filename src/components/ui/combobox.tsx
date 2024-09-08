@@ -70,7 +70,7 @@ export function Combobox({ form, disabled }: ComboboxProps) {
           >
             <PopoverTrigger asChild>
               <FormControl>
-                <div className="relative w-full sm:w-[200px]">
+                <div className="relative w-full sm:w-[600px]">
                   <FormLabel
                     className={cn(
                       "absolute -top-3 left-2 z-10 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
@@ -87,7 +87,7 @@ export function Combobox({ form, disabled }: ComboboxProps) {
                     placeholder="Search project..."
                     autoComplete="off"
                     className={cn(
-                      "w-[200px] justify-between",
+                      "w-[600px] justify-between",
                       !field.value && "text-muted-foreground",
                     )}
                     autoFocus
@@ -108,7 +108,7 @@ export function Combobox({ form, disabled }: ComboboxProps) {
             </PopoverTrigger>
             <PopoverContent
               className={cn(
-                "w-full sm:w-[200px] p-0",
+                "w-full sm:w-[600px] p-0",
                 !debouncedSearch && "hidden",
               )}
               onOpenAutoFocus={(e) => e.preventDefault()}

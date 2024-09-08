@@ -1,6 +1,7 @@
 "use client";
 import getChartConfig from "@/app/(home)/utils/getChartConfig";
 import MultipleLineChart from "@/components/ui/line-chart";
+import { cn } from "@/lib/utils/cn";
 import { UseQueryResult } from "@tanstack/react-query";
 import { memo, useMemo } from "react";
 import prepareChartData from "../utils/prepareChartData";
@@ -34,7 +35,12 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
   );
 
   return (
-    <div className="mt-8 size-full">
+    <div
+      className={cn(
+        "mt-16 size-full",
+        processedProjectsStats.length === 0 && "hidden",
+      )}
+    >
       <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
     </div>
   );

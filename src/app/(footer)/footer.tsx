@@ -1,9 +1,9 @@
+import TextLink from "@/components/ui/text-link";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import TextLink from "./ui/text-link";
 
 const Footer = () => {
   return (
-    <footer className="flex flex-col items-start gap-2 border-t border-gray-200 py-8">
+    <footer className="flex flex-col items-start gap-2 border-t border-gray-200 py-16">
       <span className="inline-flex items-center justify-center sm:flex-wrap md:justify-start">
         Created by Dominik Rycharski (
         <TextLink

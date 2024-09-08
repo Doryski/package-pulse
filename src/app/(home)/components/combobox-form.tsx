@@ -3,6 +3,7 @@ import ClientOnly from "@/components/ui/client-only";
 import { Combobox } from "@/components/ui/combobox";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
+import { cn } from "@/lib/utils/cn";
 import { UseFormReturn } from "react-hook-form";
 import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
@@ -11,7 +12,7 @@ type ComboboxFormProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;
 };
 
-export function ComboboxForm({ form }: ComboboxFormProps) {
+const ComboboxForm = ({ form }: ComboboxFormProps) => {
   const selectedProjects = form.watch("projects");
 
   function onSubmit(_data: ProjectsSearchFormValues) {}
@@ -21,8 +22,11 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex flex-col gap-4"
+      >
+        <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
           <Combobox form={form} disabled={hasExceededSelectedProjectsLimit} />
           {hasExceededSelectedProjectsLimit && (
             <FormMessage className="text-xs text-destructive">
@@ -35,13 +39,13 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
           control={form.control}
           name="projects"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={cn(selectedProjects.length === 0 && "hidden")}>
               <div className="flex flex-wrap gap-2">
-                {field.value.map((project, idx) => (
+                {field.value.map((project) => (
                   <ClientOnly key={project}>
                     <ProjectTag
                       project={project}
-                      colorIndex={idx + 1}
+                      colorIndex={field.value.indexOf(project)}
                       onRemove={() =>
                         form.setValue(
                           "projects",
@@ -58,4 +62,6 @@ export function ComboboxForm({ form }: ComboboxFormProps) {
       </form>
     </Form>
   );
-}
+};
+
+export default ComboboxForm;

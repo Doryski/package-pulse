@@ -101,7 +101,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
             accessibilityLayer
             data={chartData}
             margin={{
-              left: 24,
+              left: 28,
               right: 12,
             }}
           >
