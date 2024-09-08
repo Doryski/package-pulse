@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils/cn";
 import { UseQueryResult } from "@tanstack/react-query";
 import { memo } from "react";
 import ProjectsStatsTable from "./projects-stats-table";
@@ -20,8 +21,16 @@ type TableSectionProps = {
 };
 
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
+  const isLoading = projectsStats.some((project) => project.isLoading);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <div className="mt-8 size-full">
+    <div
+      className={cn("mt-8 size-full", projectsStats.length === 0 && "hidden")}
+    >
       <h3 className="text-center">NPM downloads change by project</h3>
       <div className="mt-2">
         <ProjectsStatsTable projectsStats={projectsStats} />

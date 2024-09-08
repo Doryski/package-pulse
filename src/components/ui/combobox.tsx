@@ -1,6 +1,7 @@
 "use client";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
+import { encodeProjectName } from "@/app/(home)/utils/search-params";
 import {
   FormControl,
   FormField,
@@ -42,13 +43,16 @@ export function Combobox({ form, disabled }: ComboboxProps) {
   const selectedProjects = form.watch("projects");
 
   function handleComboboxItemClick(projectName: string) {
-    if (selectedProjects.includes(projectName)) {
+    const encodedProjectName = encodeProjectName(projectName);
+    console.log({ selectedProjects, encodedProjectName });
+
+    if (selectedProjects.includes(encodedProjectName)) {
       form.setValue(
         "projects",
-        selectedProjects.filter((project) => project !== projectName),
+        selectedProjects.filter((project) => project !== encodedProjectName),
       );
     } else {
-      form.setValue("projects", [...selectedProjects, projectName]);
+      form.setValue("projects", [...selectedProjects, encodedProjectName]);
     }
     form.setFocus("search");
   }

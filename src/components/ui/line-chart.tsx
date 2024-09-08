@@ -71,7 +71,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
   }, [handleTimePeriodChange, timePeriod]);
 
   return (
-    <div className="size-full space-y-2">
+    <div className={cn("size-full space-y-2", data.length === 0 && "hidden")}>
       <div>
         <Select
           value={timePeriod}
@@ -94,7 +94,6 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
       <div
         className={cn(
           "relative mx-auto w-full h-full max-w-[900px] max-h-[600px]",
-          data.length === 0 && "hidden",
         )}
       >
         <ChartContainer config={config}>

@@ -118,8 +118,8 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
             <TableRow key={projectStats.projectName}>
               <TableCell className="sticky left-0 z-10 table-cell cursor-pointer">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">{projectStats.projectName}</span>
                   <DotIndicator color={projectStats.color} />
+                  <span className="text-sm">{projectStats.projectName}</span>
                 </div>
               </TableCell>
               <TableCellWithStats change={projectStats.weeklyChange} />
