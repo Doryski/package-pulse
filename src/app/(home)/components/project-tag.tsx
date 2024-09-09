@@ -9,8 +9,8 @@ type ProjectTagProps = {
 };
 
 const ProjectTag = ({ project, onRemove, colorIndex }: ProjectTagProps) => {
-  const { theme } = useTheme();
-  const color = getChartColor(theme, colorIndex);
+  const { resolvedTheme } = useTheme();
+  const color = getChartColor(resolvedTheme, colorIndex);
 
   return (
     <Tag

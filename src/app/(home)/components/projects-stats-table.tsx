@@ -34,12 +34,12 @@ type ProjectStats = UseQueryResult<
 type ProjectsStatsTableProps = { projectsStats: ProjectStats[] };
 
 const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [sortColumn, setSortColumn] = useState<SortColumn>("oneYearAgo");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const processedProjectsTableStats = useMemo(() => {
-    const stats = getStatsMatrix(projectsStats, theme);
+    const stats = getStatsMatrix(projectsStats, resolvedTheme);
     return stats.toSorted((a, b) => {
       if (sortColumn === "projectName") {
         return sortDirection === "desc"
@@ -51,7 +51,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
       }
     });
-  }, [projectsStats, theme, sortColumn, sortDirection]);
+  }, [projectsStats, resolvedTheme, sortColumn, sortDirection]);
 
   const handleSort = useCallback(
     (column: SortColumn) => {

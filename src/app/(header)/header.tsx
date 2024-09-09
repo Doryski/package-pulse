@@ -1,4 +1,5 @@
 import Logo from "@/components/logo";
+import ThemeSwitch from "@/components/ui/theme-switch";
 
 const Header = () => {
   return (
@@ -6,6 +7,7 @@ const Header = () => {
       <a href="/">
         <Logo />
       </a>
+      <ThemeSwitch />
     </header>
   );
 };

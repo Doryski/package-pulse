@@ -3,7 +3,7 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 const Footer = () => {
   return (
-    <footer className="flex flex-col items-start gap-2 border-t border-gray-200 py-16">
+    <footer className="flex flex-col items-start gap-2 border-t border-gray-200 py-16 dark:border-gray-800">
       <span className="inline-flex items-center justify-center sm:flex-wrap md:justify-start">
         Created by Dominik Rycharski (
         <TextLink
@@ -11,7 +11,7 @@ const Footer = () => {
           className="inline-flex items-center gap-1 px-0.5"
           outside
         >
-          <GitHubLogoIcon className="text-black" /> Doryski
+          <GitHubLogoIcon className="text-black dark:text-white" /> Doryski
         </TextLink>
         ).
       </span>
@@ -28,7 +28,8 @@ const Footer = () => {
           outside
           className="inline-flex items-center gap-1 px-1"
         >
-          <GitHubLogoIcon className="text-black" /> Github repository
+          <GitHubLogoIcon className="text-black dark:text-white" /> Github
+          repository
         </TextLink>
         .
       </span>
