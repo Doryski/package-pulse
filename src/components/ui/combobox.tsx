@@ -44,7 +44,6 @@ export function Combobox({ form, disabled }: ComboboxProps) {
 
   function handleComboboxItemClick(projectName: string) {
     const encodedProjectName = encodeProjectName(projectName);
-    console.log({ selectedProjects, encodedProjectName });
 
     if (selectedProjects.includes(encodedProjectName)) {
       form.setValue(

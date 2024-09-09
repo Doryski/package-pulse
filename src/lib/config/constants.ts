@@ -1,1 +1,1 @@
-export const MAX_SELECTED_PROJECTS = 5;
+export const MAX_SELECTED_PROJECTS = 10;
