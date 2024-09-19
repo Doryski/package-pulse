@@ -2,6 +2,7 @@ import {
   NPMDownloadCount,
   NPMDownloadPeriodSchema,
 } from "@/lib/schemas/npmDownloadsPeriod";
+import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import { format, isValid, parseISO, startOfToday } from "date-fns";
 export const NPM_API_FIRST_DAY = "2015-01-10";
@@ -39,16 +40,19 @@ export default async function fetchNPMDownloads(
 
   for (const result of results) {
     if (result.status === "fulfilled") {
+      if (result.value.status === 404) {
+        throw new AppError(`Package "${packageName}" not found`);
+      }
       const data = await result.value.json();
 
       try {
         const { downloads } = NPMDownloadPeriodSchema.parse(data);
         downloadsByDate.push(...downloads);
       } catch (error) {
-        console.error("download data parsing error");
+        throw new AppError("Received invalid data from NPM API");
       }
     } else {
-      console.error("download data fetching error", result.reason);
+      throw new AppError(`Unknown error while fetching NPM download data`);
     }
   }
 

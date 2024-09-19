@@ -71,13 +71,19 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
   }, [handleTimePeriodChange, timePeriod]);
 
   return (
-    <div className={cn("size-full space-y-2", data.length === 0 && "hidden")}>
-      <div>
+    <div
+      className={cn(
+        "size-full flex flex-col gap-8",
+        data.length === 0 && "hidden",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <label htmlFor="time-period-select">Time period</label>
         <Select
           value={timePeriod}
           onValueChange={(value) => setTimePeriod(value as TimePeriod)}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger id="time-period-select" className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -141,7 +147,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           </LineChart>
         </ChartContainer>
         {isPending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/65">
             <div className="size-12 animate-spin rounded-full border-y-2 border-primary" />
           </div>
         )}

@@ -11,7 +11,7 @@ const TextLink = ({ children, outside, ...props }: TextLinkProps) => {
       rel={outside ? "noopener noreferrer" : undefined}
       {...props}
       className={cn(
-        "text-blue-500 hover:underline hover:text-blue-600",
+        "inline-flex items-center gap-1 text-blue-500 hover:underline",
         props.className,
       )}
     >

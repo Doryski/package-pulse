@@ -2,20 +2,19 @@
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "next-themes";
+import ClientOnly from "./client-only";
 
 const ThemeSwitch = () => {
   const { theme, setTheme } = useTheme();
 
   return (
-    <SelectGroup className="flex items-center space-x-2">
-      <SelectLabel className="text-sm font-medium">Theme:</SelectLabel>
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium">Theme:</label>
       <Select value={theme} onValueChange={(value) => setTheme(value)}>
         <SelectTrigger className="w-24">
           <SelectValue placeholder="Select theme" />
@@ -26,8 +25,14 @@ const ThemeSwitch = () => {
           <SelectItem value="light">Light</SelectItem>
         </SelectContent>
       </Select>
-    </SelectGroup>
+    </div>
   );
 };
 
-export default ThemeSwitch;
+const ThemeSwitchClientOnly = () => (
+  <ClientOnly>
+    <ThemeSwitch />
+  </ClientOnly>
+);
+
+export default ThemeSwitchClientOnly;

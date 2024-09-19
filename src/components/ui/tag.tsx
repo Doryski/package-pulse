@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils/cn";
 import { Cross1Icon } from "@radix-ui/react-icons";
+import { Button } from "./button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 type TagProps = {
   children: React.ReactNode;
@@ -16,7 +18,14 @@ const Tag = ({ children, onRemove, ...props }: TagProps) => {
         props.className,
       )}
     >
-      <Cross1Icon className="size-3 cursor-pointer" onClick={onRemove} />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="link" size="icon" onClick={onRemove}>
+            <Cross1Icon />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Remove</TooltipContent>
+      </Tooltip>
       {children}
     </div>
   );
