@@ -6,3 +6,8 @@ export const getProjectStatsQueryKey = (projectName: string) => [
   projectName,
   format(new Date(), DATE_FORMAT),
 ];
+
+export const getSearchNPMRegistryQueryKey = (search: string) => [
+  "projects-suggestions",
+  search,
+];

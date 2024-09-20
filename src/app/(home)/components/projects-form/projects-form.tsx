@@ -47,7 +47,10 @@ const ProjectsForm = () => {
       )}
     >
       <ComboboxForm form={projectsSearchForm} />
-      <StatsSection selectedProjects={selectedProjects} />
+      <StatsSection
+        form={projectsSearchForm}
+        selectedProjects={selectedProjects}
+      />
     </div>
   );
 };
