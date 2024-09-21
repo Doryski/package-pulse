@@ -59,7 +59,7 @@ export default function RootLayout({
         )}
       >
         <Providers>
-          <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-8">
+          <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-2 md:px-4 lg:px-8">
             <Header />
             <main className="relative flex grow flex-col">{children}</main>
             <Footer />

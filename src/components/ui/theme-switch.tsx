@@ -14,7 +14,7 @@ const ThemeSwitch = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-sm font-medium">Theme:</label>
+      <label className="hidden text-sm font-medium sm:block">Theme:</label>
       <Select value={theme} onValueChange={(value) => setTheme(value)}>
         <SelectTrigger className="w-24">
           <SelectValue placeholder="Select theme" />
