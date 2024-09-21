@@ -67,8 +67,9 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
         onSubmit={form.handleSubmit(onSubmit)}
         className="flex flex-col gap-4"
       >
-        <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+        <div className="flex w-full flex-col items-start gap-2">
           <Combobox
+            fullwidth={selectedProjects.length > 0}
             options={npmRegistry.data}
             isLoadingOptions={npmRegistry.isLoading}
             form={form}

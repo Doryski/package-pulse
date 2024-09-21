@@ -5,6 +5,8 @@ import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   ChartConfig,
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -78,12 +80,20 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
       )}
     >
       <div className="flex items-center gap-2">
-        <label htmlFor="time-period-select">Time period</label>
+        <label
+          htmlFor="time-period-select"
+          className="text-nowrap text-sm font-medium"
+        >
+          Time period
+        </label>
         <Select
           value={timePeriod}
           onValueChange={(value) => setTimePeriod(value as TimePeriod)}
         >
-          <SelectTrigger id="time-period-select" className="w-[180px]">
+          <SelectTrigger
+            id="time-period-select"
+            className="w-full md:w-[180px]"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -97,12 +107,8 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           </SelectContent>
         </Select>
       </div>
-      <div
-        className={cn(
-          "relative mx-auto w-full h-full max-w-[900px] max-h-[600px]",
-        )}
-      >
-        <ChartContainer config={config}>
+      <div className={cn("relative mx-auto w-full h-full")}>
+        <ChartContainer config={config} className="max-h-[450px] w-full">
           <LineChart
             accessibilityLayer
             data={chartData}
@@ -111,6 +117,11 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
               right: 12,
             }}
           >
+            <ChartLegend
+              content={<ChartLegendContent />}
+              layout="horizontal"
+              verticalAlign="top"
+            />
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="time"
@@ -124,6 +135,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
               axisLine={false}
               tickMargin={8}
               tickFormatter={(value) => value.toLocaleString()}
+              tickCount={12}
             />
             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
             {data &&

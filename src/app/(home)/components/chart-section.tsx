@@ -37,7 +37,7 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
   return (
     <div
       className={cn(
-        "mt-16 size-full",
+        "mt-4 md:mt-8 lg:mt-16 size-full",
         processedProjectsStats.length === 0 && "hidden",
       )}
     >

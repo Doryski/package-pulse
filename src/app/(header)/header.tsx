@@ -3,7 +3,7 @@ import ThemeSwitch from "@/components/ui/theme-switch";
 
 const Header = () => {
   return (
-    <header className="flex items-center justify-between py-2">
+    <header className="flex items-center justify-between py-4">
       <a href="/">
         <Logo />
       </a>

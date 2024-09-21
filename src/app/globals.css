@@ -34,6 +34,7 @@
     --chart-8: 47.9 95.8% 53.1%;
     --chart-9: 221.2 83.2% 53.3%;
     --chart-10: 349 84% 74%;
+    --combobox-width: 600px;
   }
 
   .dark {
@@ -82,5 +83,10 @@
 @layer utilities {
   .center {
     @apply flex items-center justify-center;
+  }
+
+  .PopoverContent {
+    width: var(--radix-popover-trigger-width);
+    max-height: var(--radix-popover-content-available-height);
   }
 }
