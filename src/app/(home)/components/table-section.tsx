@@ -35,7 +35,7 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
       )}
     >
       <h3 className="text-center">NPM downloads change by project</h3>
-      <div className="mt-2">
+      <div className="mt-1 md:mt-2">
         <ProjectsStatsTable projectsStats={projectsStats} />
       </div>
     </div>

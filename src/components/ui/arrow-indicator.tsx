@@ -11,7 +11,7 @@ const ArrowIndicator = ({ value }: ArrowIndicatorProps) => {
   const color = isPositive ? "text-green-700" : "text-red-700";
   const arrow = isPositive ? "↑" : "↓";
 
-  return <div className={cn(color, "text-xl")}>{arrow}</div>;
+  return <div className={cn(color, "text-lg md:text-xl")}>{arrow}</div>;
 };
 
 export default ArrowIndicator;

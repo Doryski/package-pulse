@@ -3,15 +3,16 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 const Footer = () => {
   return (
-    <footer className="flex flex-col items-start gap-2 border-t border-gray-200 py-4 dark:border-gray-800">
+    <footer className="mt-4 flex flex-col items-start gap-2 border-t border-gray-200 py-4 text-sm dark:border-gray-800 md:mt-8 md:text-base">
       <p className="inline">
         Created by Dominik Rycharski (
         <TextLink
           href="https://github.com/Doryski"
-          className="inline-flex items-center px-0.5"
+          className="inline-flex px-0.5"
           outside
         >
-          <GitHubLogoIcon className="text-black dark:text-white" /> Doryski
+          <GitHubLogoIcon className="text-black dark:text-white" />
+          <span>Doryski</span>
         </TextLink>
         ).
       </p>
