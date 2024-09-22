@@ -24,6 +24,7 @@ type ComboboxProps<T> = {
   disabled: boolean;
   options: T[] | undefined;
   isLoadingOptions: boolean;
+  fullwidth?: boolean;
   onSelectItem: (item: string) => void;
   optionValuePredicate: (option: T) => string;
 };
@@ -33,6 +34,7 @@ export function Combobox<T>({
   disabled,
   options,
   isLoadingOptions,
+  fullwidth,
   onSelectItem,
   optionValuePredicate,
 }: ComboboxProps<T>) {
@@ -44,14 +46,19 @@ export function Combobox<T>({
       name="search"
       disabled={disabled}
       render={({ field }) => (
-        <FormItem className="w-full grow sm:w-auto sm:flex-initial">
+        <FormItem className="w-full grow">
           <Popover
             open={isPopoverOpen}
             onOpenChange={(isOpen) => (isOpen ? openPopover() : closePopover())}
           >
             <PopoverTrigger asChild>
               <FormControl>
-                <div className="relative w-full sm:w-[600px]">
+                <div
+                  className={cn(
+                    "relative w-full max-w-full sm:w-[var(--combobox-width)]",
+                    fullwidth && "sm:w-full",
+                  )}
+                >
                   <FormLabel
                     className={cn(
                       "absolute -top-3 left-2 z-10 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
@@ -68,8 +75,9 @@ export function Combobox<T>({
                     placeholder="Search project..."
                     autoComplete="off"
                     className={cn(
-                      "w-[600px] justify-between",
+                      "w-full sm:w-[var(--combobox-width)] justify-between max-w-full",
                       !field.value && "text-muted-foreground",
+                      fullwidth && "sm:w-full",
                     )}
                     autoFocus
                     onChangeCapture={() => {
@@ -88,10 +96,7 @@ export function Combobox<T>({
               </FormControl>
             </PopoverTrigger>
             <PopoverContent
-              className={cn(
-                "w-full sm:w-[600px] p-0",
-                !field.value && "hidden",
-              )}
+              className={cn("p-0 max-w-full", !field.value && "hidden")}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <ListGroup>

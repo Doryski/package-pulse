@@ -16,6 +16,7 @@ type TableHeadSortableProps = PropsWithChildren<
     handleSort: (column: SortColumn) => void;
     isSorted: boolean;
     sortDirection: SortDirection;
+    contentClassName?: string;
   } & React.ThHTMLAttributes<HTMLTableCellElement>
 >;
 
@@ -26,17 +27,26 @@ const TableHeadSortable = memo(
     handleSort,
     isSorted,
     sortDirection,
+    contentClassName,
     ...props
   }: TableHeadSortableProps) => {
     return (
       <TableHead
-        className={cn("text-center cursor-pointer", props.className)}
+        className={cn(
+          "cursor-pointer bg-slate-100 dark:bg-slate-900",
+          props.className,
+        )}
         onClick={() => handleSort(column)}
         {...props}
       >
-        <div className="flex items-center justify-center gap-2">
+        <div
+          className={cn(
+            "flex items-center justify-center gap-2 text-xs md:text-sm",
+            contentClassName,
+          )}
+        >
           {children}
-          <span className="text-sm">
+          <span className="text-[10px] md:text-xs">
             {isSorted && (sortDirection === "desc" ? "▼" : "▲")}
           </span>
         </div>

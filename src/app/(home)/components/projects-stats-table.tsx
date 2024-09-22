@@ -71,7 +71,8 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableHeader>
           <TableRow>
             <TableHeadSortable
-              className="sticky left-0 z-20 w-[250px] min-w-[150px] cursor-pointer"
+              className="sticky left-0 z-20 w-[100px] min-w-[100px] cursor-pointer bg-slate-100 dark:bg-slate-900 md:w-[200px] md:min-w-[150px]"
+              contentClassName="justify-start"
               column="projectName"
               isSorted={sortColumn === "projectName"}
               sortDirection={sortDirection}
@@ -116,7 +117,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableBody>
           {processedProjectsTableStats.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
-              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer">
+              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background">
                 <div className="flex items-center gap-2">
                   <DotIndicator color={projectStats.color} />
                   <span className="text-sm">{projectStats.projectName}</span>
