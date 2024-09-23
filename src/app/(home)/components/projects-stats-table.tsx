@@ -117,7 +117,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableBody>
           {processedProjectsTableStats.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
-              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background">
+              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background md:bg-transparent">
                 <div className="flex items-center gap-2">
                   <DotIndicator color={projectStats.color} />
                   <span className="text-sm">{projectStats.projectName}</span>
