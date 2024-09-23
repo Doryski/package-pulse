@@ -1,8 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
-import type { Metadata } from "next";
+import { Viewport } from "next";
 import { Inter } from "next/font/google";
-import Head from "next/head";
 import Footer from "./(footer)/footer";
 import Header from "./(header)/header";
 import "./globals.css";
@@ -10,17 +9,56 @@ import Providers from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Package Pulse",
+export const metadata = {
+  title: "Package Pulse | Explore NPM Package Trends",
   description:
     "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
   keywords: [
-    "NPM",
+    "NPM trends",
+    "NPM package trends",
+    "NPM package",
     "package stats",
     "JavaScript libraries",
     "dependency trends",
     "open source analytics",
   ],
+  openGraph: {
+    title: "Package Pulse | Explore NPM Package Trends",
+    description:
+      "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
+    url: "https://www.package-pulse.com",
+    type: "website",
+    images: [
+      {
+        url: "https://www.package-pulse.com/images/share_image.png",
+        width: 800,
+        height: 600,
+        alt: "Package Pulse Share Image",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Package Pulse | Explore NPM Package Trends",
+    description:
+      "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
+    images: ["https://www.package-pulse.com/images/share_image.png"],
+  },
+  icons: {
+    icon: [
+      { rel: "icon", url: "/favicon-32x32.png", sizes: "32x32" },
+      { rel: "icon", url: "/favicon-16x16.png", sizes: "16x16" },
+    ],
+    appleTouchIcon: { rel: "apple-touch-icon", url: "/apple-touch-icon.png" },
+  },
+  manifest: "/site.webmanifest",
+  msapplication: {
+    TileColor: "#c12336",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -30,28 +68,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <Head>
-        <link
-          rel="apple-touch-icon"
-          sizes="180x180"
-          href="/apple-touch-icon.png"
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="32x32"
-          href="/favicon-32x32.png"
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="16x16"
-          href="/favicon-16x16.png"
-        />
-        <link rel="manifest" href="/site.webmanifest" />
-        <meta name="msapplication-TileColor" content="#da532c" />
-        <meta name="theme-color" content="#ffffff" />
-      </Head>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
