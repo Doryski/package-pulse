@@ -89,7 +89,7 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
           name="projects"
           render={({ field, formState }) => (
             <FormItem className={cn(selectedProjects.length === 0 && "hidden")}>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" role="list">
                 {field.value.map((project, index) => {
                   const error = formState.errors.projects?.[index];
 
