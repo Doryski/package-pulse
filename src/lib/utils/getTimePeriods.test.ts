@@ -1,21 +1,31 @@
 import { describe, expect, it } from "vitest";
 import getTimePeriods from "./getTimePeriods";
 
-describe.only("getTimePeriods", () => {
+describe("getTimePeriods", () => {
   it("should return correct periods for days", () => {
     const from = new Date("2023-01-01");
     const to = new Date("2023-01-05");
     const periods = getTimePeriods(from, to, 1, "days");
 
     expect(periods).toHaveLength(4);
-    expect(periods[0]).toEqual({
-      start: new Date("2023-01-04"),
-      end: new Date("2023-01-05"),
-    });
-    expect(periods[3]).toEqual({
-      start: new Date("2023-01-01"),
-      end: new Date("2023-01-02"),
-    });
+    expect(periods).toEqual([
+      {
+        start: new Date("2023-01-04"),
+        end: new Date("2023-01-05"),
+      },
+      {
+        start: new Date("2023-01-03"),
+        end: new Date("2023-01-04"),
+      },
+      {
+        start: new Date("2023-01-02"),
+        end: new Date("2023-01-03"),
+      },
+      {
+        start: new Date("2023-01-01"),
+        end: new Date("2023-01-02"),
+      },
+    ]);
   });
 
   it("should return correct periods for hours", () => {
@@ -24,14 +34,24 @@ describe.only("getTimePeriods", () => {
     const periods = getTimePeriods(from, to, 3, "hours");
 
     expect(periods).toHaveLength(4);
-    expect(periods[0]).toEqual({
-      start: new Date("2023-01-01T09:00:00"),
-      end: new Date("2023-01-01T12:00:00"),
-    });
-    expect(periods[3]).toEqual({
-      start: new Date("2023-01-01T00:00:00"),
-      end: new Date("2023-01-01T03:00:00"),
-    });
+    expect(periods).toEqual([
+      {
+        start: new Date("2023-01-01T09:00:00"),
+        end: new Date("2023-01-01T12:00:00"),
+      },
+      {
+        start: new Date("2023-01-01T06:00:00"),
+        end: new Date("2023-01-01T09:00:00"),
+      },
+      {
+        start: new Date("2023-01-01T03:00:00"),
+        end: new Date("2023-01-01T06:00:00"),
+      },
+      {
+        start: new Date("2023-01-01T00:00:00"),
+        end: new Date("2023-01-01T03:00:00"),
+      },
+    ]);
   });
 
   it("should handle periods that don't divide evenly", () => {
