@@ -12,6 +12,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
+import { getPeriodStartByDays } from "./getPeriodStartByDays";
 
 export function groupByDays<
   T extends {
@@ -19,7 +20,13 @@ export function groupByDays<
     count: number;
   },
 >(stats: T[], periodLength: number) {
-  return groupByPeriod(stats, periodLength, addDays, differenceInCalendarDays);
+  return groupByPeriod(
+    stats,
+    periodLength,
+    addDays,
+    differenceInCalendarDays,
+    (date) => getPeriodStartByDays(date, periodLength),
+  );
 }
 
 export function groupByWeeks<
@@ -85,7 +92,8 @@ export function groupStats<
 export const calculatePeriodStartDate = (
   date: string,
   periodLength: number,
-  startOfPeriodFn: (date: Date) => Date,
+  startOfPeriodFn: (date: Date) => Date = (date) =>
+    getPeriodStartByDays(date, periodLength),
   differenceFn: (dateLeft: Date, dateRight: Date) => number,
   addPeriodFn: (date: Date, periodLength: number) => Date,
 ): Date => {
@@ -117,7 +125,8 @@ export default function groupByPeriod<
   periodLength: number,
   addPeriodFn: (date: Date, periodLength: number) => Date,
   differenceFn: (dateLeft: Date, dateRight: Date) => number,
-  startOfPeriodFn: (date: Date) => Date = (date) => date,
+  startOfPeriodFn: (date: Date) => Date = (date) =>
+    getPeriodStartByDays(date, periodLength),
 ) {
   return Object.values(
     stats.reduce<Record<string, { date: string; count: number }>>(
