@@ -1,7 +1,7 @@
 import { differenceInCalendarDays } from "date-fns";
 
-export default function sortByDate<T extends { date: string }>(data: T[]) {
+export default function sortByDate<T>(data: T[], predicate: (item: T) => Date) {
   return data.toSorted((a, b) =>
-    differenceInCalendarDays(new Date(a.date), new Date(b.date)),
+    differenceInCalendarDays(predicate(a), predicate(b)),
   );
 }

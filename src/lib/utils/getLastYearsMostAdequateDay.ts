@@ -1,4 +1,4 @@
-import { addDays, getDay, subDays, subYears } from "date-fns";
+import { addDays, getDay, subYears } from "date-fns";
 
 export default function getLastYearsMostAdequateDay(
   currentDay: string | Date,
@@ -6,13 +6,11 @@ export default function getLastYearsMostAdequateDay(
   const oneYearAgo = subYears(currentDay, 1);
   const currentDayOfTheWeek = getDay(currentDay);
   const oneYearAgoDayOfTheWeek = getDay(oneYearAgo);
+
   if (currentDayOfTheWeek === oneYearAgoDayOfTheWeek) {
     return oneYearAgo;
   }
-  const daysDifference = currentDayOfTheWeek - oneYearAgoDayOfTheWeek;
-  if (daysDifference > 0) {
-    return addDays(oneYearAgo, daysDifference);
-  } else {
-    return subDays(oneYearAgo, Math.abs(daysDifference));
-  }
+
+  const daysDifference = (currentDayOfTheWeek - oneYearAgoDayOfTheWeek + 7) % 7;
+  return addDays(oneYearAgo, daysDifference);
 }
