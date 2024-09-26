@@ -32,6 +32,7 @@ const StatsSection = memo(({ form, selectedProjects }: StatsSectionProps) => {
           try {
             const sortedDownloads = sortByDate(
               await fetchNPMDownloads(projectName),
+              (download) => new Date(download.date),
             );
             const groupedDownloads = groupByWeeks(sortedDownloads).slice(0, -1);
 

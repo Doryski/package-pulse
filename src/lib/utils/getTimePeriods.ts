@@ -1,4 +1,4 @@
-import { isAfter, isBefore, sub } from "date-fns";
+import { DurationUnit, isAfter, isBefore, sub } from "date-fns";
 
 type Period = { start: Date; end: Date };
 
@@ -6,7 +6,7 @@ export default function getTimePeriods(
   from: Date,
   to: Date,
   unitsCount: number,
-  unit: string,
+  unit: DurationUnit,
 ): Period[] {
   let periods: Period[] = [];
   let endTime = to;
