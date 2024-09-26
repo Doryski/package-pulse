@@ -17,6 +17,7 @@ test.describe("Chart Section", () => {
   });
 
   test("chart is visible", async ({ page }) => {
+    await page.waitForSelector(".recharts-wrapper");
     await expect(page.locator(".recharts-wrapper")).toBeVisible();
   });
 

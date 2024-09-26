@@ -87,7 +87,6 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           Time period
         </label>
         <Select
-          // open
           value={timePeriod}
           onValueChange={(value) => setTimePeriod(value as TimePeriod)}
         >

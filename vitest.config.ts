@@ -7,6 +7,7 @@ export default defineConfig({
     globals: true,
     setupFiles: "./vitest.setup.ts",
     environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
       include: ["src/**"],
     },
