@@ -10,7 +10,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import TimePeriod from "@/lib/enums/TimePeriod";
+import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
 import { format, isAfter, subMonths, subYears } from "date-fns";
@@ -32,7 +32,7 @@ type MultipleLineChartProps = {
   config: ChartConfig;
 };
 function MultipleLineChart({ data, config }: MultipleLineChartProps) {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>(TimePeriod.ALL_TIME);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
   const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
 
@@ -44,19 +44,19 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           const date = new Date(item.time);
           const today = new Date();
           switch (value) {
-            case TimePeriod.ONE_MONTH:
+            case "months-1":
               return isAfter(date, subMonths(today, 1));
-            case TimePeriod.THREE_MONTH:
+            case "months-3":
               return isAfter(date, subMonths(today, 3));
-            case TimePeriod.SIX_MONTH:
+            case "months-6":
               return isAfter(date, subMonths(today, 6));
-            case TimePeriod.ONE_YEAR:
+            case "years-1":
               return isAfter(date, subYears(today, 1));
-            case TimePeriod.TWO_YEARS:
+            case "years-2":
               return isAfter(date, subYears(today, 2));
-            case TimePeriod.FIVE_YEARS:
+            case "years-5":
               return isAfter(date, subYears(today, 5));
-            case TimePeriod.ALL_TIME:
+            case "all-time":
               return true;
             default:
               assertUnreachable(value, "Invalid time period");
@@ -87,6 +87,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           Time period
         </label>
         <Select
+          // open
           value={timePeriod}
           onValueChange={(value) => setTimePeriod(value as TimePeriod)}
         >
@@ -97,13 +98,11 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TimePeriod.ONE_MONTH}>1 month</SelectItem>
-            <SelectItem value={TimePeriod.THREE_MONTH}>3 month</SelectItem>
-            <SelectItem value={TimePeriod.SIX_MONTH}>6 month</SelectItem>
-            <SelectItem value={TimePeriod.ONE_YEAR}>1 year</SelectItem>
-            <SelectItem value={TimePeriod.TWO_YEARS}>2 years</SelectItem>
-            <SelectItem value={TimePeriod.FIVE_YEARS}>5 years</SelectItem>
-            <SelectItem value={TimePeriod.ALL_TIME}>All time</SelectItem>
+            {timePeriods.map((timePeriod) => (
+              <SelectItem key={timePeriod.value} value={timePeriod.value}>
+                {timePeriod.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

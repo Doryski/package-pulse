@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: "html",
   fullyParallel: true,
   use: {
-    headless: false,
+    headless: true,
     viewport: { width: 1280, height: 720 },
     video: "on-first-retry",
     baseURL: "http://localhost:3000",
