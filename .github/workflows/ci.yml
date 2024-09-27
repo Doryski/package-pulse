@@ -59,6 +59,7 @@ jobs:
           name: build-output
           if-no-files-found: error
           path: .next
+          overwrite: true
 
   e2e-tests:
     name: E2E Tests
