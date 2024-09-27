@@ -2,7 +2,6 @@
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { cn } from "@/lib/utils/cn";
-import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
@@ -24,13 +23,7 @@ const ProjectsForm = () => {
     resolver: zodResolver(ProjectsSearchFormSchema),
     defaultValues: ProjectsSearchFormSchema.parse({
       search: "",
-      projects:
-        initialProjects.length > 0
-          ? initialProjects
-          : getLocalStorageValue(
-              LocalStorageKey.SELECTED_PROJECTS,
-              ProjectsSearchFormSchema.shape.projects,
-            ),
+      projects: initialProjects,
     }),
   });
 

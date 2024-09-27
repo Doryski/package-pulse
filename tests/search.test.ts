@@ -1,16 +1,24 @@
 import { expect, test } from "@playwright/test";
+import { projectNames, projectNamesLimit } from "./data";
 import {
   addManyProjects,
   fillSearchInput,
   getOptionsList,
   getSearchInput,
   getTags,
+  goToProjectsPage,
   waitForSearchResponse,
 } from "./utils";
 
 test.describe("Search Projects Form", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.removeItem("selected-projects");
+    });
   });
 
   test("should allow searching for and selecting projects", async ({
@@ -67,14 +75,29 @@ test.describe("Search Projects Form", () => {
     expect(url).toContain("projects=react,vue");
   });
 
-  test("should load projects from URL", async ({ page }) => {
-    await page.goto("/?projects=react,vue");
+  test("should load projects from URL and show the tags", async ({ page }) => {
+    await goToProjectsPage(page, projectNames);
+    await page.waitForSelector("[role='list']");
+    const tags = getTags(page);
+    for (const projectName of projectNames) {
+      expect(tags.getByText(projectName)).toBeVisible();
+    }
+  });
 
-    const reactProject = getTags(page).getByText("react");
-    const vueProject = getTags(page).getByText("vue");
+  test("should load empty projects list if the projects URL param is empty", async ({
+    page,
+  }) => {
+    await page.evaluate((projects) => {
+      localStorage.setItem("selected-projects", JSON.stringify(projects));
+    }, projectNames);
 
-    await expect(reactProject).toBeVisible();
-    await expect(vueProject).toBeVisible();
+    await goToProjectsPage(page, []);
+    const localStorageProjects = await page.evaluate(() => {
+      return localStorage.getItem("selected-projects");
+    });
+    expect(localStorageProjects).toEqual(JSON.stringify([]));
+    const tagsEmpty = getTags(page);
+    expect(await tagsEmpty.all()).toHaveLength(0);
   });
 
   test("should show error for non-existent project", async ({ page }) => {
@@ -105,19 +128,8 @@ test.describe("Search Projects Form", () => {
 
   test("should limit the number of selected projects", async ({ page }) => {
     const searchInput = getSearchInput(page);
-    const projectNames = [
-      "react",
-      "vue",
-      "@angular/core",
-      "svelte",
-      "preact",
-      "next",
-      "nuxt",
-      "gatsby",
-      "ember",
-      "backbone",
-    ];
-    await page.goto(`/?projects=${projectNames.join(",")}`);
+
+    await goToProjectsPage(page, projectNamesLimit);
 
     const limitMessage = page.getByText(
       "You cannot select more than 10 projects",
