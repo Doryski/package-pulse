@@ -53,6 +53,10 @@ jobs:
         run: npm ci
       - name: Build project
         run: npm run build
+      - name: Debug - List .next directory contents
+        run: |
+          echo "Contents of .next directory:"
+          ls -R .next
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
