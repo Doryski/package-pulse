@@ -12,4 +12,24 @@ export default defineConfig({
     video: "on-first-retry",
     baseURL: "http://localhost:3000",
   },
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+    timeout: 2 * 60 * 1000, // 2 minutes
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+      },
+    },
+    {
+      name: "firefox",
+      use: {
+        browserName: "firefox",
+      },
+    },
+  ],
 });
