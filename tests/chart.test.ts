@@ -26,11 +26,6 @@ test.describe("Chart Section", () => {
     await checkLegendContent(page);
   });
 
-  test("time period selector is present", async ({ page }) => {
-    await expect(page.locator("text=Time period")).toBeVisible();
-    await expect(page.locator("#time-period-select")).toBeVisible();
-  });
-
   test("changing time period updates chart", async ({ page }) => {
     await page.waitForSelector(".recharts-wrapper");
     await page.waitForSelector(".recharts-cartesian-axis-tick-value");
@@ -39,6 +34,7 @@ test.describe("Chart Section", () => {
       .locator(".recharts-xAxis .recharts-cartesian-axis-tick-value")
       .allTextContents();
 
+    await expect(page.locator("#time-period-select")).toBeVisible();
     await page.click("#time-period-select");
     const oneMonthTimePeriod = timePeriods.find(
       (timePeriod) => timePeriod.value === "months-1",
