@@ -36,6 +36,7 @@ const TableHeadSortable = memo(
           "cursor-pointer bg-slate-100 dark:bg-slate-900",
           props.className,
         )}
+        data-column-name={column}
         onClick={() => handleSort(column)}
         {...props}
       >

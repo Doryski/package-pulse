@@ -1,7 +1,7 @@
 import timePeriods from "@/lib/enums/TimePeriod";
 import { expect, Page, test } from "@playwright/test";
-
-const projectNames = ["react", "vue", "next", "zod"];
+import { projectNames } from "./data";
+import { goToProjectsPage } from "./utils";
 
 const checkLegendContent = async (page: Page) => {
   for (const project of projectNames) {
@@ -13,7 +13,7 @@ const checkLegendContent = async (page: Page) => {
 
 test.describe("Chart Section", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`/?projects=${projectNames.join(",")}`);
+    await goToProjectsPage(page, projectNames);
   });
 
   test("chart is visible", async ({ page }) => {

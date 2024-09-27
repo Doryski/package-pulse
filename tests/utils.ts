@@ -52,3 +52,7 @@ export const addManyProjects = async (
     );
   }
 };
+
+export const goToProjectsPage = async (page: Page, projects: string[]) => {
+  await page.goto(`/?projects=${projects.join(",")}`);
+};
