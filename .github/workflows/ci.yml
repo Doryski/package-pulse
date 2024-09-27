@@ -57,12 +57,18 @@ jobs:
         run: |
           echo "Contents of .next directory:"
           ls -R .next
+      - name: Debug - Print working directory and contents
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Contents of current directory:"
+          ls -la
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-output
           if-no-files-found: error
-          path: .next
+          path: ${{ github.workspace }}/.next/**
           overwrite: true
 
   e2e-tests:
