@@ -21,6 +21,20 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm run test
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -72,7 +86,7 @@ jobs:
             sleep 1
           done
       - name: Run Playwright tests
-        run: npm run test
+        run: npm run test:e2e
       - uses: actions/upload-artifact@v3
         if: always()
         with:
