@@ -14,8 +14,12 @@ const TableCellWithStats = memo(({ change }: TableCellWithStatsProps) => (
   <TableCell className="table-cell text-center">
     <div className="flex items-center justify-center gap-2">
       <div className="flex flex-col">
-        <span>{formatCellValue(change?.nominal, formatInteger)}</span>
-        <span>{formatCellValue(change?.percentage, formatPercentage)}</span>
+        <span data-value-type="nominal">
+          {formatCellValue(change?.nominal, formatInteger)}
+        </span>
+        <span data-value-type="percentage">
+          {formatCellValue(change?.percentage, formatPercentage)}
+        </span>
       </div>
       <ArrowIndicator value={change?.nominal} />
     </div>

@@ -67,7 +67,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
 
   return (
     <div className="relative overflow-x-auto">
-      <Table>
+      <Table data-sort-column={sortColumn} data-sort-direction={sortDirection}>
         <TableHeader>
           <TableRow>
             <TableHeadSortable

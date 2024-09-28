@@ -108,11 +108,12 @@ export function Combobox<T>({
                 <ListLoading
                   className={isLoadingOptions ? "block" : "hidden"}
                 />
-                <List>
+                <List role="listbox">
                   {options?.map((option) => {
                     const optionValue = optionValuePredicate(option);
                     return (
                       <ListItem
+                        role="option"
                         key={optionValue}
                         onClick={() => onSelectItem(optionValue)}
                       >

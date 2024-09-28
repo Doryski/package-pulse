@@ -21,6 +21,7 @@ const ProjectTag = ({
 
   return (
     <Tag
+      role="listitem"
       key={project}
       style={{
         border: `2px solid ${error ? "red" : color}`,

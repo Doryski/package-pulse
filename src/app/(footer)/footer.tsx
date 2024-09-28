@@ -1,4 +1,5 @@
 import TextLink from "@/components/ui/text-link";
+import { links } from "@/lib/config/constants";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 const Footer = () => {
@@ -7,7 +8,7 @@ const Footer = () => {
       <p className="inline">
         Created by Dominik Rycharski (
         <TextLink
-          href="https://github.com/Doryski"
+          href={links.githubProfile}
           className="inline-flex px-0.5"
           outside
         >
@@ -19,16 +20,12 @@ const Footer = () => {
       <p className="inline">
         For any questions, bugs or feature requests, please contact me through
         the contact form at{" "}
-        <TextLink
-          href="https://dominikrycharski.com/"
-          outside
-          className="inline px-1"
-        >
+        <TextLink href={links.personalWebsite} outside className="inline px-1">
           dominikrycharski.com
         </TextLink>{" "}
         or open an issue on{" "}
         <TextLink
-          href="https://github.com/Doryski/package-pulse"
+          href={links.githubRepository}
           outside
           className="inline-flex items-center px-1"
         >
@@ -43,7 +40,7 @@ const Footer = () => {
           project running:
         </p>
         <TextLink
-          href="https://www.buymeacoffee.com/doryski"
+          href={links.buyMeACoffee}
           outside
           className="mx-auto mt-1 inline-block rounded bg-yellow-400 px-2 py-1 text-black lg:ml-2 lg:mr-0"
         >
