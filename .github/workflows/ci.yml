@@ -56,7 +56,7 @@ jobs:
       - name: Debug - List build directory contents
         run: |
           echo "Contents of build directory:"
-          ls -R build
+          ls -R .next
       - name: Debug - Print working directory and contents
         run: |
           echo "Current working directory:"
@@ -68,7 +68,7 @@ jobs:
         with:
           name: build-output
           if-no-files-found: error
-          path: build
+          path: ".next"
           overwrite: true
 
   e2e-tests:
@@ -88,7 +88,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: build
+          path: ".next"
       - name: Install Playwright
         run: npx playwright install --with-deps
       - name: Run Playwright tests
