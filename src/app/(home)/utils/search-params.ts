@@ -1,7 +1,7 @@
-import LocalStorageKey from "@/lib/enums/LocalStorageKey";
-import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import LocalStorageKey from "../../../lib/enums/LocalStorageKey";
+import getLocalStorageValue from "../../../lib/utils/getLocalStorageValue";
 import { ProjectsSearchFormSchema } from "../components/projects-form/schema";
 
 export const encodeProjectName = (name: string) =>
@@ -11,17 +11,15 @@ export const encodeProjectName = (name: string) =>
     .replace(/%2F/g, "/");
 export const decodeProjectName = (name: string) => decodeURIComponent(name);
 
-export function useInitialProjectsFromSearchParams(delimiter: string) {
-  const searchParams = useSearchParams();
-  const projectsParam = searchParams.get("projects");
+export function getInitialProjects(
+  projectsParam: string | null,
+  delimiter: string,
+) {
   const decodedProjectsParam = projectsParam
     ? projectsParam.split(delimiter).map(decodeProjectName)
     : null;
-  if (!decodedProjectsParam) {
-    return [];
-  }
 
-  if (decodedProjectsParam.length > 0) {
+  if (decodedProjectsParam && decodedProjectsParam.length > 0) {
     return decodedProjectsParam;
   }
 
@@ -33,6 +31,46 @@ export function useInitialProjectsFromSearchParams(delimiter: string) {
   );
 }
 
+export function useInitialProjectsFromSearchParams(delimiter: string) {
+  const searchParams = useSearchParams();
+  const projectsParam = searchParams.get("projects");
+  return getInitialProjects(projectsParam, delimiter);
+}
+
+export function getOtherParamsString(
+  searchParams: URLSearchParams,
+  excludeKey: string,
+): string {
+  return Array.from(searchParams.entries())
+    .filter(([key]) => key !== excludeKey)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+}
+
+export function getProjectsQueryString(
+  projects: string[],
+  delimiter: string,
+): string {
+  return `projects=${projects.map(encodeProjectName).join(delimiter)}`;
+}
+
+export function constructNewUrl(
+  pathname: string,
+  selectedProjects: string[],
+  otherParams: string,
+  delimiter: string,
+): string {
+  if (selectedProjects.length > 0) {
+    const projectsQuery = getProjectsQueryString(selectedProjects, delimiter);
+    return otherParams
+      ? `${pathname}?${projectsQuery}&${otherParams}`
+      : `${pathname}?${projectsQuery}`;
+  } else if (otherParams) {
+    return `${pathname}?${otherParams}`;
+  }
+  return pathname;
+}
+
 export function useUpdateSearchParams(
   selectedProjects: string[],
   delimiter: string,
@@ -42,24 +80,13 @@ export function useUpdateSearchParams(
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const otherParams = Array.from(searchParams.entries())
-      .filter(([key]) => key !== "projects")
-      .map(([key, value]) => `${key}=${value}`)
-      .join("&");
-
-    let newUrl = pathname;
-
-    if (selectedProjects.length > 0) {
-      const projectsQuery = `projects=${selectedProjects
-        .map(encodeProjectName)
-        .join(delimiter)}`;
-      newUrl = otherParams
-        ? `?${projectsQuery}&${otherParams}`
-        : `?${projectsQuery}`;
-    } else if (selectedProjects.length === 0 && otherParams) {
-      newUrl = `?${otherParams}`;
-    }
-
+    const otherParams = getOtherParamsString(searchParams, "projects");
+    const newUrl = constructNewUrl(
+      pathname,
+      selectedProjects,
+      otherParams,
+      delimiter,
+    );
     router.replace(newUrl, { scroll: false });
   }, [selectedProjects, router, searchParams, delimiter, pathname]);
 }
