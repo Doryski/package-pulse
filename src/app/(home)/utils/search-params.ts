@@ -14,21 +14,22 @@ export const decodeProjectName = (name: string) => decodeURIComponent(name);
 export function getInitialProjects(
   projectsParam: string | null,
   delimiter: string,
-) {
+): string[] {
+  if (projectsParam === "") return [];
+  if (projectsParam === null)
+    return (
+      getLocalStorageValue(
+        LocalStorageKey.SELECTED_PROJECTS,
+        ProjectsSearchFormSchema.shape.projects,
+      ) ?? []
+    );
+
   const decodedProjectsParam = projectsParam
-    ? projectsParam.split(delimiter).map(decodeProjectName)
-    : null;
+    .split(delimiter)
+    .map(decodeProjectName);
 
-  if (decodedProjectsParam && decodedProjectsParam.length > 0) {
-    return decodedProjectsParam;
-  }
-
-  return (
-    getLocalStorageValue(
-      LocalStorageKey.SELECTED_PROJECTS,
-      ProjectsSearchFormSchema.shape.projects,
-    ) ?? []
-  );
+  if (decodedProjectsParam.length > 0) return decodedProjectsParam;
+  return [];
 }
 
 export function useInitialProjectsFromSearchParams(delimiter: string) {

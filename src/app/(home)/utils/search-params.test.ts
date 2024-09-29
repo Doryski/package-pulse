@@ -1,4 +1,4 @@
-import { describe, expect, it, Mock, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import getLocalStorageValue from "../../../lib/utils/getLocalStorageValue";
 import {
   constructNewUrl,
@@ -79,14 +79,29 @@ describe("getInitialProjects", () => {
 
   it("should return projects from local storage when projectsParam is null and local storage has projects", () => {
     const localStorageProjects = ["localProject1", "localProject2"];
-    (getLocalStorageValue as Mock).mockReturnValue(localStorageProjects);
+    vi.mocked(getLocalStorageValue).mockReturnValue(localStorageProjects);
 
     const result = getInitialProjects(null, delimiter);
     expect(result).toEqual(localStorageProjects);
   });
 
   it("should return an empty array when projectsParam is null and local storage is empty", () => {
-    (getLocalStorageValue as Mock).mockReturnValue(null);
+    vi.mocked(getLocalStorageValue).mockReturnValue(null);
+
+    const result = getInitialProjects(null, delimiter);
+    expect(result).toEqual([]);
+  });
+
+  it("should return projects from local storage when projectsParam is null", () => {
+    const localStorageProjects = ["localProject1", "localProject2"];
+    vi.mocked(getLocalStorageValue).mockReturnValue(localStorageProjects);
+
+    const result = getInitialProjects(null, delimiter);
+    expect(result).toEqual(localStorageProjects);
+  });
+
+  it("should return an empty array when projectsParam is null and local storage is empty", () => {
+    vi.mocked(getLocalStorageValue).mockReturnValue(null);
 
     const result = getInitialProjects(null, delimiter);
     expect(result).toEqual([]);

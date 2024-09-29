@@ -12,7 +12,7 @@
     "test": "vitest --passWithNoTests",
     "coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:inspect": "playwright test --headed --retries=0",
+    "test:e2e:inspect": "playwright test --headed --retries=0 --timeout=10000",
     "verify": "node verify.cjs"
   },
   "dependencies": {
