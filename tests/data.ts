@@ -11,3 +11,5 @@ export const projectNamesLimit = [
   "ember",
   "backbone",
 ];
+
+export const projectNamesExcessive = [...projectNamesLimit, "zustand", "jotai"];

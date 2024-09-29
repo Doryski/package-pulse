@@ -1,5 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
-import { projectNames, projectNamesLimit } from "./data";
+import { projectNames, projectNamesExcessive, projectNamesLimit } from "./data";
 import {
   addManyProjects,
   fillSearchInput,
@@ -201,5 +201,42 @@ test.describe("Search Projects Form", () => {
 
     const selectedProject = getTags(page).getByText(projectName);
     await expect(selectedProject).toBeVisible();
+  });
+
+  test("should limit the number of projects to 10 when more than 10 are provided in the URL", async ({
+    page,
+  }) => {
+    await goToProjectsPage(page, projectNamesExcessive);
+    await page.waitForSelector("[role='list']");
+
+    const tags = getTags(page);
+    const visibleTags = await tags.all();
+    expect(visibleTags).toHaveLength(10);
+
+    for (let i = 0; i < 10; i++) {
+      const projectName = projectNamesExcessive[i];
+      expect(projectName).not.toBeUndefined();
+      if (!projectName) continue;
+      await expect(tags.getByText(projectName, { exact: true })).toBeVisible();
+    }
+
+    for (let i = 10; i < projectNamesExcessive.length; i++) {
+      const projectName = projectNamesExcessive[i];
+      expect(projectName).not.toBeUndefined();
+      if (!projectName) continue;
+      await expect(
+        tags.getByText(projectName, { exact: true }),
+      ).not.toBeVisible();
+    }
+
+    const url = page.url();
+    const urlProjects =
+      new URL(url).searchParams.get("projects")?.split(",") || [];
+    expect(urlProjects).toHaveLength(10);
+
+    const remainingProjects = urlProjects.slice(10);
+    for (const projectName of remainingProjects) {
+      expect(tags.getByText(projectName, { exact: true })).not.toBeVisible();
+    }
   });
 });

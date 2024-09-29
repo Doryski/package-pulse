@@ -106,6 +106,20 @@ describe("getInitialProjects", () => {
     const result = getInitialProjects(null, delimiter);
     expect(result).toEqual([]);
   });
+
+  it("should limit the number of projects to 10 when more than 10 are provided", () => {
+    const projectsParam = Array(15)
+      .fill("project")
+      .map((p, i) => `${p}${i + 1}`)
+      .join(delimiter);
+    const result = getInitialProjects(projectsParam, delimiter);
+    expect(result).toHaveLength(10);
+    expect(result).toEqual(
+      Array(10)
+        .fill("project")
+        .map((p, i) => `${p}${i + 1}`),
+    );
+  });
 });
 
 describe("getOtherParamsString", () => {

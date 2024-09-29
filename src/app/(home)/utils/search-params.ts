@@ -28,6 +28,8 @@ export function getInitialProjects(
     .split(delimiter)
     .map(decodeProjectName);
 
+  if (decodedProjectsParam.length > 10)
+    return decodedProjectsParam.slice(0, 10);
   if (decodedProjectsParam.length > 0) return decodedProjectsParam;
   return [];
 }
