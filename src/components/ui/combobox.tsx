@@ -15,6 +15,7 @@ import {
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import { cn } from "@/lib/utils/cn";
 import { CheckIcon } from "@radix-ui/react-icons";
+import { KeyboardEvent, useCallback, useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Input } from "./input";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./list";
@@ -39,6 +40,81 @@ export function Combobox<T>({
   optionValuePredicate,
 }: ComboboxProps<T>) {
   const [isPopoverOpen, openPopover, closePopover] = useBooleanState(false);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const popoverContentRef = useRef<HTMLDivElement>(null);
+  const optionsElements = popoverContentRef.current?.querySelectorAll("li");
+
+  const focusNextOption = useCallback(
+    (index: number) => {
+      const nextOption = optionsElements?.[index];
+      if (nextOption) {
+        nextOption.focus();
+      }
+      setActiveIndex(index);
+    },
+    [optionsElements, setActiveIndex],
+  );
+
+  const handleInputKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (
+        e.key === "ArrowDown" &&
+        isPopoverOpen &&
+        e.currentTarget.selectionStart === e.currentTarget.value.length
+      ) {
+        e.preventDefault();
+        const nextIndex =
+          activeIndex < (optionsElements?.length ?? 0) - 1
+            ? activeIndex + 1
+            : 0;
+        focusNextOption(nextIndex);
+      } else if (e.key === "Tab") {
+        closePopover();
+      }
+    },
+    [
+      isPopoverOpen,
+      activeIndex,
+      optionsElements,
+      focusNextOption,
+      closePopover,
+    ],
+  );
+
+  const handleOptionKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLLIElement>, option: T) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextIndex =
+          activeIndex < (optionsElements?.length ?? 0) - 1
+            ? activeIndex + 1
+            : activeIndex;
+        focusNextOption(nextIndex);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (activeIndex === 0) {
+          form.setFocus("search");
+          setActiveIndex(-1);
+        } else {
+          const nextIndex = activeIndex > 0 ? activeIndex - 1 : activeIndex;
+          focusNextOption(nextIndex);
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        onSelectItem(optionValuePredicate(option));
+        closePopover();
+      }
+    },
+    [
+      activeIndex,
+      optionsElements,
+      focusNextOption,
+      form,
+      onSelectItem,
+      optionValuePredicate,
+      closePopover,
+    ],
+  );
 
   return (
     <FormField
@@ -86,11 +162,7 @@ export function Combobox<T>({
                         openPopover();
                       }
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        closePopover();
-                      }
-                    }}
+                    onKeyDown={handleInputKeyDown}
                   />
                 </div>
               </FormControl>
@@ -98,6 +170,7 @@ export function Combobox<T>({
             <PopoverContent
               className={cn("p-0 max-w-full", !field.value && "hidden")}
               onOpenAutoFocus={(e) => e.preventDefault()}
+              ref={popoverContentRef}
             >
               <ListGroup>
                 <ListEmpty
@@ -109,13 +182,16 @@ export function Combobox<T>({
                   className={isLoadingOptions ? "block" : "hidden"}
                 />
                 <List role="listbox">
-                  {options?.map((option) => {
+                  {options?.map((option, index) => {
                     const optionValue = optionValuePredicate(option);
                     return (
                       <ListItem
                         role="option"
                         key={optionValue}
                         onClick={() => onSelectItem(optionValue)}
+                        tabIndex={-1}
+                        aria-selected={index === activeIndex}
+                        onKeyDown={(e) => handleOptionKeyDown(e, option)}
                       >
                         {optionValue}
                         <CheckIcon

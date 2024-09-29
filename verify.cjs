@@ -55,6 +55,11 @@ async function verify() {
     await runCommand("npx kill-port 3000", "Stopping dev server", true);
   }
 
+  if (success) {
+    console.info("\n✅ Verification completed successfully.");
+  } else {
+    console.info("\n❌ Verification failed. See above for details.");
+  }
   process.exit(success ? 0 : 1);
 }
 

@@ -40,9 +40,10 @@ test.describe("Chart Section", () => {
       (timePeriod) => timePeriod.value === "months-1",
     )!;
     const oneMonthOption = page.getByText(oneMonthTimePeriod?.label);
-    oneMonthOption.click();
+    await oneMonthOption.click();
 
-    await page.waitForTimeout(1000);
+    const loader = page.locator("[role='status']");
+    await expect(loader).not.toBeVisible();
 
     const updatedXAxisLabels = await page
       .locator(".recharts-xAxis .recharts-cartesian-axis-tick-value")

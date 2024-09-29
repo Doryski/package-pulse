@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { projectNames, projectNamesLimit } from "./data";
+import { expect, Page, test } from "@playwright/test";
+import { projectNames, projectNamesExcessive, projectNamesLimit } from "./data";
 import {
   addManyProjects,
   fillSearchInput,
@@ -9,6 +9,15 @@ import {
   goToProjectsPage,
   waitForSearchResponse,
 } from "./utils";
+
+const prepareFilledCombobox = async (page: Page, projectName: string) => {
+  const searchInput = getSearchInput(page);
+
+  await fillSearchInput(searchInput, projectName);
+  await waitForSearchResponse(page, projectName);
+
+  return searchInput;
+};
 
 test.describe("Search Projects Form", () => {
   test.beforeEach(async ({ page }) => {
@@ -24,11 +33,8 @@ test.describe("Search Projects Form", () => {
   test("should allow searching for and selecting projects", async ({
     page,
   }) => {
-    const searchInput = getSearchInput(page);
     const projectName = "react";
-
-    await fillSearchInput(searchInput, projectName);
-    await waitForSearchResponse(page, projectName);
+    const searchInput = await prepareFilledCombobox(page, projectName);
 
     const list = getOptionsList(page);
     await expect(list).toBeVisible();
@@ -46,11 +52,8 @@ test.describe("Search Projects Form", () => {
   });
 
   test("should allow removing selected projects", async ({ page }) => {
-    const searchInput = getSearchInput(page);
     const projectName = "react";
-
-    await fillSearchInput(searchInput, projectName);
-    await waitForSearchResponse(page, projectName);
+    await prepareFilledCombobox(page, projectName);
 
     const list = getOptionsList(page);
     const firstOption = list.getByRole("option").first();
@@ -92,9 +95,10 @@ test.describe("Search Projects Form", () => {
     }, projectNames);
 
     await goToProjectsPage(page, []);
-    const localStorageProjects = await page.evaluate(() => {
-      return localStorage.getItem("selected-projects");
-    });
+    await fillSearchInput(getSearchInput(page), "");
+    const localStorageProjects = await page.evaluate(() =>
+      localStorage.getItem("selected-projects"),
+    );
     expect(localStorageProjects).toEqual(JSON.stringify([]));
     const tagsEmpty = getTags(page);
     expect(await tagsEmpty.all()).toHaveLength(0);
@@ -137,5 +141,102 @@ test.describe("Search Projects Form", () => {
     await expect(limitMessage).toBeVisible();
 
     await expect(searchInput).toBeDisabled();
+  });
+
+  test("should navigate through the options with the arrow keys", async ({
+    page,
+  }) => {
+    const searchInput = await prepareFilledCombobox(page, "react");
+
+    const list = getOptionsList(page);
+    await expect(list).toBeVisible();
+
+    const searchResults = list.getByRole("option");
+    await expect(searchResults.first()).toBeVisible();
+
+    const searchResultsElements = await searchResults.all();
+
+    // Navigate down
+    for (let i = 0; i < searchResultsElements.length; i++) {
+      await page.keyboard.press("ArrowDown");
+      await expect(searchResults.nth(i)).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    }
+
+    // Navigate up
+    for (let i = searchResultsElements.length - 1; i >= 0; i--) {
+      await expect(searchResults.nth(i)).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await page.keyboard.press("ArrowUp");
+    }
+
+    // The last ArrowUp should focus the input
+    await expect(searchInput).toBeFocused();
+  });
+
+  test("should close the options list when the tab key is pressed", async ({
+    page,
+  }) => {
+    await prepareFilledCombobox(page, "react");
+
+    const list = getOptionsList(page);
+    await expect(list).toBeVisible();
+
+    await page.keyboard.press("Tab");
+
+    await expect(list).not.toBeVisible();
+  });
+
+  test("should search for project when the enter key is pressed", async ({
+    page,
+  }) => {
+    const projectName = "react";
+    const searchInput = await prepareFilledCombobox(page, projectName);
+
+    await searchInput.press("Enter");
+
+    const selectedProject = getTags(page).getByText(projectName);
+    await expect(selectedProject).toBeVisible();
+  });
+
+  test("should limit the number of projects to 10 when more than 10 are provided in the URL", async ({
+    page,
+  }) => {
+    await goToProjectsPage(page, projectNamesExcessive);
+    await page.waitForSelector("[role='list']");
+
+    const tags = getTags(page);
+    const visibleTags = await tags.all();
+    expect(visibleTags).toHaveLength(10);
+
+    for (let i = 0; i < 10; i++) {
+      const projectName = projectNamesExcessive[i];
+      expect(projectName).not.toBeUndefined();
+      if (!projectName) continue;
+      await expect(tags.getByText(projectName, { exact: true })).toBeVisible();
+    }
+
+    for (let i = 10; i < projectNamesExcessive.length; i++) {
+      const projectName = projectNamesExcessive[i];
+      expect(projectName).not.toBeUndefined();
+      if (!projectName) continue;
+      await expect(
+        tags.getByText(projectName, { exact: true }),
+      ).not.toBeVisible();
+    }
+
+    const url = page.url();
+    const urlProjects =
+      new URL(url).searchParams.get("projects")?.split(",") || [];
+    expect(urlProjects).toHaveLength(10);
+
+    const remainingProjects = urlProjects.slice(10);
+    for (const projectName of remainingProjects) {
+      expect(tags.getByText(projectName, { exact: true })).not.toBeVisible();
+    }
   });
 });

@@ -14,17 +14,26 @@ const ThemeSwitch = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="hidden text-nowrap text-sm font-medium sm:block">
+      <label
+        htmlFor="theme-switch"
+        className="hidden text-nowrap text-sm font-medium sm:block"
+      >
         Theme:
       </label>
       <Select value={theme} onValueChange={(value) => setTheme(value)}>
-        <SelectTrigger className="w-24">
+        <SelectTrigger className="w-24" id="theme-switch" aria-label="Theme">
           <SelectValue placeholder="Select theme" />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="system">System</SelectItem>
-          <SelectItem value="dark">Dark</SelectItem>
-          <SelectItem value="light">Light</SelectItem>
+        <SelectContent role="menu">
+          <SelectItem role="menuitem" value="system">
+            System
+          </SelectItem>
+          <SelectItem role="menuitem" value="dark">
+            Dark
+          </SelectItem>
+          <SelectItem role="menuitem" value="light">
+            Light
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>
