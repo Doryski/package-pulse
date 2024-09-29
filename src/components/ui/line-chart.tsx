@@ -157,7 +157,10 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
           </LineChart>
         </ChartContainer>
         {isPending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/65">
+          <div
+            role="status"
+            className="absolute inset-0 flex items-center justify-center bg-background/65"
+          >
             <div className="size-12 animate-spin rounded-full border-y-2 border-primary" />
           </div>
         )}
