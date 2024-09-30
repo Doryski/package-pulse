@@ -37,7 +37,7 @@ const ProjectsForm = () => {
         selectedProjects.length > 0 &&
           "flex flex-col h-full justify-center py-4",
         selectedProjects.length === 0 &&
-          "flex flex-col h-full justify-center max-w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+          "flex flex-col h-full justify-center max-w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full sm:w-auto",
       )}
     >
       <ComboboxForm form={projectsSearchForm} />
