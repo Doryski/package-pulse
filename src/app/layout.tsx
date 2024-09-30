@@ -13,7 +13,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   title: "Package Pulse | Explore NPM Package Trends",
   description:
-    "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
+    "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on NPM trends and analytics.",
   keywords: [
     "NPM trends",
     "NPM package trends",
@@ -22,6 +22,8 @@ export const metadata = {
     "JavaScript libraries",
     "dependency trends",
     "open source analytics",
+    "Github stars",
+    "Github trends",
   ],
   openGraph: {
     title: "Package Pulse | Explore NPM Package Trends",
@@ -83,7 +85,7 @@ export default function RootLayout({
           </div>
           <Toaster />
         </Providers>
-        <Analytics />
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
   );

@@ -4,7 +4,8 @@ import {
 } from "@/lib/schemas/npmDownloadsPeriod";
 import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
-import { format, isValid, parseISO, startOfToday } from "date-fns";
+import { format, isValid, parseISO, startOfDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 export const NPM_API_FIRST_DAY = "2015-01-10";
 export const NPM_RANGE_API_PERIOD_MONTHS = 18;
 export const DATE_FORMAT = "yyyy-MM-dd";
@@ -22,7 +23,8 @@ export default async function fetchNPMDownloads(
   }
 
   const downloadsByDate: NPMDownloadCount[] = [];
-  const today = startOfToday();
+  const today = startOfDay(toZonedTime(new Date(), "UTC"));
+
   const periods = getTimePeriods(
     createdAtDate,
     today,
