@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
+import { Analytics } from "@vercel/analytics/react";
 import { Viewport } from "next";
 import { Inter } from "next/font/google";
 import Footer from "./(footer)/footer";
@@ -82,6 +83,7 @@ export default function RootLayout({
           </div>
           <Toaster />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
