@@ -1,6 +1,6 @@
 ## Project Overview
 
-Package Pulse is a web application designed to provide more comprehensive and analytics-driven statistics and visualizations for NPM packages compared to existing tools like npm trends. The main goal is to deliver fast, insightful stats, visualizations and comparisons.
+Package Pulse is a web application designed to provide comprehensive, analytics-driven statistics and visualizations for NPM packages. The main goal is to offer developers and teams valuable insights into package trends, usage patterns, and performance metrics.
 
 ## Contact
 
