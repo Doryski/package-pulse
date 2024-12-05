@@ -3,7 +3,7 @@ import { z } from "zod";
 export const NPMPackageSearchItemSchema = z.object({
   package: z.object({
     name: z.string(),
-    scope: z.string(),
+    scope: z.string().optional(),
     version: z.string(),
     description: z.string().optional(),
     keywords: z.array(z.string()).optional(),
