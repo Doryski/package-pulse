@@ -1,7 +1,7 @@
 import {
   NPMPackageSearch,
   NPMPackageSearchSchema,
-} from "../lib/schemas/npmPackageSearch";
+} from "../lib/schemas/npmPackageSearch.schema";
 
 export default async function searchNPMRegistry(
   search: string,

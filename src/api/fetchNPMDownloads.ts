@@ -1,7 +1,7 @@
 import {
   NPMDownloadCount,
   NPMDownloadPeriodSchema,
-} from "@/lib/schemas/npmDownloadsPeriod";
+} from "@/lib/schemas/npmDownloadsPeriod.schema";
 import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import { format, isValid, parseISO, startOfDay } from "date-fns";

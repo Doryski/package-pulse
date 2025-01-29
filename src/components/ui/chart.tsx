@@ -300,13 +300,15 @@ const ChartLegendContent = React.forwardRef<
                 <itemConfig.icon />
               ) : (
                 <div
-                  className="size-2 shrink-0 rounded-[2px] md:size-3"
+                  className="size-2 shrink-0 rounded-full md:size-3"
                   style={{
                     backgroundColor: item.color,
                   }}
                 />
               )}
-              <span className="text-xs md:text-sm">{itemConfig?.label}</span>
+              <span className="text-xs leading-none md:text-sm md:leading-none">
+                {itemConfig?.label}
+              </span>
             </div>
           );
         })}

@@ -9,10 +9,10 @@ const Footer = () => {
         Created by Dominik Rycharski (
         <TextLink
           href={links.githubProfile}
-          className="inline-flex px-0.5"
+          className="inline-flex items-center px-0.5"
           outside
         >
-          <GitHubLogoIcon className="text-black dark:text-white" />
+          <GitHubLogoIcon className="mr-1 text-black dark:text-white" />
           <span>Doryski</span>
         </TextLink>
         ).
@@ -20,16 +20,16 @@ const Footer = () => {
       <p className="inline">
         For any questions, bugs or feature requests, please contact me through
         the contact form at{" "}
-        <TextLink href={links.personalWebsite} outside className="inline px-1">
+        <TextLink href={links.personalWebsite} outside className="inline">
           dominikrycharski.com
         </TextLink>{" "}
         or open an issue on{" "}
         <TextLink
           href={links.githubRepository}
           outside
-          className="inline-flex items-center px-1"
+          className="inline-flex items-center"
         >
-          <GitHubLogoIcon className="text-black dark:text-white" /> Github
+          <GitHubLogoIcon className="mr-1 text-black dark:text-white" /> Github
           repository
         </TextLink>
         .
