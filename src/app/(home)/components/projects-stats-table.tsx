@@ -1,4 +1,6 @@
+import Loader from "@/components/loader";
 import DotIndicator from "@/components/ui/dot-indicator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -117,12 +119,10 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableBody>
           {processedProjectsTableStats.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
-              <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background md:bg-transparent">
-                <div className="flex items-center gap-2">
-                  <DotIndicator color={projectStats.color} />
-                  <span className="text-sm">{projectStats.projectName}</span>
-                </div>
-              </TableCell>
+              <ProjectNameCell
+                projectName={projectStats.projectName}
+                color={projectStats.color}
+              />
               <TableCellWithStats change={projectStats.weeklyChange} />
               <TableCellWithStats change={projectStats.monthlyChange} />
               <TableCellWithStats change={projectStats.yearlyChange} />
@@ -134,5 +134,31 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
     </div>
   );
 };
+
+type ProjectNameCellProps = {
+  isLoading?: boolean;
+  projectName: string;
+  color: string | undefined;
+};
+
+export function ProjectNameCell({
+  isLoading = false,
+  projectName,
+  color,
+}: ProjectNameCellProps) {
+  return (
+    <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background md:bg-transparent">
+      <Loader
+        isLoading={isLoading}
+        fallback={<Skeleton className="h-4 w-full" />}
+      >
+        <div className="flex items-center gap-2">
+          <DotIndicator color={color} />
+          <span className="text-sm">{projectName}</span>
+        </div>
+      </Loader>
+    </TableCell>
+  );
+}
 
 export default ProjectsStatsTable;

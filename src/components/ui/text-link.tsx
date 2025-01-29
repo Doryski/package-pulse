@@ -1,23 +1,28 @@
 import { cn } from "@/lib/utils/cn";
+import { forwardRef } from "react";
 
-type TextLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+type TextLinkProps = {
   outside?: boolean;
-};
+} & React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-const TextLink = ({ children, outside, ...props }: TextLinkProps) => {
-  return (
-    <a
-      target={outside ? "_blank" : undefined}
-      rel={outside ? "noopener noreferrer" : undefined}
-      {...props}
-      className={cn(
-        "inline-flex items-center gap-1 text-blue-500 hover:underline",
-        props.className,
-      )}
-    >
-      {children}
-    </a>
-  );
-};
+const TextLink = forwardRef<HTMLAnchorElement, TextLinkProps>(
+  ({ className, outside, children, ...props }, ref) => {
+    return (
+      <a
+        ref={ref}
+        className={cn(
+          "hover:underline hover:opacity-80 transition-opacity",
+          className,
+        )}
+        {...(outside ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
+);
+
+TextLink.displayName = "TextLink";
 
 export default TextLink;
