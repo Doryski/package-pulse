@@ -6,7 +6,7 @@ const Footer = () => {
   return (
     <footer className="mt-4 flex flex-col items-start gap-2 border-t border-gray-200 py-4 text-sm dark:border-gray-800 md:mt-8 md:text-base">
       <p className="inline">
-        Created by Dominik Rycharski (
+        Developed by Dominik Rycharski (
         <TextLink
           href={links.githubProfile}
           className="inline-flex items-center px-0.5"
@@ -15,38 +15,24 @@ const Footer = () => {
           <GitHubLogoIcon className="mr-1 text-black dark:text-white" />
           <span>Doryski</span>
         </TextLink>
-        ).
+        )
       </p>
       <p className="inline">
-        For any questions, bugs or feature requests, please contact me through
-        the contact form at{" "}
+        For inquiries, bug reports, or feature requests, please use the contact
+        form at{" "}
         <TextLink href={links.personalWebsite} outside className="inline">
           dominikrycharski.com
         </TextLink>{" "}
-        or open an issue on{" "}
+        or submit an issue on{" "}
         <TextLink
           href={links.githubRepository}
           outside
           className="inline-flex items-center"
         >
-          <GitHubLogoIcon className="mr-1 text-black dark:text-white" /> Github
+          <GitHubLogoIcon className="mr-1 text-black dark:text-white" /> GitHub
           repository
         </TextLink>
-        .
       </p>
-      <div className="flex w-full flex-col items-start lg:flex-row lg:items-center">
-        <p className="inline">
-          If you find this project helpful, consider supporting me to keep this
-          project running:
-        </p>
-        <TextLink
-          href={links.buyMeACoffee}
-          outside
-          className="mx-auto mt-1 inline-block rounded bg-yellow-400 px-2 py-1 text-black lg:ml-2 lg:mr-0"
-        >
-          Buy me a coffee ☕
-        </TextLink>
-      </div>
     </footer>
   );
 };
