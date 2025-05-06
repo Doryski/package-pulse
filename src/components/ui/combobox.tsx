@@ -43,6 +43,7 @@ export function Combobox<T>({
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const popoverContentRef = useRef<HTMLDivElement>(null);
   const optionsElements = popoverContentRef.current?.querySelectorAll("li");
+  const searchValue = form.watch("search");
 
   const focusNextOption = useCallback(
     (index: number) => {
@@ -176,7 +177,9 @@ export function Combobox<T>({
                 <ListEmpty
                   className={options?.length === 0 ? "block" : "hidden"}
                 >
-                  No project found.
+                  {searchValue && searchValue.length === 1
+                    ? "Type at least 2 characters to search"
+                    : "No project found."}
                 </ListEmpty>
                 <ListLoading
                   className={isLoadingOptions ? "block" : "hidden"}

@@ -6,7 +6,7 @@ export default function useSearchNPMRegistryQuery(search: string) {
   return useQuery({
     queryKey: getSearchNPMRegistryQueryKey(search),
     queryFn: () => searchNPMRegistry(search),
-    enabled: !!search,
+    enabled: search.length >= 2,
     staleTime: 5 * 60 * 1000,
   });
 }
