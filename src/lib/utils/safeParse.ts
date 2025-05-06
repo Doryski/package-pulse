@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/react";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 export default function safeParse<Output, Input = Output>(

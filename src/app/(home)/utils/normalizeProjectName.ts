@@ -1,3 +1,4 @@
+import safeParse from "@/lib/utils/safeParse";
 import { z } from "zod";
 
 const NormalizedProjectNameSchema = z
@@ -12,7 +13,7 @@ export type NormalizedProjectName = z.infer<typeof NormalizedProjectNameSchema>;
 export const normalizeProjectName = (
   projectName: string,
 ): NormalizedProjectName => {
-  return NormalizedProjectNameSchema.parse(projectName);
+  return safeParse(projectName, NormalizedProjectNameSchema);
 };
 
 export default normalizeProjectName;

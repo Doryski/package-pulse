@@ -4,6 +4,7 @@ import {
 } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
+import safeParse from "@/lib/utils/safeParse";
 import { format, isValid, parseISO, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 export const NPM_API_FIRST_DAY = "2015-01-10";
@@ -48,7 +49,7 @@ export default async function fetchNPMDownloads(
       const data = await result.value.json();
 
       try {
-        const { downloads } = NPMDownloadPeriodSchema.parse(data);
+        const { downloads } = safeParse(data, NPMDownloadPeriodSchema);
         downloadsByDate.push(...downloads);
       } catch (error) {
         throw new AppError("Received invalid data from NPM API");

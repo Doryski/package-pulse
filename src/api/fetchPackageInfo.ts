@@ -1,5 +1,6 @@
 import { GithubRepoInfoSchema } from "@/lib/schemas/githubRepoInfo.schema";
 import { NPMPackageInfoSchema } from "@/lib/schemas/npmPackageInfo.schema";
+import safeParse from "@/lib/utils/safeParse";
 import { z } from "zod";
 
 const AnyObjectSchema = z.record(z.string(), z.any());
@@ -8,7 +9,7 @@ const AnyArraySchema = z.array(AnyObjectSchema);
 export const fetchGithubRepoInfo = async (repoName: string) => {
   const response = await fetch(`https://api.github.com/repos/${repoName}`);
   const data = await response.json();
-  return GithubRepoInfoSchema.parse(data);
+  return safeParse(data, GithubRepoInfoSchema);
 };
 
 export const getRepoNameFromUrl = (gitUrl: string) => {
@@ -22,7 +23,7 @@ export const fetchPackageInfo = async (projectName: string) => {
   try {
     const response = await fetch(`https://registry.npmjs.org/${projectName}`);
     const data = await response.json();
-    const parsedData = NPMPackageInfoSchema.parse(data);
+    const parsedData = safeParse(data, NPMPackageInfoSchema);
     const repositoryUrl = parsedData.repository.url;
     const latestVersion = parsedData.versions[parsedData["dist-tags"].latest];
     const lastReleaseDate = parsedData.time.modified;
@@ -66,7 +67,7 @@ export const fetchContributorsCount = async (repoName: string) => {
     `https://api.github.com/repos/${repoName}/contributors`,
   );
   const data = await response.json();
-  return AnyArraySchema.parse(data).length;
+  return safeParse(data, AnyArraySchema).length;
 };
 
 export const fetchGithubPullRequestsCount = async (repoName: string) => {
@@ -74,5 +75,5 @@ export const fetchGithubPullRequestsCount = async (repoName: string) => {
     `https://api.github.com/repos/${repoName}/pulls`,
   );
   const data = await response.json();
-  return AnyArraySchema.parse(data).length;
+  return safeParse(data, AnyArraySchema).length;
 };

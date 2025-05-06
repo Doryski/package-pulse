@@ -1,3 +1,4 @@
+import safeParse from "@/lib/utils/safeParse";
 import {
   NPMPackageSearch,
   NPMPackageSearchSchema,
@@ -13,7 +14,7 @@ export default async function searchNPMRegistry(
     );
     const data = await res.json();
     try {
-      const { objects } = NPMPackageSearchSchema.parse(data);
+      const { objects } = safeParse(data, NPMPackageSearchSchema);
       return objects;
     } catch (error) {
       console.error(error);

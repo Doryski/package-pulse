@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod.mjs";
 import { ResponseInput } from "openai/resources/responses/responses.mjs";
 import { z } from "zod";
+import safeParse from "./safeParse";
 
 export type SimilarProject = {
   name: string;
@@ -49,8 +50,9 @@ export async function fetchSimilarProjects(
     },
   });
 
-  return SimilarProjectsSchema.parse(
+  return safeParse(
     JSON.parse(response.output_text),
+    SimilarProjectsSchema,
   ).similarProjects.map((project) => project.trim().toLowerCase());
 }
 
