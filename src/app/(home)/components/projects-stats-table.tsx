@@ -13,6 +13,8 @@ import TableHeadSortable, {
   SortColumn,
   SortDirection,
 } from "@/components/ui/table-head-sortable";
+import LocalStorageKey from "@/lib/enums/LocalStorageKey";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useCallback, useMemo, useState } from "react";
@@ -39,6 +41,9 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   const { resolvedTheme } = useTheme();
   const [sortColumn, setSortColumn] = useState<SortColumn>("oneYearAgo");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  useLocalStorage(LocalStorageKey.TABLE_SORT_COLUMN, sortColumn);
+  useLocalStorage(LocalStorageKey.TABLE_SORT_DIRECTION, sortDirection);
 
   const processedProjectsTableStats = useMemo(() => {
     const stats = getStatsMatrix(projectsStats, resolvedTheme);

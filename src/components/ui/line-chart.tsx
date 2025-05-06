@@ -9,7 +9,9 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
+import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
 import { format, isAfter, subMonths, subYears } from "date-fns";
@@ -91,7 +93,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
   const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
-  const { isHiddenElement, hiddenElements } = useLineChart(chartKey)();
+  const { isHiddenElement } = useLineChart(chartKey)();
 
   const handleTimePeriodChange = useCallback(
     (value: TimePeriod) => {
@@ -125,6 +127,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     [data],
   );
 
+  useLocalStorage(LocalStorageKey.TIME_PERIOD, timePeriod);
   useEffect(() => {
     handleTimePeriodChange(timePeriod);
   }, [handleTimePeriodChange, timePeriod]);
