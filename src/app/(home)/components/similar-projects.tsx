@@ -20,6 +20,7 @@ const SimilarProjects = ({
     queryFn: () => fetchSimilarProjects(selectedProjects),
     enabled: selectedProjects.length > 0,
     staleTime: 1000 * 60 * 60 * 24, // 24 hours
+    retry: 1,
   });
 
   if (!selectedProjects.length) {
@@ -30,11 +31,6 @@ const SimilarProjects = ({
     <section className="mt-4">
       <h2 className="text-lg">Similar projects</h2>
       <div className="mt-2">
-        {similarProjects.isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        )}
         {similarProjects.data && similarProjects.data.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {similarProjects.data.map((similarProject) => (

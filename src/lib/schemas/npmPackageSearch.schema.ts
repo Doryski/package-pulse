@@ -14,10 +14,12 @@ export const NPMPackageSearchItemSchema = z.object({
       repository: z.string().optional(),
       bugs: z.string().optional(),
     }),
-    publisher: z.object({
-      username: z.string(),
-      email: z.string(),
-    }),
+    publisher: z
+      .object({
+        username: z.string(),
+        email: z.string(),
+      })
+      .optional(),
     maintainers: z.array(
       z.object({
         username: z.string(),
