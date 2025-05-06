@@ -9,7 +9,7 @@ export default async function searchNPMRegistry(
   if (!search) return [];
   try {
     const res = await fetch(
-      `https://registry.npmjs.org/-/v1/search?text=${search}&size=10`,
+      `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(search)}&size=20&popularity=1.0`,
     );
     const data = await res.json();
     try {

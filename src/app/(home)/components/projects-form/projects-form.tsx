@@ -9,6 +9,7 @@ import {
   useUpdateSearchParams,
 } from "../../utils/search-params";
 import ComboboxForm from "../combobox-form";
+import SimilarProjects from "../similar-projects";
 import StatsSection from "../stats-section";
 import { ProjectsSearchFormSchema, ProjectsSearchFormValues } from "./schema";
 
@@ -31,6 +32,15 @@ const ProjectsForm = () => {
   useLocalStorage(LocalStorageKey.SELECTED_PROJECTS, selectedProjects);
   useUpdateSearchParams(selectedProjects, PROJECTS_URL_DELIMITER);
 
+  const handleAddProject = (projectName: string) => {
+    if (!selectedProjects.includes(projectName)) {
+      projectsSearchForm.setValue("projects", [
+        ...selectedProjects,
+        projectName,
+      ]);
+    }
+  };
+
   return (
     <FormProvider {...projectsSearchForm}>
       <div
@@ -42,6 +52,10 @@ const ProjectsForm = () => {
         )}
       >
         <ComboboxForm form={projectsSearchForm} />
+        <SimilarProjects
+          selectedProjects={selectedProjects}
+          onAddProject={handleAddProject}
+        />
         <StatsSection
           form={projectsSearchForm}
           selectedProjects={selectedProjects}
