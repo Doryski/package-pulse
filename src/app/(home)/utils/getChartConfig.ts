@@ -1,4 +1,4 @@
-import { ChartConfig } from "@/components/ui/chart";
+import { ChartConfig } from "@/components/ui/line-chart";
 import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
 import normalizeProjectName from "./normalizeProjectName";
 

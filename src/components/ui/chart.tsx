@@ -1,38 +1,12 @@
 "use client";
-
+import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
+import { cn } from "@/lib/utils/cn";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
-
-import { cn } from "@/lib/utils/cn";
+import { ChartConfig, useLineChart } from "./line-chart";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
-
-export type ChartConfig = {
-  [k in string]: {
-    label?: React.ReactNode;
-    icon?: React.ComponentType;
-  } & (
-    | { color?: string; theme?: never }
-    | { color?: never; theme: Record<keyof typeof THEMES, string> }
-  );
-};
-
-type ChartContextProps = {
-  config: ChartConfig;
-};
-
-const ChartContext = React.createContext<ChartContextProps | null>(null);
-
-function useChart() {
-  const context = React.useContext(ChartContext);
-
-  if (!context) {
-    throw new Error("useChart must be used within a <ChartContainer />");
-  }
-
-  return context;
-}
 
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
@@ -47,29 +21,27 @@ const ChartContainer = React.forwardRef<
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
 
   return (
-    <ChartContext.Provider value={{ config }}>
-      <div
-        data-chart={chartId}
-        ref={ref}
-        className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
-          className,
-        )}
-        {...props}
-      >
-        <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
-      </div>
-    </ChartContext.Provider>
+    <div
+      data-chart={chartId}
+      ref={ref}
+      className={cn(
+        "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+        className,
+      )}
+      {...props}
+    >
+      <ChartStyle id={chartId} config={config} />
+      <RechartsPrimitive.ResponsiveContainer>
+        {children}
+      </RechartsPrimitive.ResponsiveContainer>
+    </div>
   );
 });
 ChartContainer.displayName = "Chart";
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([_, config]) => config.theme || config.color,
+    ([_, itemConfig]) => itemConfig.theme || itemConfig.color,
   );
 
   if (!colorConfig.length) {
@@ -111,6 +83,7 @@ const ChartTooltipContent = React.forwardRef<
       indicator?: "line" | "dot" | "dashed";
       nameKey?: string;
       labelKey?: string;
+      chartKey: string;
     }
 >(
   (
@@ -128,10 +101,11 @@ const ChartTooltipContent = React.forwardRef<
       color,
       nameKey,
       labelKey,
+      chartKey,
     },
     ref,
   ) => {
-    const { config } = useChart();
+    const { config, isHiddenElement, toggleElement } = useLineChart(chartKey)();
 
     const tooltipLabel = React.useMemo(() => {
       if (hideLabel || !payload?.length) {
@@ -189,6 +163,7 @@ const ChartTooltipContent = React.forwardRef<
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
             const indicatorColor = color || item.payload.fill || item.color;
+            const isHidden = isHiddenElement(normalizeProjectName(key));
 
             return (
               <div
@@ -196,7 +171,9 @@ const ChartTooltipContent = React.forwardRef<
                 className={cn(
                   "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center",
+                  isHidden && "opacity-50",
                 )}
+                onClick={() => toggleElement(normalizeProjectName(key))}
               >
                 {formatter && item?.value !== undefined && item.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
@@ -230,6 +207,7 @@ const ChartTooltipContent = React.forwardRef<
                       className={cn(
                         "flex flex-1 justify-between leading-none",
                         nestLabel ? "items-end" : "items-center",
+                        isHidden && "line-through",
                       )}
                     >
                       <div className="grid gap-1.5">
@@ -264,13 +242,21 @@ const ChartLegendContent = React.forwardRef<
     Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
       hideIcon?: boolean;
       nameKey?: string;
+      chartKey: string;
     }
 >(
   (
-    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
+    {
+      className,
+      hideIcon = false,
+      payload,
+      verticalAlign = "bottom",
+      nameKey,
+      chartKey,
+    },
     ref,
   ) => {
-    const { config } = useChart();
+    const { config, isHiddenElement, toggleElement } = useLineChart(chartKey)();
 
     if (!payload?.length) {
       return null;
@@ -288,13 +274,16 @@ const ChartLegendContent = React.forwardRef<
         {payload.map((item) => {
           const key = `${nameKey || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
+          const isHidden = isHiddenElement(normalizeProjectName(key));
 
           return (
             <div
               key={item.value}
               className={cn(
-                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
+                "flex cursor-pointer items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
+                isHidden && "opacity-50",
               )}
+              onClick={() => toggleElement(normalizeProjectName(key))}
             >
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
@@ -306,8 +295,13 @@ const ChartLegendContent = React.forwardRef<
                   }}
                 />
               )}
-              <span className="text-xs leading-none md:text-sm md:leading-none">
-                {itemConfig?.label}
+              <span
+                className={cn(
+                  "text-xs leading-none md:text-sm md:leading-none",
+                  isHidden && "line-through",
+                )}
+              >
+                {itemConfig?.label || item.value}
               </span>
             </div>
           );
@@ -364,4 +358,5 @@ export {
   ChartStyle,
   ChartTooltip,
   ChartTooltipContent,
+  useLineChart,
 };

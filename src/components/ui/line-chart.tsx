@@ -3,7 +3,6 @@
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
-  ChartConfig,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
@@ -16,6 +15,8 @@ import { cn } from "@/lib/utils/cn";
 import { format, isAfter, subMonths, subYears } from "date-fns";
 import { memo, useCallback, useEffect, useState, useTransition } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { create } from "zustand";
+import { devtools } from "zustand/middleware";
 import {
   Select,
   SelectContent,
@@ -27,14 +28,70 @@ import {
 export type ChartData = {
   time: string | Date;
 } & Record<string, number>;
+
+export type ChartConfig = {
+  [k in string]: {
+    label?: React.ReactNode;
+    icon?: React.ComponentType;
+  } & (
+    | { color?: string; theme?: never }
+    | { color?: never; theme: Record<"light" | "dark", string> }
+  );
+};
+
+type LineChartStore = {
+  config: ChartConfig;
+  hiddenElements: Set<string>;
+  setConfig: (config: ChartConfig) => void;
+  toggleElement: (key: string) => void;
+  isHiddenElement: (key: string) => boolean;
+};
+
+const createLineChartStore = (key: string) => {
+  const storeName = `line-chart-${key}`;
+  return create<LineChartStore>()(
+    devtools(
+      (set, get) => ({
+        config: {},
+        hiddenElements: new Set(),
+        setConfig: (config) => set({ config }),
+        toggleElement: (key) =>
+          set((state) => {
+            const nextHiddenKeys = new Set(state.hiddenElements);
+            if (nextHiddenKeys.has(key)) {
+              nextHiddenKeys.delete(key);
+            } else {
+              nextHiddenKeys.add(key);
+            }
+            return { hiddenElements: nextHiddenKeys };
+          }),
+        isHiddenElement: (key) => get().hiddenElements.has(key),
+      }),
+      { name: storeName },
+    ),
+  );
+};
+
+const storeCache = new Map<string, ReturnType<typeof createLineChartStore>>();
+
+export const useLineChart = (key: string) => {
+  if (!storeCache.has(key)) {
+    storeCache.set(key, createLineChartStore(key));
+  }
+  return storeCache.get(key)!;
+};
+
 type MultipleLineChartProps = {
   data: ChartData[];
   config: ChartConfig;
+  chartKey: string;
 };
-function MultipleLineChart({ data, config }: MultipleLineChartProps) {
+
+function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
   const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
+  const { isHiddenElement, hiddenElements } = useLineChart(chartKey)();
 
   const handleTimePeriodChange = useCallback(
     (value: TimePeriod) => {
@@ -116,7 +173,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
             }}
           >
             <ChartLegend
-              content={<ChartLegendContent />}
+              content={<ChartLegendContent chartKey={chartKey} />}
               layout="horizontal"
               verticalAlign="top"
             />
@@ -135,7 +192,10 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
               tickFormatter={(value) => value.toLocaleString()}
               tickCount={12}
             />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent chartKey={chartKey} />}
+            />
             {data &&
               data?.length > 0 &&
               data[0] &&
@@ -143,6 +203,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
                 .filter((key) => key !== "time")
                 .map((key) => {
                   const normalizedKey = normalizeProjectName(key);
+
                   return (
                     <Line
                       key={normalizedKey}
@@ -151,6 +212,7 @@ function MultipleLineChart({ data, config }: MultipleLineChartProps) {
                       stroke={`var(--color-${normalizedKey})`}
                       strokeWidth={2}
                       dot={false}
+                      hide={isHiddenElement(normalizedKey)}
                     />
                   );
                 })}

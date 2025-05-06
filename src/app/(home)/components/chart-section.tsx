@@ -41,7 +41,11 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
         processedProjectsStats.length === 0 && "hidden",
       )}
     >
-      <MultipleLineChart data={processedProjectsStats} config={chartConfig} />
+      <MultipleLineChart
+        chartKey="main-chart"
+        data={processedProjectsStats}
+        config={chartConfig}
+      />
     </div>
   );
 });
