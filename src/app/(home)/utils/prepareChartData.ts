@@ -6,9 +6,9 @@ export default function prepareChartData(stats: SelectedProjectsStatsQueries) {
   return stats.reduce<ChartData[]>((acc, project) => {
     if (project.data) {
       const projectData = project.data.groupedByWeekData;
-      const normalizedProjectName = normalizeProjectName(
-        project.data.projectName,
-      );
+      const projectName = project.data.projectName;
+      const normalizedProjectName = normalizeProjectName(projectName);
+
       projectData.forEach((data) => {
         const existingData = acc.find((d) => d.time === data.date);
         if (existingData) {

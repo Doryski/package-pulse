@@ -1,6 +1,7 @@
 "use client";
 import getChartConfig from "@/app/(home)/utils/getChartConfig";
 import MultipleLineChart from "@/components/ui/line-chart";
+import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import { cn } from "@/lib/utils/cn";
 import { UseQueryResult } from "@tanstack/react-query";
 import { memo, useMemo } from "react";
@@ -24,9 +25,14 @@ type ChartSectionProps = {
 };
 
 const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
+  const packagesInfo = usePackagesInfo(
+    projectStats
+      .map((project) => project.data?.projectName)
+      .filter((project) => project !== undefined),
+  );
   const chartConfig = useMemo(
-    () => getChartConfig(projectStats),
-    [projectStats],
+    () => getChartConfig(projectStats, packagesInfo),
+    [packagesInfo, projectStats],
   );
 
   const processedProjectsStats = useMemo(

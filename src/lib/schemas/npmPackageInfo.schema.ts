@@ -3,19 +3,26 @@ import { z } from "zod";
 export const VersionSchema = z.object({
   name: z.string(),
   version: z.string(),
+  keywords: z.array(z.string()).optional(),
   description: z.string(),
-  main: z.string(),
+  main: z.string().optional(),
   scripts: z.record(z.string()).optional(),
   repository: z
-    .object({
-      type: z.string(),
-      url: z.string(),
-    })
+    .union([
+      z.object({
+        type: z.string(),
+        url: z.string(),
+      }),
+      z.string(),
+    ])
     .optional(),
   author: z
-    .object({
-      name: z.string(),
-    })
+    .union([
+      z.object({
+        name: z.string(),
+      }),
+      z.string(),
+    ])
     .optional(),
   license: z.string().optional(),
   bugs: z
@@ -58,37 +65,46 @@ export const VersionSchema = z.object({
 });
 
 export const NPMPackageInfoSchema = z.object({
-  _id: z.string(),
-  _rev: z.string(),
-  name: z.string(),
-  description: z.string(),
-  "dist-tags": z.object({
-    latest: z.string(),
-    next: z.string().optional(),
-  }),
-  versions: z.record(VersionSchema),
+  _id: z.string().optional(),
+  _rev: z.string().optional(),
+  name: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  "dist-tags": z
+    .object({
+      latest: z.string(),
+      next: z.string().optional(),
+    })
+    .optional(),
+  versions: z.record(VersionSchema).optional(),
   readme: z.string().optional(),
-  maintainers: z.array(
-    z.object({
-      name: z.string(),
-      email: z.string(),
-    }),
-  ),
-  time: z.record(z.string()),
+  maintainers: z
+    .array(
+      z.object({
+        name: z.string(),
+        email: z.string(),
+      }),
+    )
+    .optional(),
+  time: z.record(z.string()).optional(),
   homepage: z.string().optional(),
-  repository: z.object({
-    type: z.string(),
-    url: z.string(),
-  }),
+  repository: z
+    .object({
+      type: z.string(),
+      url: z.string(),
+    })
+    .optional(),
   author: z
     .object({
       name: z.string(),
     })
     .optional(),
-  license: z.string(),
-  bugs: z.object({
-    url: z.string(),
-  }),
-  readmeFilename: z.string(),
+  license: z.string().optional(),
+  bugs: z
+    .object({
+      url: z.string(),
+    })
+    .optional(),
+  readmeFilename: z.string().optional(),
   users: z.record(z.boolean()).optional(),
 });

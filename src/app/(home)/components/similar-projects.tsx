@@ -1,27 +1,27 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
-import { fetchSimilarProjects } from "@/lib/utils/fetchSimilarProjects";
-import { useQuery } from "@tanstack/react-query";
+import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import useSimilarProjects from "@/lib/queries/useSimilarProjects";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 type SimilarProjectsProps = {
   selectedProjects: string[];
+  similarProjects: string[];
   onAddProject: (projectName: string) => void;
 };
 
 const SimilarProjects = ({
   selectedProjects,
+  similarProjects,
   onAddProject,
 }: SimilarProjectsProps) => {
-  const similarProjects = useQuery<string[], Error>({
-    queryKey: ["similarProjects", selectedProjects],
-    queryFn: () => fetchSimilarProjects(selectedProjects),
-    enabled: selectedProjects.length > 0,
-    staleTime: 1000 * 60 * 60 * 24, // 24 hours
-    retry: 1,
-  });
+  const packagesInfo = usePackagesInfo(selectedProjects);
+  const similarProjectsQuery = useSimilarProjects(
+    packagesInfo.map((info) => info.data).filter((info) => info != null),
+  );
 
   if (!selectedProjects.length) {
     return null;
@@ -31,9 +31,18 @@ const SimilarProjects = ({
     <section className="mt-4">
       <h2 className="text-lg">Similar projects</h2>
       <div className="mt-2">
-        {similarProjects.data && similarProjects.data.length > 0 && (
+        {similarProjectsQuery.isLoading &&
+          !similarProjectsQuery.data &&
+          similarProjects.length === 0 && (
+            <ul className="flex flex-wrap gap-2">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="w-20 h-8" />
+              ))}
+            </ul>
+          )}
+        {similarProjects.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {similarProjects.data.map((similarProject) => (
+            {similarProjects.map((similarProject) => (
               <Button
                 key={similarProject}
                 variant="outline"
@@ -50,7 +59,7 @@ const SimilarProjects = ({
                 }}
                 disabled={
                   selectedProjects.includes(similarProject) ||
-                  similarProjects.isLoading ||
+                  similarProjectsQuery.isLoading ||
                   selectedProjects.length >= MAX_SELECTED_PROJECTS
                 }
               >
@@ -60,7 +69,7 @@ const SimilarProjects = ({
             ))}
           </div>
         )}
-        {!similarProjects.isLoading && !similarProjects.data && (
+        {!similarProjectsQuery.isLoading && similarProjects.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No similar projects found. Try selecting other projects.
           </p>

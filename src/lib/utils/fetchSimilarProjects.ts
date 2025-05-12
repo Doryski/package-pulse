@@ -1,5 +1,5 @@
 "use server";
-import { fetchPackageInfo } from "@/api/fetchPackageInfo";
+import { fetchPackageInfo, PackageInfo } from "@/api/fetchPackageInfo";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod.mjs";
 import { ResponseInput } from "openai/resources/responses/responses.mjs";
@@ -7,13 +7,9 @@ import { z } from "zod";
 import safeParse from "./safeParse";
 import trim from "./trim";
 
-export type SimilarProject = {
-  name: string;
-  similarityScore: number;
-  matchedKeywords?: string[];
-};
-
-const createPrompt = (selectedProjects: string[]): ResponseInput => [
+const createPrompt = (
+  packagesInfo: Pick<PackageInfo, "projectName" | "keywords" | "description">[],
+): ResponseInput => [
   {
     role: "system",
     content:
@@ -25,20 +21,32 @@ const createPrompt = (selectedProjects: string[]): ResponseInput => [
     Return the names of maximum 5 valid NPM packages, without any other text. \\
     Focus on the packages that have the most similar purpose e.g. frontend framework, state management, validation, etc. \\
     <example>
-      <example>
-        <input>react</input>
-        <output>
+      <input>
+      [
         {
-          similarProjects: [vue, @angular/core, solid-js]
-        }
-        </output>
-      </example>
-    </examples>
+          projectName: "react",
+          keywords: ["frontend", "framework"],
+          description: "React is a JavaScript library for building user interfaces.",
+        },
+      ]
+      </input>
+      <output>
+      {
+        similarProjects: [vue, @angular/core, solid-js]
+      }
+      </output>
+    </example>
     `,
   },
   {
     role: "user",
-    content: selectedProjects.join(", "),
+    content: JSON.stringify(
+      packagesInfo.map((info) => ({
+        projectName: info.projectName,
+        keywords: info.keywords,
+        description: info.description,
+      })),
+    ),
   },
 ];
 
@@ -49,14 +57,14 @@ const SimilarProjectsSchema = z.object({
 });
 
 export async function fetchSimilarProjects(
-  selectedProjects: string[],
+  packagesInfo: Pick<PackageInfo, "projectName" | "keywords" | "description">[],
 ): Promise<string[]> {
   const openaiClient = new OpenAI();
 
   const response = await openaiClient.responses.create(
     {
       model: "gpt-4.1-mini",
-      input: createPrompt(selectedProjects),
+      input: createPrompt(packagesInfo),
       text: {
         format: zodTextFormat(SimilarProjectsSchema, "similar_projects"),
       },
@@ -70,7 +78,10 @@ export async function fetchSimilarProjects(
   );
   const similarProjects = parsedResponse.similarProjects
     .map((project) => project.trim().toLowerCase())
-    .filter((project) => !!project && !selectedProjects.includes(project));
+    .filter(
+      (project) =>
+        !!project && !packagesInfo.find((info) => info.projectName === project),
+    );
 
   return similarProjects;
 }

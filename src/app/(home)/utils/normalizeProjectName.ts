@@ -10,9 +10,7 @@ const NormalizedProjectNameSchema = z
 
 export type NormalizedProjectName = z.infer<typeof NormalizedProjectNameSchema>;
 
-export const normalizeProjectName = (
-  projectName: string,
-): NormalizedProjectName => {
+const normalizeProjectName = (projectName: string): NormalizedProjectName => {
   return safeParse(projectName, NormalizedProjectNameSchema);
 };
 

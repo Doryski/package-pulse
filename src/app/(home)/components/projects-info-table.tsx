@@ -17,9 +17,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import TextLink from "@/components/ui/text-link";
+import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import getChartColor from "@/lib/utils/getChartColor";
 import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
-import { useQueries, useQuery, UseQueryResult } from "@tanstack/react-query";
+import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -34,14 +35,7 @@ const getNpmLink = (projectName: string) =>
 export default function ProjectsInfoTable() {
   const form = useFormContext<ProjectsSearchFormValues>();
   const selectedProjects = form.watch("projects");
-
-  const packagesInfo = useQueries({
-    queries: selectedProjects.map((project) => ({
-      queryKey: ["projectsInfo", project],
-      queryFn: () => fetchPackageInfo(project),
-      retry: false,
-    })),
-  });
+  const packagesInfo = usePackagesInfo(selectedProjects);
 
   return (
     <Table>
