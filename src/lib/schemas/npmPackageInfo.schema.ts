@@ -4,7 +4,7 @@ export const VersionSchema = z.object({
   name: z.string(),
   version: z.string(),
   keywords: z.array(z.string()).optional(),
-  description: z.string(),
+  description: z.string().optional(),
   main: z.string().optional(),
   scripts: z.record(z.string()).optional(),
   repository: z

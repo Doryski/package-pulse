@@ -14,9 +14,24 @@ import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
-import { format, isAfter, subMonths, subYears } from "date-fns";
-import { memo, useCallback, useEffect, useState, useTransition } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import sortByVersion from "@/lib/utils/sortByVersion";
+import { format, isAfter, startOfWeek, subMonths, subYears } from "date-fns";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import {
@@ -31,10 +46,16 @@ export type ChartData = {
   time: string | Date;
 } & Record<string, number>;
 
+export type VersionData = {
+  version: string;
+  date: string;
+};
+
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode;
     icon?: React.ComponentType;
+    versions?: VersionData[];
   } & (
     | { color?: string; theme?: never }
     | { color?: never; theme: Record<"light" | "dark", string> }
@@ -206,17 +227,48 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                 .filter((key) => key !== "time")
                 .map((key) => {
                   const normalizedKey = normalizeProjectName(key);
+                  const projectConfig = config[normalizedKey];
 
                   return (
-                    <Line
-                      key={normalizedKey}
-                      dataKey={normalizedKey}
-                      type="monotone"
-                      stroke={`var(--color-${normalizedKey})`}
-                      strokeWidth={2}
-                      dot={false}
-                      hide={isHiddenElement(normalizedKey)}
-                    />
+                    <Fragment key={normalizedKey}>
+                      <Line
+                        dataKey={normalizedKey}
+                        type="monotone"
+                        stroke={`var(--color-${normalizedKey})`}
+                        strokeWidth={2}
+                        dot={false}
+                        hide={isHiddenElement(normalizedKey)}
+                      />
+                      {!isHiddenElement(normalizedKey) &&
+                        projectConfig?.versions &&
+                        sortByVersion(projectConfig.versions)
+                          .slice(-1)
+                          .map((version) => {
+                            const formattedDate = format(
+                              version.date,
+                              DATE_FORMAT,
+                            );
+                            const weekStart = format(
+                              startOfWeek(version.date),
+                              DATE_FORMAT,
+                            );
+
+                            return (
+                              <ReferenceLine
+                                key={`${normalizedKey}-${version.version}`}
+                                x={weekStart}
+                                stroke={`var(--color-${normalizedKey})`}
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: `${version.version} (${formattedDate})`,
+                                  position: "insideTopRight",
+                                  fill: `var(--color-${normalizedKey})`,
+                                  fontSize: 10,
+                                }}
+                              />
+                            );
+                          })}
+                    </Fragment>
                   );
                 })}
           </LineChart>

@@ -24,9 +24,13 @@ export const fetchPackageInfo = async (projectName: string) => {
     const response = await fetch(`https://registry.npmjs.org/${projectName}`);
     const data = await response.json();
     const parsedData = safeParse(data, NPMPackageInfoSchema);
-    const repositoryUrl = parsedData.repository.url;
-    const latestVersion = parsedData.versions[parsedData["dist-tags"].latest];
-    const lastReleaseDate = parsedData.time.modified;
+    const repositoryUrl = parsedData.repository?.url;
+
+    const latestDistTag = parsedData["dist-tags"]?.latest;
+    const latestVersion = latestDistTag
+      ? parsedData.versions?.[latestDistTag]
+      : null;
+    const lastReleaseDate = parsedData.time?.modified;
     const contributorsCount = parsedData.users
       ? Object.keys(parsedData.users).length
       : 0;
@@ -39,12 +43,30 @@ export const fetchPackageInfo = async (projectName: string) => {
     const homepage = parsedData.homepage;
     const license = parsedData.license;
     const description = parsedData.description;
-    const createdAt = parsedData.time.created;
-    const repoName = getRepoNameFromUrl(repositoryUrl);
+    const createdAt = parsedData.time?.created;
+    const repoName = repositoryUrl ? getRepoNameFromUrl(repositoryUrl) : null;
+    const versions = parsedData.versions
+      ? Object.entries(parsedData.versions)
+          .reduce<Array<{ version: string; date: string }>>(
+            (acc, [version, _]) => {
+              if (!/^\d+\.\d+\.\d+$/.test(version)) return acc;
+              const date = parsedData.time?.[version];
+              if (!date) return acc;
+              return [...acc, { version, date }];
+            },
+            [],
+          )
+          .toSorted(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+          )
+      : [];
+
+    const keywords = parsedData.keywords ?? latestVersion?.keywords;
 
     return {
       projectName,
       repoName,
+      keywords,
       latestVersion,
       lastReleaseDate,
       contributorsCount,
@@ -55,12 +77,15 @@ export const fetchPackageInfo = async (projectName: string) => {
       repositoryUrl,
       description,
       createdAt,
+      versions,
     };
   } catch (error) {
     console.error(error);
     throw error;
   }
 };
+
+export type PackageInfo = Awaited<ReturnType<typeof fetchPackageInfo>>;
 
 export const fetchContributorsCount = async (repoName: string) => {
   const response = await fetch(
