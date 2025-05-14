@@ -23,8 +23,12 @@ export const fetchPackageInfo = async (projectName: string) => {
   try {
     const response = await fetch(`https://registry.npmjs.org/${projectName}`);
     const data = await response.json();
+
     const parsedData = safeParse(data, NPMPackageInfoSchema);
-    const repositoryUrl = parsedData.repository?.url;
+    const repositoryUrl =
+      typeof parsedData.repository === "string"
+        ? parsedData.repository
+        : parsedData.repository?.url;
 
     const latestDistTag = parsedData["dist-tags"]?.latest;
     const latestVersion = latestDistTag

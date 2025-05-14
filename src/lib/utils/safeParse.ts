@@ -14,7 +14,7 @@ export default function safeParse<Output, Input = Output>(
         data,
         schemaName: schema.description || "Unknown schema",
         errorPath: parsed.error.errors.map((err) => ({
-          path: err.path.join("."),
+          path: err.path.map((p) => `"${p}"`).join("."),
           message: err.message,
           code: err.code,
         })),

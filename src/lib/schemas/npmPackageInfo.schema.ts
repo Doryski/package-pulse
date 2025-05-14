@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const RepositorySchema = z.union([
+  z.object({
+    type: z.string().optional(),
+    url: z.string(),
+  }),
+  z.string(),
+]);
+
 export const VersionSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -7,15 +15,7 @@ export const VersionSchema = z.object({
   description: z.string().optional(),
   main: z.string().optional(),
   scripts: z.record(z.string()).optional(),
-  repository: z
-    .union([
-      z.object({
-        type: z.string(),
-        url: z.string(),
-      }),
-      z.string(),
-    ])
-    .optional(),
+  repository: RepositorySchema.optional(),
   author: z
     .union([
       z.object({
@@ -24,10 +24,18 @@ export const VersionSchema = z.object({
       z.string(),
     ])
     .optional(),
-  license: z.string().optional(),
+  license: z
+    .union([
+      z.string(),
+      z.object({
+        type: z.string(),
+        url: z.string(),
+      }),
+    ])
+    .optional(),
   bugs: z
     .object({
-      url: z.string(),
+      url: z.string().optional(),
     })
     .optional(),
   homepage: z.string().optional(),
@@ -38,10 +46,12 @@ export const VersionSchema = z.object({
   _shasum: z.string().optional(),
   _from: z.string().optional(),
   _npmVersion: z.string().optional(),
-  _npmUser: z.object({
-    name: z.string(),
-    email: z.string(),
-  }),
+  _npmUser: z
+    .object({
+      name: z.string(),
+      email: z.string(),
+    })
+    .optional(),
   maintainers: z
     .array(
       z.object({
@@ -88,12 +98,7 @@ export const NPMPackageInfoSchema = z.object({
     .optional(),
   time: z.record(z.string()).optional(),
   homepage: z.string().optional(),
-  repository: z
-    .object({
-      type: z.string(),
-      url: z.string(),
-    })
-    .optional(),
+  repository: RepositorySchema.optional(),
   author: z
     .object({
       name: z.string(),
