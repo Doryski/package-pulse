@@ -69,7 +69,7 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
       >
         <div className="flex w-full flex-col items-start gap-2">
           <Combobox
-            fullwidth={selectedProjects.length > 0}
+            fullwidth
             options={npmRegistry.data}
             isLoadingOptions={npmRegistry.isLoading}
             form={form}

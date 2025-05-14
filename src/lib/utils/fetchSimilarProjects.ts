@@ -63,7 +63,7 @@ export async function fetchSimilarProjects(
 
   const response = await openaiClient.responses.create(
     {
-      model: "gpt-4.1-mini",
+      model: "gpt-4.1-nano",
       input: createPrompt(packagesInfo),
       text: {
         format: zodTextFormat(SimilarProjectsSchema, "similar_projects"),

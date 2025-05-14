@@ -3,7 +3,6 @@ import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useSimilarProjects from "@/lib/queries/useSimilarProjects";
-import { cn } from "@/lib/utils/cn";
 import safeParse from "@/lib/utils/safeParse";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isEqual as isEqualLodash } from "lodash";
@@ -80,14 +79,7 @@ const ProjectsForm = () => {
 
   return (
     <FormProvider {...projectsSearchForm}>
-      <div
-        className={cn(
-          selectedProjects.length > 0 &&
-            "flex flex-col h-full justify-center py-4",
-          selectedProjects.length === 0 &&
-            "flex flex-col h-full justify-center max-w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full sm:w-auto",
-        )}
-      >
+      <div className="flex flex-col h-full justify-center py-4">
         <ComboboxForm form={projectsSearchForm} />
         <SimilarProjects
           selectedProjects={selectedProjects}
