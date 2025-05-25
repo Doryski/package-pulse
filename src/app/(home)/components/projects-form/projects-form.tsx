@@ -49,7 +49,6 @@ const ProjectsForm = () => {
   const [similarProjectsState, setSimilarProjectsState] = useState<string[]>(
     [],
   );
-  console.log({ similarProjectsState });
 
   useEffect(() => {
     if (
@@ -79,7 +78,7 @@ const ProjectsForm = () => {
 
   return (
     <FormProvider {...projectsSearchForm}>
-      <div className="flex flex-col h-full justify-center py-4">
+      <div className="flex h-full flex-col justify-center py-4">
         <ComboboxForm form={projectsSearchForm} />
         <SimilarProjects
           selectedProjects={selectedProjects}

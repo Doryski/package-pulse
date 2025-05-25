@@ -36,7 +36,7 @@ const SimilarProjects = ({
           similarProjects.length === 0 && (
             <ul className="flex flex-wrap gap-2">
               {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="w-20 h-8" />
+                <Skeleton key={index} className="h-8 w-20" />
               ))}
             </ul>
           )}
