@@ -1,11 +1,11 @@
 import { fetchPackageInfo } from "@/api/fetchPackageInfo";
 import { ChartConfig, VersionData } from "@/components/ui/line-chart";
+import { ProjectStats } from "@/lib/queries/useProjectsStats";
 import { UseQueryResult } from "@tanstack/react-query";
-import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
 import normalizeProjectName from "./normalizeProjectName";
 
 export default function getChartConfig(
-  stats: SelectedProjectsStatsQueries,
+  stats: UseQueryResult<ProjectStats>[],
   packagesInfo: UseQueryResult<
     Awaited<ReturnType<typeof fetchPackageInfo>>,
     Error

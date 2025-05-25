@@ -1,16 +1,17 @@
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
+import { ProjectStats } from "@/lib/queries/useProjectsStats";
+import { UseQueryResult } from "@tanstack/react-query";
 import { format } from "date-fns";
 import getChartColor from "../../../lib/utils/getChartColor";
 import getLastYearsMostAdequateDay from "../../../lib/utils/getLastYearsMostAdequateDay";
 import getPercentChange from "../../../lib/utils/getPercentChange";
 import { groupStats } from "../../../lib/utils/groupByPeriod";
-import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
 
 export type StatChange = {
   nominal: number;
   percentage: number;
 };
-type StatsRow = {
+export type StatsRow = {
   projectName: string;
   color: string | undefined;
   weeklyChange: StatChange | null;
@@ -24,7 +25,7 @@ type StatsRow = {
     | null;
 };
 export default function getStatsMatrix(
-  stats: SelectedProjectsStatsQueries,
+  stats: UseQueryResult<ProjectStats>[],
   theme: string | undefined,
 ) {
   return stats.reduce<StatsRow[]>((acc, query, index) => {

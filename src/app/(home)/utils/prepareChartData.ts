@@ -1,8 +1,11 @@
 import { ChartData } from "@/components/ui/line-chart";
-import { SelectedProjectsStatsQueries } from "../types/selected-projects-stats-queries";
+import { ProjectStats } from "@/lib/queries/useProjectsStats";
+import { UseQueryResult } from "@tanstack/react-query";
 import normalizeProjectName from "./normalizeProjectName";
 
-export default function prepareChartData(stats: SelectedProjectsStatsQueries) {
+export default function prepareChartData(
+  stats: UseQueryResult<ProjectStats>[],
+) {
   return stats.reduce<ChartData[]>((acc, project) => {
     if (project.data) {
       const projectData = project.data.groupedByWeekData;

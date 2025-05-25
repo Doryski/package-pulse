@@ -1,14 +1,22 @@
 import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils/cn";
 import { memo, PropsWithChildren } from "react";
+import { z } from "zod";
 
-export type SortColumn =
-  | "projectName"
-  | "weekly"
-  | "monthly"
-  | "yearly"
-  | "oneYearAgo";
-export type SortDirection = "asc" | "desc";
+const sortColumnOptions = [
+  "projectName",
+  "weekly",
+  "monthly",
+  "yearly",
+  "oneYearAgo",
+] as const;
+const sortDirectionOptions = ["asc", "desc"] as const;
+
+export const SortColumnSchema = z.enum(sortColumnOptions);
+export const SortDirectionSchema = z.enum(sortDirectionOptions);
+
+export type SortColumn = z.infer<typeof SortColumnSchema>;
+export type SortDirection = z.infer<typeof SortDirectionSchema>;
 
 type TableHeadSortableProps = PropsWithChildren<
   {

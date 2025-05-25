@@ -18,8 +18,8 @@ import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useCallback, useMemo, useState } from "react";
-import getStatsMatrix from "../utils/getStatsMatrix";
 
+import { processProjectsStats } from "@/lib/queries/useProjectsStats";
 type ProjectStats = UseQueryResult<
   {
     projectName: string;
@@ -45,20 +45,16 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   useLocalStorage(LocalStorageKey.TABLE_SORT_COLUMN, sortColumn);
   useLocalStorage(LocalStorageKey.TABLE_SORT_DIRECTION, sortDirection);
 
-  const processedProjectsTableStats = useMemo(() => {
-    const stats = getStatsMatrix(projectsStats, resolvedTheme);
-    return stats.toSorted((a, b) => {
-      if (sortColumn === "projectName") {
-        return sortDirection === "desc"
-          ? b.projectName.localeCompare(a.projectName)
-          : a.projectName.localeCompare(b.projectName);
-      } else {
-        const aValue = a[`${sortColumn}Change`]?.percentage ?? 0;
-        const bValue = b[`${sortColumn}Change`]?.percentage ?? 0;
-        return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
-      }
-    });
-  }, [projectsStats, resolvedTheme, sortColumn, sortDirection]);
+  const processedProjectsTableStats = useMemo(
+    () =>
+      processProjectsStats(
+        projectsStats,
+        resolvedTheme,
+        sortColumn,
+        sortDirection,
+      ),
+    [projectsStats, resolvedTheme, sortColumn, sortDirection],
+  );
 
   const handleSort = useCallback(
     (column: SortColumn) => {
