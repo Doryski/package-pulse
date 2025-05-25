@@ -12,10 +12,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { MULTI_SEARCH_DELIMITER } from "@/lib/config/constants";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import { cn } from "@/lib/utils/cn";
 import { CheckIcon } from "@radix-ui/react-icons";
-import { KeyboardEvent, useCallback, useRef, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Input } from "./input";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./list";
@@ -44,6 +45,12 @@ export function Combobox<T>({
   const popoverContentRef = useRef<HTMLDivElement>(null);
   const optionsElements = popoverContentRef.current?.querySelectorAll("li");
   const searchValue = form.watch("search");
+
+  useEffect(() => {
+    if (isPopoverOpen && searchValue.includes(MULTI_SEARCH_DELIMITER)) {
+      closePopover();
+    }
+  }, [searchValue, openPopover, isPopoverOpen, closePopover]);
 
   const focusNextOption = useCallback(
     (index: number) => {
@@ -143,13 +150,13 @@ export function Combobox<T>({
                     )}
                     htmlFor={field.name}
                   >
-                    Search project...
+                    Search projects...
                   </FormLabel>
                   <Input
                     {...field}
                     id={field.name}
                     role="combobox"
-                    placeholder="Search project..."
+                    placeholder="Search projects..."
                     autoComplete="off"
                     className={cn(
                       "w-full sm:w-[var(--combobox-width)] justify-between max-w-full",

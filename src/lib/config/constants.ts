@@ -1,4 +1,5 @@
-export const MAX_SELECTED_PROJECTS = 10;
+export const SELECTED_PROJECTS_LIMIT = 10;
+export const MULTI_SEARCH_DELIMITER = ",";
 
 export const links = {
   githubProfile: "https://github.com/Doryski",

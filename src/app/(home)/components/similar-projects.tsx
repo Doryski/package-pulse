@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useSimilarProjects from "@/lib/queries/useSimilarProjects";
 import { Plus } from "lucide-react";
@@ -27,6 +27,10 @@ const SimilarProjects = ({
     return null;
   }
 
+  const filteredSimilarProjects = similarProjects.filter(
+    (project) => !selectedProjects.includes(project),
+  );
+
   return (
     <section className="mt-4">
       <h2 className="text-lg">Similar projects</h2>
@@ -40,18 +44,18 @@ const SimilarProjects = ({
               ))}
             </ul>
           )}
-        {similarProjects.length > 0 && (
+        {filteredSimilarProjects.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {similarProjects.map((similarProject) => (
+            {filteredSimilarProjects.map((similarProject) => (
               <Button
                 key={similarProject}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-1 px-2"
                 onClick={() => {
-                  if (selectedProjects.length >= MAX_SELECTED_PROJECTS) {
+                  if (selectedProjects.length >= SELECTED_PROJECTS_LIMIT) {
                     toast.error(
-                      `You can select a maximum of ${MAX_SELECTED_PROJECTS} projects`,
+                      `You can select a maximum of ${SELECTED_PROJECTS_LIMIT} projects`,
                     );
                     return;
                   }
@@ -60,7 +64,7 @@ const SimilarProjects = ({
                 disabled={
                   selectedProjects.includes(similarProject) ||
                   similarProjectsQuery.isLoading ||
-                  selectedProjects.length >= MAX_SELECTED_PROJECTS
+                  selectedProjects.length >= SELECTED_PROJECTS_LIMIT
                 }
               >
                 <Plus className="size-4" />
@@ -69,11 +73,12 @@ const SimilarProjects = ({
             ))}
           </div>
         )}
-        {!similarProjectsQuery.isLoading && similarProjects.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No similar projects found. Try selecting other projects.
-          </p>
-        )}
+        {!similarProjectsQuery.isLoading &&
+          filteredSimilarProjects.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No similar projects found. Try selecting other projects.
+            </p>
+          )}
       </div>
     </section>
   );

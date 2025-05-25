@@ -3,14 +3,26 @@ import searchNPMRegistry from "@/api/searchNpmRegistry";
 import ClientOnly from "@/components/ui/client-only";
 import { Combobox } from "@/components/ui/combobox";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { MAX_SELECTED_PROJECTS } from "@/lib/config/constants";
+import {
+  MULTI_SEARCH_DELIMITER,
+  SELECTED_PROJECTS_LIMIT,
+} from "@/lib/config/constants";
 import useDebounce from "@/lib/hooks/useDebounce";
 import useSearchNPMRegistryQuery from "@/lib/queries/useSearchNPMRegistryQuery";
 import { cn } from "@/lib/utils/cn";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
+import { isSingleItemArray } from "../utils/typeArray";
 import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
+
+const parseSearchValue = (searchValue: string) => {
+  const cleanedValues = searchValue
+    .split(MULTI_SEARCH_DELIMITER)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  return [...new Set(cleanedValues)];
+};
 
 type ComboboxFormProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;
@@ -23,7 +35,7 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
 
   const selectedProjects = form.watch("projects");
   const hasExceededSelectedProjectsLimit =
-    selectedProjects.length >= MAX_SELECTED_PROJECTS;
+    selectedProjects.length >= SELECTED_PROJECTS_LIMIT;
 
   function resetSearch() {
     form.setValue("search", "");
@@ -57,8 +69,79 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
     resetSearch();
   }
 
+  async function searchMultipleProjects(projectNames: string[]) {
+    const currentProjects = [...selectedProjects];
+    const newProjects: string[] = [];
+    const notFoundProjects: string[] = [];
+    const duplicateProjects: string[] = [];
+
+    const uniqueNewProjects = projectNames.filter(
+      (name) => !currentProjects.includes(name),
+    );
+
+    if (
+      currentProjects.length + uniqueNewProjects.length >
+      SELECTED_PROJECTS_LIMIT
+    ) {
+      const allowedCount = SELECTED_PROJECTS_LIMIT - currentProjects.length;
+      toast.error(
+        `Cannot add ${uniqueNewProjects.length} projects. You can only add ${allowedCount} more projects (limit: ${SELECTED_PROJECTS_LIMIT})`,
+      );
+      return;
+    }
+
+    for (const projectName of projectNames) {
+      if (!projectName) continue;
+
+      if (
+        currentProjects.includes(projectName) ||
+        newProjects.includes(projectName)
+      ) {
+        duplicateProjects.push(projectName);
+        continue;
+      }
+
+      try {
+        const registryProjects = await searchNPMRegistry(projectName);
+        const foundProject = registryProjects?.find(
+          (project) => project.package.name === projectName,
+        );
+
+        if (foundProject) {
+          newProjects.push(projectName);
+        } else {
+          notFoundProjects.push(projectName);
+        }
+      } catch (error) {
+        notFoundProjects.push(projectName);
+      }
+    }
+
+    if (newProjects.length > 0) {
+      form.setValue("projects", [...currentProjects, ...newProjects]);
+    }
+
+    if (notFoundProjects.length > 0) {
+      toast.error(`Projects not found: ${notFoundProjects.join(", ")}`);
+    }
+
+    if (duplicateProjects.length > 0) {
+      toast.warning(
+        `Projects already selected: ${duplicateProjects.join(", ")}`,
+      );
+    }
+
+    resetSearch();
+  }
+
   function onSubmit(data: ProjectsSearchFormValues) {
-    searchProject(data.search);
+    const searchValue = data.search.trim();
+    const valuesToSearch = parseSearchValue(searchValue);
+
+    if (isSingleItemArray(valuesToSearch)) {
+      return searchProject(valuesToSearch[0]);
+    }
+    return searchMultipleProjects(valuesToSearch);
   }
 
   return (
@@ -79,9 +162,13 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
           />
           {hasExceededSelectedProjectsLimit && (
             <FormMessage className="text-xs text-destructive">
-              You cannot select more than {MAX_SELECTED_PROJECTS} projects
+              You cannot select more than {SELECTED_PROJECTS_LIMIT} projects
             </FormMessage>
           )}
+          <div className="text-xs text-muted-foreground">
+            Tip: You can enter multiple projects separated by commas (e.g.,
+            &quot;react,vue,svelte&quot;)
+          </div>
         </div>
 
         <FormField
