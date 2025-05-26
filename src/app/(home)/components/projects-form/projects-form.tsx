@@ -5,7 +5,6 @@ import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useSimilarProjects from "@/lib/queries/useSimilarProjects";
 import safeParse from "@/lib/utils/safeParse";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { isEqual as isEqualLodash } from "lodash";
 import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import {
@@ -18,10 +17,6 @@ import StatsSection from "../stats-section";
 import { ProjectsSearchFormSchema, ProjectsSearchFormValues } from "./schema";
 
 const PROJECTS_URL_DELIMITER = ",";
-
-function isEqual<T>(a: T, b: T): boolean {
-  return isEqualLodash(a, b);
-}
 
 const ProjectsForm = () => {
   const initialProjects = useInitialProjectsFromSearchParams(
@@ -51,20 +46,17 @@ const ProjectsForm = () => {
   );
 
   useEffect(() => {
-    if (
-      similarProjects.data &&
-      similarProjectsState.length === 0 &&
-      !isEqual(similarProjects.data, similarProjectsState)
-    ) {
-      setSimilarProjectsState(similarProjects.data);
+    async function updateSimilarProjects() {
+      if (selectedProjects.length > 0 && similarProjectsState.length <= 2) {
+        await similarProjects.refetch();
+        if (similarProjects.data) {
+          setSimilarProjectsState(similarProjects.data);
+        }
+      }
     }
-  }, [similarProjects.data]);
 
-  useEffect(() => {
-    if (selectedProjects.length > 0 && similarProjectsState.length <= 2) {
-      similarProjects.refetch();
-    }
-  }, [selectedProjects, similarProjectsState.length]);
+    updateSimilarProjects();
+  }, [selectedProjects.length, similarProjects, similarProjectsState.length]);
 
   const handleAddProject = (projectName: string) => {
     if (!selectedProjects.includes(projectName)) {
