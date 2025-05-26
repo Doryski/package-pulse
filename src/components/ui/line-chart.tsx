@@ -117,6 +117,26 @@ const formatVersion = (version: VersionData) => {
   return `${version.version} (${formattedDate})`;
 };
 
+const formatLargeNumber = (value: unknown): string => {
+  let numericValue: number;
+  if (typeof value !== "number") {
+    numericValue = Number(value);
+  } else {
+    numericValue = value;
+  }
+
+  if (numericValue > 1_000_000_000) {
+    return `${(numericValue / 1_000_000_000).toFixed(1)}B`;
+  }
+
+  if (numericValue >= 1_000_000) {
+    return `${(numericValue / 1_000_000).toFixed(1)}M`;
+  }
+  if (numericValue >= 1_000) {
+    return `${(numericValue / 1_000).toFixed(1)}K`;
+  }
+  return numericValue.toLocaleString();
+};
 type MultipleLineChartProps = {
   data: ChartData[];
   config: ChartConfig;
@@ -205,7 +225,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             accessibilityLayer
             data={chartData}
             margin={{
-              left: 28,
+              left: 4,
               right: 12,
             }}
           >
@@ -233,7 +253,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value.toLocaleString()}
+              tickFormatter={(value) => formatLargeNumber(value)}
               tickCount={12}
             />
             <ChartTooltip
