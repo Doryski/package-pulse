@@ -7,6 +7,7 @@ import {
 } from "@/api/fetchPackageInfo";
 import Loader from "@/components/loader";
 import { SimpleTooltip } from "@/components/simple-tooltip";
+import PulsatingDotIndicator from "@/components/ui/PulsatingDotIndicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -21,7 +22,7 @@ import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import getChartColor from "@/lib/utils/getChartColor";
 import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
-import { format, formatDistanceToNow } from "date-fns";
+import { differenceInDays, format, formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { useFormContext } from "react-hook-form";
@@ -110,6 +111,17 @@ function ProjectInfoRow({ npmPackage, index }: ProjectInfoRowProps) {
     retry: false,
   });
 
+  const getPulsatingDotIndicatorColor = (
+    lastReleaseDate: string | undefined,
+  ) => {
+    if (!lastReleaseDate) return "gray";
+    const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
+    if (diff < 90) return "green";
+    if (diff < 180) return "yellow";
+    if (diff < 365) return "orange";
+    return "red";
+  };
+
   return (
     <TableRow key={`${npmPackage.data?.projectName}-${index}`}>
       <ProjectNameCell
@@ -117,22 +129,31 @@ function ProjectInfoRow({ npmPackage, index }: ProjectInfoRowProps) {
         projectName={npmPackage.data?.projectName ?? ""}
         color={getChartColor(resolvedTheme, index)}
       />
-      <TableCell className="text-center">
+      <TableCell className="flex items-center justify-between gap-1 text-center">
         <Loader
           isLoading={npmPackage.isLoading}
           fallback={<Skeleton className="h-4 w-full" />}
         >
-          {npmPackage.data?.lastReleaseDate ? (
-            <>
-              <span className="text-nowrap">
-                {format(npmPackage.data.lastReleaseDate, DATE_FORMAT)}
-              </span>
-              <br />
-              <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.lastReleaseDate)} ago)`}</span>
-            </>
-          ) : (
-            "-"
-          )}
+          <div className="text-right">
+            {npmPackage.data?.lastReleaseDate ? (
+              <>
+                <div className="flex items-center gap-1">
+                  <PulsatingDotIndicator
+                    active={!!npmPackage.data?.lastReleaseDate}
+                    color={getPulsatingDotIndicatorColor(
+                      npmPackage.data?.lastReleaseDate,
+                    )}
+                  />
+                  <span className="text-nowrap">
+                    {format(npmPackage.data.lastReleaseDate, DATE_FORMAT)}
+                  </span>
+                </div>
+                <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.lastReleaseDate)} ago)`}</span>
+              </>
+            ) : (
+              "-"
+            )}
+          </div>
         </Loader>
       </TableCell>
       <TableCell className="text-center">

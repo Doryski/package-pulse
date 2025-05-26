@@ -67,10 +67,22 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "pulse-dot": {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.1)" },
+        },
+        "pulse-ring": {
+          "0%": { transform: "scale(0.5)" },
+          "80%, 100%": { opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-dot":
+          "pulse-dot 1.25s cubic-bezier(0.455, 0.03, 0.515, 0.955) -0.4s infinite",
+        "pulse-ring":
+          "pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite",
       },
     },
   },
