@@ -166,7 +166,7 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
             </FormMessage>
           )}
           <div className="text-xs text-muted-foreground">
-            Tip: You can enter multiple projects separated by commas (e.g.,
+            Tip: You can enter multiple projects separated by commas (e.g.
             &quot;react,vue,svelte&quot;)
           </div>
         </div>
