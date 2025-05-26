@@ -3,6 +3,7 @@ import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import { cn } from "@/lib/utils/cn";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
+import Dash from "./dash";
 import { ChartConfig, useLineChart } from "./line-chart";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
@@ -84,6 +85,7 @@ const ChartTooltipContent = React.forwardRef<
       nameKey?: string;
       labelKey?: string;
       chartKey: string;
+      children?: React.ReactNode;
     }
 >(
   (
@@ -102,6 +104,7 @@ const ChartTooltipContent = React.forwardRef<
       nameKey,
       labelKey,
       chartKey,
+      children,
     },
     ref,
   ) => {
@@ -183,29 +186,16 @@ const ChartTooltipContent = React.forwardRef<
                       <itemConfig.icon />
                     ) : (
                       !hideIndicator && (
-                        <div
-                          className={cn(
-                            "shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]",
-                            {
-                              "h-2.5 w-2.5": indicator === "dot",
-                              "w-1": indicator === "line",
-                              "w-0 border-[1.5px] border-dashed bg-transparent":
-                                indicator === "dashed",
-                              "my-0.5": nestLabel && indicator === "dashed",
-                            },
-                          )}
-                          style={
-                            {
-                              "--color-bg": indicatorColor,
-                              "--color-border": indicatorColor,
-                            } as React.CSSProperties
-                          }
+                        <ChartDotIndicator
+                          indicator={indicator}
+                          nestLabel={nestLabel}
+                          indicatorColor={indicatorColor}
                         />
                       )
                     )}
                     <div
                       className={cn(
-                        "flex flex-1 justify-between leading-none",
+                        "flex flex-1 justify-between leading-none gap-1",
                         nestLabel ? "items-end" : "items-center",
                         isHidden && "line-through",
                       )}
@@ -227,6 +217,7 @@ const ChartTooltipContent = React.forwardRef<
               </div>
             );
           })}
+          {children}
         </div>
       </div>
     );
@@ -243,6 +234,7 @@ const ChartLegendContent = React.forwardRef<
       hideIcon?: boolean;
       nameKey?: string;
       chartKey: string;
+      children?: React.ReactNode;
     }
 >(
   (
@@ -253,6 +245,7 @@ const ChartLegendContent = React.forwardRef<
       verticalAlign = "bottom",
       nameKey,
       chartKey,
+      children,
     },
     ref,
   ) => {
@@ -306,11 +299,45 @@ const ChartLegendContent = React.forwardRef<
             </div>
           );
         })}
+        {children}
       </div>
     );
   },
 );
 ChartLegendContent.displayName = "ChartLegend";
+
+type ChartDotIndicatorProps = {
+  indicator: "dot" | "line" | "dashed";
+  nestLabel: boolean;
+  indicatorColor: string;
+};
+
+function ChartDotIndicator({
+  indicator,
+  indicatorColor,
+}: ChartDotIndicatorProps) {
+  const style = {
+    "--color-bg": indicatorColor,
+    "--color-border": indicatorColor,
+  } as React.CSSProperties;
+
+  if (indicator === "dashed") {
+    return <Dash style={style} />;
+  }
+
+  return (
+    <div
+      className={cn(
+        "shrink-0 rounded-full border-[--color-border] bg-[--color-bg]",
+        {
+          "h-2.5 w-2.5": indicator === "dot",
+          "w-1": indicator === "line",
+        },
+      )}
+      style={style}
+    />
+  );
+}
 
 // Helper to extract item config from a payload.
 function getPayloadConfigFromPayload(
@@ -353,6 +380,7 @@ function getPayloadConfigFromPayload(
 
 export {
   ChartContainer,
+  ChartDotIndicator,
   ChartLegend,
   ChartLegendContent,
   ChartStyle,

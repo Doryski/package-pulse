@@ -4,6 +4,7 @@ import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   ChartContainer,
+  ChartDotIndicator,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
@@ -34,6 +35,7 @@ import {
 } from "recharts";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
+import Dash from "./dash";
 import {
   Select,
   SelectContent,
@@ -41,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./select";
+import { Separator } from "./separator";
 
 export type ChartData = {
   time: string | Date;
@@ -102,6 +105,16 @@ export const useLineChart = (key: string) => {
     storeCache.set(key, createLineChartStore(key));
   }
   return storeCache.get(key)!;
+};
+
+const getLatestVersion = (versions?: VersionData[]) => {
+  if (!versions) return;
+  return sortByVersion(versions).at(-1);
+};
+
+const formatVersion = (version: VersionData) => {
+  const formattedDate = format(version.date, DATE_FORMAT);
+  return `${version.version} (${formattedDate})`;
 };
 
 type MultipleLineChartProps = {
@@ -197,7 +210,14 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             }}
           >
             <ChartLegend
-              content={<ChartLegendContent chartKey={chartKey} />}
+              content={
+                <ChartLegendContent chartKey={chartKey}>
+                  <div className="flex items-center gap-1.5 text-sm text-foreground">
+                    <Dash />
+                    <span>Last release date</span>
+                  </div>
+                </ChartLegendContent>
+              }
               layout="horizontal"
               verticalAlign="top"
             />
@@ -218,7 +238,43 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent chartKey={chartKey} />}
+              content={
+                <ChartTooltipContent chartKey={chartKey}>
+                  <Separator />
+                  <div className="flex items-center gap-1.5 text-sm text-foreground">
+                    <span>Last releases</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {Object.keys(config).map((key) => {
+                      const latestVersion = getLatestVersion(
+                        config[key]?.versions,
+                      );
+                      return (
+                        <div
+                          key={key}
+                          className="flex w-full items-center gap-2"
+                        >
+                          <ChartDotIndicator
+                            indicator="dashed"
+                            nestLabel={false}
+                            indicatorColor={`var(--color-${key})`}
+                          />
+                          <div className="flex w-full items-center justify-between gap-1">
+                            <span className="text-xs text-muted-foreground">
+                              {key}
+                            </span>
+                            <span className="text-right text-xs text-foreground">
+                              {latestVersion
+                                ? formatVersion(latestVersion)
+                                : "-"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ChartTooltipContent>
+              }
             />
             {data &&
               data?.length > 0 &&
@@ -244,10 +300,6 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                         sortByVersion(projectConfig.versions)
                           .slice(-1)
                           .map((version) => {
-                            const formattedDate = format(
-                              version.date,
-                              DATE_FORMAT,
-                            );
                             const weekStart = format(
                               startOfWeek(version.date),
                               DATE_FORMAT,
@@ -259,12 +311,6 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                                 x={weekStart}
                                 stroke={`var(--color-${normalizedKey})`}
                                 strokeDasharray="3 3"
-                                label={{
-                                  value: `${version.version} (${formattedDate})`,
-                                  position: "insideTopRight",
-                                  fill: `var(--color-${normalizedKey})`,
-                                  fontSize: 10,
-                                }}
                               />
                             );
                           })}
