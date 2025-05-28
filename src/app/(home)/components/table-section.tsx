@@ -8,7 +8,7 @@ import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useProjectsStats, {
-  processProjectsStats,
+  sortStatsMatrix,
 } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import { exportCsv } from "@/lib/utils/exportUtils";
@@ -20,8 +20,9 @@ import {
 } from "@radix-ui/react-icons";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { useFormContext, UseFormReturn } from "react-hook-form";
+import getStatsMatrix from "../utils/getStatsMatrix";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 import ProjectsInfoTable from "./projects-info-table";
 import ProjectsStatsTable from "./projects-stats-table";
@@ -57,11 +58,18 @@ function useExportData(
     LocalStorageKey.TABLE_SORT_DIRECTION,
     SortDirectionSchema,
   );
-  const processedProjectsStats = processProjectsStats(
-    projectsStats,
-    resolvedTheme,
-    sortColumn ?? "projectName",
-    sortDirection ?? "asc",
+  const statsMatrix = useMemo(
+    () => getStatsMatrix(projectsStats, resolvedTheme),
+    [projectsStats, resolvedTheme],
+  );
+  const sortedStatsMatrix = useMemo(
+    () =>
+      sortStatsMatrix(
+        statsMatrix,
+        sortColumn ?? "projectName",
+        sortDirection ?? "asc",
+      ),
+    [sortColumn, sortDirection, statsMatrix],
   );
   const projectsInfo = usePackagesInfo(selectedProjects);
 
@@ -91,7 +99,7 @@ function useExportData(
     description: string | null;
     createdAt: string | null;
   };
-  const data = processedProjectsStats.reduce<StatsRow[]>((acc, project) => {
+  const data = sortedStatsMatrix.reduce<StatsRow[]>((acc, project) => {
     let itemData: StatsRow = {
       projectName: project.projectName,
       weeklyChange_nominal: project.weeklyChange?.nominal ?? 0,

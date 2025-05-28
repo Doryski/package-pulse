@@ -1,16 +1,12 @@
 import fetchNPMDownloads from "@/api/fetchNPMDownloads";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
-import getStatsMatrix from "@/app/(home)/utils/getStatsMatrix";
+import { StatsRow } from "@/app/(home)/utils/getStatsMatrix";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import AppError from "@/lib/utils/AppError";
 import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import sortByDate from "@/lib/utils/sortByDate";
-import {
-  QueryObserverSuccessResult,
-  useQueries,
-  UseQueryResult,
-} from "@tanstack/react-query";
+import { QueryObserverSuccessResult, useQueries } from "@tanstack/react-query";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -64,14 +60,12 @@ export default function useProjectsStats(
   );
 }
 
-export function processProjectsStats(
-  projectsStats: UseQueryResult<ProjectStats>[],
-  resolvedTheme: string | undefined,
+export function sortStatsMatrix(
+  statsMatrix: StatsRow[],
   sortColumn: SortColumn,
   sortDirection: SortDirection,
 ) {
-  const stats = getStatsMatrix(projectsStats, resolvedTheme);
-  return stats.toSorted((a, b) => {
+  return statsMatrix.toSorted((a, b) => {
     if (sortColumn === "projectName") {
       return sortDirection === "desc"
         ? b.projectName.localeCompare(a.projectName)

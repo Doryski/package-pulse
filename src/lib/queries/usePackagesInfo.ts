@@ -6,7 +6,9 @@ export default function usePackagesInfo(selectedProjects: string[]) {
     queries: selectedProjects.map((project) => ({
       queryKey: ["projectsInfo", project],
       queryFn: () => fetchPackageInfo(project),
-      retry: false,
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes
+      enabled: !!project,
     })),
   });
 }

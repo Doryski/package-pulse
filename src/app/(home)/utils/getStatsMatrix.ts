@@ -11,6 +11,9 @@ import getLastYearsMostAdequateDay from "../../../lib/utils/getLastYearsMostAdeq
 import getPercentChange from "../../../lib/utils/getPercentChange";
 import { groupStats } from "../../../lib/utils/groupByPeriod";
 
+const statsCache = new Map<string, StatsRow>();
+const groupStatsCache = new Map<string, ReturnType<typeof groupStats>>();
+
 export type StatChange = {
   nominal: number;
   percentage: number;
@@ -29,6 +32,27 @@ export type StatsRow = {
     | null;
   breakDropIndicator: BreakDropIndicator;
 };
+
+function getCachedGroupStats(projectName: string, rawData: any[]) {
+  const cacheKey = `${projectName}-${rawData.length}-${rawData[0]?.date || ""}-${rawData[rawData.length - 1]?.date || ""}`;
+
+  if (groupStatsCache.has(cacheKey)) {
+    return groupStatsCache.get(cacheKey)!;
+  }
+
+  const result = groupStats(rawData);
+  groupStatsCache.set(cacheKey, result);
+
+  if (groupStatsCache.size > 50) {
+    const firstKey = groupStatsCache.keys().next().value;
+    if (firstKey) {
+      groupStatsCache.delete(firstKey);
+    }
+  }
+
+  return result;
+}
+
 export default function getStatsMatrix(
   stats: UseQueryResult<ProjectStats>[],
   theme: string | undefined,
@@ -38,8 +62,19 @@ export default function getStatsMatrix(
     if (!projectName || !query.data) {
       return acc;
     }
+
+    const dataSignature = `${projectName}-${query.data.rawSortedData.length}-${theme}-${index}`;
+
+    if (statsCache.has(dataSignature)) {
+      acc.push(statsCache.get(dataSignature)!);
+      return acc;
+    }
+
     const color = getChartColor(theme, index);
-    const groupedStats = groupStats(query.data?.rawSortedData);
+    const groupedStats = getCachedGroupStats(
+      projectName,
+      query.data.rawSortedData,
+    );
     const currentFullWeek = groupedStats.byWeeks.slice(-2)[0];
     const previousFullWeek = groupedStats.byWeeks.slice(-3)[0];
     if (!currentFullWeek || !previousFullWeek) {
@@ -109,7 +144,7 @@ export default function getStatsMatrix(
 
     const breakDropIndicator = calculateBreakDrop(query.data.rawSortedData);
 
-    acc.push({
+    const result: StatsRow = {
       projectName,
       weeklyChange,
       monthlyChange,
@@ -117,7 +152,18 @@ export default function getStatsMatrix(
       oneYearAgoChange,
       breakDropIndicator,
       color,
-    });
+    };
+
+    statsCache.set(dataSignature, result);
+
+    if (statsCache.size > 100) {
+      const firstKey = statsCache.keys().next().value;
+      if (firstKey) {
+        statsCache.delete(firstKey);
+      }
+    }
+
+    acc.push(result);
     return acc;
   }, []);
 }

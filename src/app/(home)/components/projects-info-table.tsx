@@ -25,6 +25,7 @@ import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { differenceInDays, format, formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import Image from "next/image";
+import { memo, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import ReactMarkdown from "react-markdown";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
@@ -33,7 +34,7 @@ import { ProjectNameCell } from "./projects-stats-table";
 const getNpmLink = (projectName: string) =>
   `https://www.npmjs.com/package/${projectName}`;
 
-export default function ProjectsInfoTable() {
+const ProjectsInfoTable = memo(() => {
   const form = useFormContext<ProjectsSearchFormValues>();
   const selectedProjects = form.watch("projects");
   const packagesInfo = usePackagesInfo(selectedProjects);
@@ -68,7 +69,11 @@ export default function ProjectsInfoTable() {
       </TableBody>
     </Table>
   );
-}
+});
+
+ProjectsInfoTable.displayName = "ProjectsInfoTable";
+
+export default ProjectsInfoTable;
 
 type ProjectInfoRowProps = {
   npmPackage: UseQueryResult<
@@ -78,7 +83,7 @@ type ProjectInfoRowProps = {
   index: number;
 };
 
-function ProjectInfoRow({ npmPackage, index }: ProjectInfoRowProps) {
+const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
   const { resolvedTheme } = useTheme();
 
   const githubRepo = useQuery({
@@ -88,39 +93,43 @@ function ProjectInfoRow({ npmPackage, index }: ProjectInfoRowProps) {
       info: await fetchGithubRepoInfo(npmPackage.data?.repoName!),
       name: npmPackage.data?.projectName,
     }),
-    retry: false,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 
   const githubPullRequestsCount = useQuery({
-    enabled: !!npmPackage.data?.repoName,
+    enabled: !!npmPackage.data?.repoName && !!githubRepo.data,
     queryKey: ["githubPullRequestsCount", npmPackage.data?.repoName!],
     queryFn: async () => ({
       count: await fetchGithubPullRequestsCount(npmPackage.data?.repoName!),
       name: npmPackage.data?.projectName,
     }),
-    retry: false,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 
   const githubContributorsCount = useQuery({
-    enabled: !!npmPackage.data?.repoName,
+    enabled: !!npmPackage.data?.repoName && !!githubRepo.data,
     queryKey: ["githubContributorsCount", npmPackage.data?.repoName!],
     queryFn: async () => ({
       count: await fetchContributorsCount(npmPackage.data?.repoName!),
       name: npmPackage.data?.projectName,
     }),
-    retry: false,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 
-  const getPulsatingDotIndicatorColor = (
-    lastReleaseDate: string | undefined,
-  ) => {
-    if (!lastReleaseDate) return "gray";
-    const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
-    if (diff < 90) return "green";
-    if (diff < 180) return "yellow";
-    if (diff < 365) return "orange";
-    return "red";
-  };
+  const getPulsatingDotIndicatorColor = useCallback(
+    (lastReleaseDate: string | undefined) => {
+      if (!lastReleaseDate) return "gray";
+      const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
+      if (diff < 90) return "green";
+      if (diff < 180) return "yellow";
+      if (diff < 365) return "orange";
+      return "red";
+    },
+    [],
+  );
 
   return (
     <TableRow key={`${npmPackage.data?.projectName}-${index}`}>
@@ -289,4 +298,6 @@ function ProjectInfoRow({ npmPackage, index }: ProjectInfoRowProps) {
       </TableCell>
     </TableRow>
   );
-}
+});
+
+ProjectInfoRow.displayName = "ProjectInfoRow";

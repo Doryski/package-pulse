@@ -16,10 +16,11 @@ import TableHeadSortable, {
 } from "@/components/ui/table-head-sortable";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
-import { processProjectsStats } from "@/lib/queries/useProjectsStats";
+import { sortStatsMatrix } from "@/lib/queries/useProjectsStats";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useCallback, useMemo, useState } from "react";
+import getStatsMatrix from "../utils/getStatsMatrix";
 
 type ProjectStats = UseQueryResult<
   {
@@ -46,15 +47,14 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   useLocalStorage(LocalStorageKey.TABLE_SORT_COLUMN, sortColumn);
   useLocalStorage(LocalStorageKey.TABLE_SORT_DIRECTION, sortDirection);
 
-  const processedProjectsTableStats = useMemo(
-    () =>
-      processProjectsStats(
-        projectsStats,
-        resolvedTheme,
-        sortColumn,
-        sortDirection,
-      ),
-    [projectsStats, resolvedTheme, sortColumn, sortDirection],
+  const statsMatrix = useMemo(
+    () => getStatsMatrix(projectsStats, resolvedTheme),
+    [projectsStats, resolvedTheme],
+  );
+
+  const sortedStatsMatrix = useMemo(
+    () => sortStatsMatrix(statsMatrix, sortColumn, sortDirection),
+    [sortColumn, sortDirection, statsMatrix],
   );
 
   const handleSort = useCallback(
@@ -127,7 +127,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {processedProjectsTableStats.map((projectStats) => (
+          {sortedStatsMatrix.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
               <ProjectNameCell
                 projectName={projectStats.projectName}
