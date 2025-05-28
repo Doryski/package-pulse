@@ -76,6 +76,10 @@ export function processProjectsStats(
       return sortDirection === "desc"
         ? b.projectName.localeCompare(a.projectName)
         : a.projectName.localeCompare(b.projectName);
+    } else if (sortColumn === "breakDrop") {
+      const aValue = a.breakDropIndicator.corporateUsageScore;
+      const bValue = b.breakDropIndicator.corporateUsageScore;
+      return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
     } else {
       const aValue = a[`${sortColumn}Change`]?.percentage ?? 0;
       const bValue = b[`${sortColumn}Change`]?.percentage ?? 0;

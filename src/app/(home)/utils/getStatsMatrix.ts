@@ -1,5 +1,9 @@
 import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import { ProjectStats } from "@/lib/queries/useProjectsStats";
+import {
+  BreakDropIndicator,
+  calculateBreakDrop,
+} from "@/lib/utils/calculateBreakDrop";
 import { UseQueryResult } from "@tanstack/react-query";
 import { format } from "date-fns";
 import getChartColor from "../../../lib/utils/getChartColor";
@@ -23,6 +27,7 @@ export type StatsRow = {
         lastYearsMostAdequateDay: string;
       })
     | null;
+  breakDropIndicator: BreakDropIndicator;
 };
 export default function getStatsMatrix(
   stats: UseQueryResult<ProjectStats>[],
@@ -102,12 +107,15 @@ export default function getStatsMatrix(
           }
         : null;
 
+    const breakDropIndicator = calculateBreakDrop(query.data.rawSortedData);
+
     acc.push({
       projectName,
       weeklyChange,
       monthlyChange,
       yearlyChange,
       oneYearAgoChange,
+      breakDropIndicator,
       color,
     });
     return acc;

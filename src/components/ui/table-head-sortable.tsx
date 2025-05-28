@@ -9,6 +9,7 @@ const sortColumnOptions = [
   "monthly",
   "yearly",
   "oneYearAgo",
+  "breakDrop",
 ] as const;
 const sortDirectionOptions = ["asc", "desc"] as const;
 

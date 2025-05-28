@@ -1,4 +1,5 @@
 import Loader from "@/components/loader";
+import BreakDropIndicatorComponent from "@/components/ui/break-drop-indicator";
 import DotIndicator from "@/components/ui/dot-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,11 +16,11 @@ import TableHeadSortable, {
 } from "@/components/ui/table-head-sortable";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
+import { processProjectsStats } from "@/lib/queries/useProjectsStats";
 import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useCallback, useMemo, useState } from "react";
 
-import { processProjectsStats } from "@/lib/queries/useProjectsStats";
 type ProjectStats = UseQueryResult<
   {
     projectName: string;
@@ -115,6 +116,14 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
             >
               Today vs a year ago
             </TableHeadSortable>
+            <TableHeadSortable
+              column="breakDrop"
+              isSorted={sortColumn === "breakDrop"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+            >
+              Break Drop
+            </TableHeadSortable>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -128,6 +137,11 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
               <TableCellWithStats change={projectStats.monthlyChange} />
               <TableCellWithStats change={projectStats.yearlyChange} />
               <TableCellWithStats change={projectStats.oneYearAgoChange} />
+              <TableCell>
+                <BreakDropIndicatorComponent
+                  indicator={projectStats.breakDropIndicator}
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

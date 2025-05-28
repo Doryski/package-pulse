@@ -75,6 +75,10 @@ function useExportData(
     yearlyChange_percentage: number | null;
     oneYearAgoChange_nominal: number | null;
     oneYearAgoChange_percentage: number | null;
+    breakDropPercentage: number;
+    weekendDropPercentage: number;
+    corporateUsageScore: number;
+    corporateUsageLevel: string;
     repoName: string | null;
     latestVersion: string | null;
     lastReleaseDate: string | null;
@@ -98,6 +102,10 @@ function useExportData(
       yearlyChange_percentage: project.yearlyChange?.percentage ?? 0,
       oneYearAgoChange_nominal: project.oneYearAgoChange?.nominal ?? 0,
       oneYearAgoChange_percentage: project.oneYearAgoChange?.percentage ?? 0,
+      breakDropPercentage: project.breakDropIndicator.christmasDropPercentage,
+      weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
+      corporateUsageScore: project.breakDropIndicator.corporateUsageScore,
+      corporateUsageLevel: project.breakDropIndicator.corporateUsageLevel,
       repoName: null,
       latestVersion: null,
       lastReleaseDate: null,
