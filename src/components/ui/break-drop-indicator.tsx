@@ -1,5 +1,10 @@
+import { SimpleTooltip } from "@/components/simple-tooltip";
 import { BreakDropIndicator } from "@/lib/utils/calculateBreakDrop";
 import { cn } from "@/lib/utils/cn";
+import {
+  ExclamationTriangleIcon,
+  InfoCircledIcon,
+} from "@radix-ui/react-icons";
 
 type BreakDropIndicatorProps = {
   indicator: BreakDropIndicator;
@@ -47,11 +52,25 @@ export default function BreakDropIndicatorComponent({
     return (
       <div
         className={cn(
-          "flex items-center justify-center text-xs text-muted-foreground",
+          "flex items-center justify-center gap-2 text-xs text-muted-foreground",
           className,
         )}
       >
-        Insufficient data
+        <span>Insufficient data</span>
+        <SimpleTooltip
+          content={
+            <div className="max-w-xs">
+              <p className="mb-2 font-medium">Insufficient Data</p>
+              <p className="text-sm">
+                Not enough download data to calculate corporate usage
+                indicators. Requires at least 365 days of data with minimum
+                10,000 average daily downloads.
+              </p>
+            </div>
+          }
+        >
+          <InfoCircledIcon className="size-3 cursor-help" />
+        </SimpleTooltip>
       </div>
     );
   }
@@ -65,20 +84,60 @@ export default function BreakDropIndicatorComponent({
         className,
       )}
     >
-      <div
-        className={cn(
-          "inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium",
-          config.color,
-          config.bgColor,
-          config.borderColor,
-        )}
-      >
-        {config.label} Corporate
+      <div className="flex items-center gap-1">
+        <div
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium",
+            config.color,
+            config.bgColor,
+            config.borderColor,
+          )}
+        >
+          {config.label} Corporate
+        </div>
+        <SimpleTooltip
+          content={
+            <div className="max-w-xs">
+              <p className="mb-2 text-xs font-medium">
+                Corporate Usage Analysis
+              </p>
+              <p className="mb-2 text-xs">
+                This analysis examines download patterns to estimate corporate
+                vs individual usage by looking at activity during business vs
+                non-business hours:
+              </p>
+              <ul className="mb-2 list-inside list-disc space-y-1 text-xs">
+                <li>
+                  <strong>Christmas Drop:</strong> Reduction during Christmas
+                  holiday period
+                </li>
+                <li>
+                  <strong>Weekend Drop:</strong> Reduction during weekends vs
+                  weekdays
+                </li>
+              </ul>
+              <p className="mb-2 text-xs">
+                Higher percentages suggest more corporate usage, as business
+                applications, CI/CD pipelines, and automated deployment systems
+                typically show reduced activity during non-business hours and
+                holiday periods when development teams are offline.
+              </p>
+              <div className="text-orange-500 dark:text-orange-500">
+                <ExclamationTriangleIcon className="size-4 min-h-4 min-w-4" />
+                <p className="flex items-center gap-1 text-xs font-medium">
+                  Use as a general indicator only. Individual projects may have
+                  different usage patterns regardless of their target audience.
+                </p>
+              </div>
+            </div>
+          }
+        >
+          <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
+        </SimpleTooltip>
       </div>
       <div className="text-xs text-muted-foreground">
         <div>Christmas: {indicator.christmasDropPercentage.toFixed(1)}%</div>
         <div>Weekend: {indicator.weekendDropPercentage.toFixed(1)}%</div>
-        <div>Score: {indicator.corporateUsageScore.toFixed(1)}</div>
       </div>
     </div>
   );
