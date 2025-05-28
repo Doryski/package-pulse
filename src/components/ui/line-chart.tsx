@@ -269,6 +269,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                       const latestVersion = getLatestVersion(
                         config[key]?.versions,
                       );
+                      const displayName = config[key]?.label || key;
                       return (
                         <div
                           key={key}
@@ -281,7 +282,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                           />
                           <div className="flex w-full items-center justify-between gap-1">
                             <span className="text-xs text-muted-foreground">
-                              {key}
+                              {displayName}
                             </span>
                             <span className="text-right text-xs text-foreground">
                               {latestVersion
@@ -308,7 +309,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                   return (
                     <Fragment key={normalizedKey}>
                       <Line
-                        dataKey={normalizedKey}
+                        dataKey={key}
                         type="monotone"
                         stroke={`var(--color-${normalizedKey})`}
                         strokeWidth={2}
