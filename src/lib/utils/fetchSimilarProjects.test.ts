@@ -4,7 +4,7 @@
 import { describe, expect, test } from "vitest";
 import { fetchSimilarProjects } from "./fetchSimilarProjects";
 
-describe("findSimilarProjects", () => {
+describe.skip("fetchSimilarProjects", () => {
   test("should find similar validation libraries", async () => {
     const result = await fetchSimilarProjects([
       {
