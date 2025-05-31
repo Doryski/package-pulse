@@ -1,8 +1,9 @@
 import * as Papa from "papaparse";
 import * as XLSX from "xlsx";
 
-export const downloadFile = (filename: string, blob: Blob) => {
-  const url = URL.createObjectURL(blob);
+export const downloadFile = (filename: string, blobOrUrl: Blob | string) => {
+  const url =
+    typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;

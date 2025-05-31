@@ -2,26 +2,13 @@
 import getChartConfig from "@/app/(home)/utils/getChartConfig";
 import MultipleLineChart from "@/components/ui/line-chart";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
-import { UseQueryResult } from "@tanstack/react-query";
 import { memo, useMemo } from "react";
 import prepareChartData from "../utils/prepareChartData";
 
 type ChartSectionProps = {
-  projectStats: UseQueryResult<
-    {
-      projectName: string;
-      groupedByWeekData: {
-        date: string;
-        count: number;
-      }[];
-      rawSortedData: {
-        date: string;
-        count: number;
-      }[];
-    },
-    Error
-  >[];
+  projectStats: ProjectStatsQuery[];
 };
 
 const ChartSection = memo(({ projectStats }: ChartSectionProps) => {

@@ -6,7 +6,11 @@ import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import AppError from "@/lib/utils/AppError";
 import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import sortByDate from "@/lib/utils/sortByDate";
-import { QueryObserverSuccessResult, useQueries } from "@tanstack/react-query";
+import {
+  QueryObserverSuccessResult,
+  useQueries,
+  UseQueryResult,
+} from "@tanstack/react-query";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -15,6 +19,7 @@ export type ProjectStats = {
   groupedByWeekData: { date: string; count: number }[];
   rawSortedData: { date: string; count: number }[];
 };
+export type ProjectStatsQuery = UseQueryResult<ProjectStats, Error>;
 
 type SuccessfulProjectQuery = QueryObserverSuccessResult<ProjectStats>;
 

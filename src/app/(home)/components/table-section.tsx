@@ -8,6 +8,7 @@ import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useProjectsStats, {
+  ProjectStatsQuery,
   sortStatsMatrix,
 } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
@@ -18,7 +19,6 @@ import {
   DownloadIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
-import { UseQueryResult } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { memo, useMemo } from "react";
 import { useFormContext, UseFormReturn } from "react-hook-form";
@@ -28,20 +28,7 @@ import ProjectsInfoTable from "./projects-info-table";
 import ProjectsStatsTable from "./projects-stats-table";
 
 type TableSectionProps = {
-  projectsStats: UseQueryResult<
-    {
-      projectName: string;
-      groupedByWeekData: {
-        date: string;
-        count: number;
-      }[];
-      rawSortedData: {
-        date: string;
-        count: number;
-      }[];
-    },
-    Error
-  >[];
+  projectsStats: ProjectStatsQuery[];
 };
 
 function useExportData(
@@ -186,9 +173,10 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
         projectsStats.length === 0 && "hidden",
       )}
     >
-      <div className="flex justify-between">
-        <div />
-        <h3 className="text-center">NPM downloads change by project</h3>
+      <div className="relative flex justify-end">
+        <h3 className="absolute left-1/2 top-0 -translate-x-1/2 text-center text-lg">
+          Downloads by project
+        </h3>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

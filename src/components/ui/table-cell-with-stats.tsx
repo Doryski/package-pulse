@@ -1,7 +1,9 @@
 import { StatChange } from "@/app/(home)/utils/getStatsMatrix";
-import formatCellValue from "@/lib/utils/formatCellValue";
-import formatInteger from "@/lib/utils/formatInteger";
-import formatPercentage from "@/lib/utils/formatPercentage";
+import {
+  formatCellValue,
+  formatInteger,
+  formatPercentage,
+} from "@/lib/utils/formatters";
 import { memo } from "react";
 import ArrowIndicator from "./arrow-indicator";
 import { TableCell } from "./table";

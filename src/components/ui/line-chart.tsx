@@ -15,6 +15,7 @@ import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
+import { formatLargeNumber } from "@/lib/utils/formatters";
 import sortByVersion from "@/lib/utils/sortByVersion";
 import { format, isAfter, startOfWeek, subMonths, subYears } from "date-fns";
 import {
@@ -117,26 +118,6 @@ const formatVersion = (version: VersionData) => {
   return `${version.version} (${formattedDate})`;
 };
 
-const formatLargeNumber = (value: unknown): string => {
-  let numericValue: number;
-  if (typeof value !== "number") {
-    numericValue = Number(value);
-  } else {
-    numericValue = value;
-  }
-
-  if (numericValue > 1_000_000_000) {
-    return `${(numericValue / 1_000_000_000).toFixed(1)}B`;
-  }
-
-  if (numericValue >= 1_000_000) {
-    return `${(numericValue / 1_000_000).toFixed(1)}M`;
-  }
-  if (numericValue >= 1_000) {
-    return `${(numericValue / 1_000).toFixed(1)}K`;
-  }
-  return numericValue.toLocaleString();
-};
 type MultipleLineChartProps = {
   data: ChartData[];
   config: ChartConfig;

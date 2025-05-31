@@ -5,6 +5,7 @@ import { UseFormReturn } from "react-hook-form";
 import ChartSection from "./chart-section";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 import TableSection from "./table-section";
+import WidgetsSection from "./widgets-section";
 
 type StatsSectionProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;
@@ -18,6 +19,7 @@ const StatsSection = memo(({ form, selectedProjects }: StatsSectionProps) => {
     <>
       <ChartSection projectStats={selectedProjectsStats} />
       <TableSection projectsStats={selectedProjectsStats} />
+      <WidgetsSection projectsStats={selectedProjectsStats} />
     </>
   );
 });

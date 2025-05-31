@@ -1,6 +1,7 @@
 import { SimpleTooltip } from "@/components/simple-tooltip";
 import { BreakDropIndicator } from "@/lib/utils/calculateBreakDrop";
 import { cn } from "@/lib/utils/cn";
+import { formatPercentage } from "@/lib/utils/formatters";
 import {
   ExclamationTriangleIcon,
   InfoCircledIcon,
@@ -136,8 +137,12 @@ export default function BreakDropIndicatorComponent({
         </SimpleTooltip>
       </div>
       <div className="text-xs text-muted-foreground">
-        <div>Christmas: {indicator.christmasDropPercentage.toFixed(1)}%</div>
-        <div>Weekend: {indicator.weekendDropPercentage.toFixed(1)}%</div>
+        <div>
+          Christmas: {formatPercentage(indicator.christmasDropPercentage, 1)}
+        </div>
+        <div>
+          Weekend: {formatPercentage(indicator.weekendDropPercentage, 1)}
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { round } from "../utils/math";
 
 type PerformanceMetrics = {
   componentName: string;
@@ -24,15 +25,13 @@ export function usePerformanceMonitor(componentName: string) {
 
     performanceLog.push(metrics);
 
-    // Keep only last 100 entries
     if (performanceLog.length > 100) {
       performanceLog.shift();
     }
 
-    // Log slow renders (> 16ms for 60fps)
     if (renderTime > 16) {
       console.warn(
-        `Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`,
+        `Slow render detected in ${componentName}: ${round(renderTime, 2)}ms`,
       );
     }
   });
