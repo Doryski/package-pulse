@@ -60,7 +60,7 @@ async function runPlaywrightTests() {
 
   console.info("🚀 Running UI tests...");
   try {
-    await runCommand("npm run test:e2e", "Running UI tests");
+    await runCommand("npm run test:e2e -- --reporter=list", "Running UI tests");
     console.info("✅ UI tests completed successfully.");
   } catch (error) {
     console.error("❌ UI tests failed:", error);

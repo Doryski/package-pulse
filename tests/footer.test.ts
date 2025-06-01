@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("Footer Links", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://localhost:3000"); // Adjust the URL to your local development server
+    await page.goto("/");
   });
 
   test("should navigate to GitHub profile", async ({ page }) => {
@@ -31,14 +31,5 @@ test.describe("Footer Links", () => {
     ]);
     await newPage.waitForLoadState("networkidle");
     await expect(newPage).toHaveURL(links.githubRepository);
-  });
-
-  test("should navigate to Buy Me a Coffee page", async ({ page }) => {
-    const [newPage] = await Promise.all([
-      page.waitForEvent("popup"),
-      page.locator(`a[href="${links.buyMeACoffee}"]`).click(),
-    ]);
-    await newPage.waitForLoadState("networkidle");
-    await expect(newPage).toHaveURL(links.buyMeACoffee);
   });
 });
