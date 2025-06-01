@@ -4,7 +4,7 @@ import { z } from "zod";
 const NormalizedProjectNameSchema = z
   .string()
   .transform((projectName) => {
-    return projectName.replace(/[\s\/@]/g, "_x_").toLowerCase();
+    return projectName.replace(/[\s\/@\.]/g, "_x_").toLowerCase();
   })
   .brand("NormalizedChartKey");
 

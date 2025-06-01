@@ -16,6 +16,15 @@ describe("math", () => {
       expect(round(-3.585, 2, "up")).toBe(-3.58);
       expect(round(-3.585, 2, "down")).toBe(-3.59);
       expect(round(-3.585, 2, "nearest")).toBe(-3.59);
+      expect(round(0, 0, "up")).toBe(0);
+      expect(round(0, 0, "down")).toBe(0);
+      expect(round(0, 0, "nearest")).toBe(0);
+      expect(round(0.0, 0, "up")).toBe(0);
+      expect(round(0.0, 0, "down")).toBe(0);
+      expect(round(0.0, 0, "nearest")).toBe(0);
+      expect(round(-0.0, 0, "up")).toBe(0);
+      expect(round(-0.0, 0, "down")).toBe(0);
+      expect(round(-0.0, 0, "nearest")).toBe(0);
     });
   });
 });

@@ -1,15 +1,13 @@
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import { ProjectStats } from "@/lib/queries/useProjectsStats";
 import {
   BreakDropIndicator,
   calculateBreakDrop,
 } from "@/lib/utils/calculateBreakDrop";
 import { UseQueryResult } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { isWithinInterval, subYears } from "date-fns";
 import getChartColor from "../../../lib/utils/getChartColor";
-import getLastYearsMostAdequateDay from "../../../lib/utils/getLastYearsMostAdequateDay";
 import getPercentChange from "../../../lib/utils/getPercentChange";
-import { groupStats } from "../../../lib/utils/groupByPeriod";
+import { groupStats, PeriodStat } from "../../../lib/utils/groupByPeriod";
 
 const statsCache = new Map<string, StatsRow>();
 const groupStatsCache = new Map<string, ReturnType<typeof groupStats>>();
@@ -24,12 +22,8 @@ export type StatsRow = {
   weeklyChange: StatChange | null;
   monthlyChange: StatChange | null;
   yearlyChange: StatChange | null;
-  oneYearAgoChange:
-    | (StatChange & {
-        currentFullDay: string;
-        lastYearsMostAdequateDay: string;
-      })
-    | null;
+  yoyWeekChange: StatChange | null;
+  yoyMonthChange: StatChange | null;
   breakDropIndicator: BreakDropIndicator;
 };
 
@@ -53,11 +47,36 @@ function getCachedGroupStats(projectName: string, rawData: any[]) {
   return result;
 }
 
+export type GetStatsMatrixResult = {
+  stats: StatsRow[];
+  dates: {
+    recentFullWeek: Omit<PeriodStat, "count"> | undefined;
+    previousFullWeek: Omit<PeriodStat, "count"> | undefined;
+    recentFullMonth: Omit<PeriodStat, "count"> | undefined;
+    previousFullMonth: Omit<PeriodStat, "count"> | undefined;
+    recentFullYear: Omit<PeriodStat, "count"> | undefined;
+    previousFullYear: Omit<PeriodStat, "count"> | undefined;
+    lastYearsReferenceWeek: Omit<PeriodStat, "count"> | undefined;
+    lastYearsReferenceMonth: Omit<PeriodStat, "count"> | undefined;
+  };
+};
+
 export default function getStatsMatrix(
   stats: UseQueryResult<ProjectStats>[],
   theme: string | undefined,
-) {
-  return stats.reduce<StatsRow[]>((acc, query, index) => {
+): GetStatsMatrixResult {
+  let collectedDates: GetStatsMatrixResult["dates"] = {
+    recentFullWeek: undefined,
+    previousFullWeek: undefined,
+    recentFullMonth: undefined,
+    previousFullMonth: undefined,
+    recentFullYear: undefined,
+    previousFullYear: undefined,
+    lastYearsReferenceWeek: undefined,
+    lastYearsReferenceMonth: undefined,
+  };
+
+  const statsData = stats.reduce<StatsRow[]>((acc, query, index) => {
     const projectName = query.data?.projectName;
     if (!projectName || !query.data) {
       return acc;
@@ -65,80 +84,125 @@ export default function getStatsMatrix(
 
     const dataSignature = `${projectName}-${query.data.rawSortedData.length}-${theme}-${index}`;
 
-    if (statsCache.has(dataSignature)) {
-      acc.push(statsCache.get(dataSignature)!);
-      return acc;
-    }
-
     const color = getChartColor(theme, index);
     const groupedStats = getCachedGroupStats(
       projectName,
       query.data.rawSortedData,
     );
-    const currentFullWeek = groupedStats.byWeeks.slice(-2)[0];
-    const previousFullWeek = groupedStats.byWeeks.slice(-3)[0];
-    if (!currentFullWeek || !previousFullWeek) {
+
+    const recentFullWeek = groupedStats.byWeeks.at(-2);
+    const previousFullWeek = groupedStats.byWeeks.at(-3);
+    const recentFullMonth = groupedStats.byMonths.at(-2);
+    const previousFullMonth = groupedStats.byMonths.at(-3);
+    const recentFullYear = groupedStats.byYears.at(-2);
+    const previousFullYear = groupedStats.byYears.at(-3);
+
+    const lastDayOfRecentWeek = recentFullWeek?.end;
+    const lastYearsReferenceWeek = lastDayOfRecentWeek
+      ? subYears(lastDayOfRecentWeek, 1)
+      : undefined;
+    const lastYearsReferenceWeekStats = groupedStats.byWeeks.toReversed().find(
+      (week) =>
+        lastYearsReferenceWeek &&
+        isWithinInterval(lastYearsReferenceWeek, {
+          start: week.start,
+          end: week.end,
+        }),
+    );
+
+    const lastDayOfRecentMonth = recentFullMonth?.end;
+    const lastYearsReferenceMonth = lastDayOfRecentMonth
+      ? subYears(lastDayOfRecentMonth, 1)
+      : undefined;
+    const lastYearsReferenceMonthStats = groupedStats.byMonths
+      .toReversed()
+      .find(
+        (month) =>
+          lastYearsReferenceMonth &&
+          isWithinInterval(lastYearsReferenceMonth, {
+            start: month.start,
+            end: month.end,
+          }),
+      );
+
+    if (
+      collectedDates.recentFullWeek === undefined &&
+      recentFullWeek &&
+      previousFullWeek &&
+      recentFullMonth &&
+      previousFullMonth &&
+      recentFullYear &&
+      previousFullYear
+    ) {
+      collectedDates = {
+        recentFullWeek: recentFullWeek,
+        previousFullWeek: previousFullWeek,
+        recentFullMonth: recentFullMonth,
+        previousFullMonth: previousFullMonth,
+        recentFullYear: recentFullYear,
+        previousFullYear: previousFullYear,
+        lastYearsReferenceWeek: lastYearsReferenceWeekStats,
+        lastYearsReferenceMonth: lastYearsReferenceMonthStats,
+      };
+    }
+
+    if (statsCache.has(dataSignature)) {
+      acc.push(statsCache.get(dataSignature)!);
       return acc;
     }
+
     const weeklyChange =
-      currentFullWeek && previousFullWeek
+      recentFullWeek && previousFullWeek
         ? {
-            nominal: currentFullWeek.count - previousFullWeek.count,
+            nominal: recentFullWeek.count - previousFullWeek.count,
             percentage: getPercentChange(
-              currentFullWeek.count,
+              recentFullWeek.count,
               previousFullWeek.count,
             ),
           }
         : null;
 
-    const currentFullMonth = groupedStats.byMonths.slice(-2)[0];
-    const previousFullMonth = groupedStats.byMonths.slice(-3)[0];
     const monthlyChange =
-      currentFullMonth && previousFullMonth
+      recentFullMonth && previousFullMonth
         ? {
-            nominal: currentFullMonth.count - previousFullMonth.count,
+            nominal: recentFullMonth.count - previousFullMonth.count,
             percentage: getPercentChange(
-              currentFullMonth.count,
+              recentFullMonth.count,
               previousFullMonth.count,
             ),
           }
         : null;
 
-    const currentFullYear = groupedStats.byYears.slice(-2)[0];
-    const previousFullYear = groupedStats.byYears.slice(-3)[0];
     const yearlyChange =
-      currentFullYear && previousFullYear
+      recentFullYear && previousFullYear
         ? {
-            nominal: currentFullYear.count - previousFullYear.count,
+            nominal: recentFullYear.count - previousFullYear.count,
             percentage: getPercentChange(
-              currentFullYear.count,
+              recentFullYear.count,
               previousFullYear.count,
             ),
           }
         : null;
 
-    const currentFullDay = groupedStats.byDays.slice(-2)[0];
-
-    const lastYearsMostAdequateDay = currentFullDay?.date
-      ? format(getLastYearsMostAdequateDay(currentFullDay?.date), DATE_FORMAT)
-      : null;
-
-    const lastYearsDay =
-      currentFullDay && lastYearsMostAdequateDay
-        ? groupedStats.byDays.find(
-            (day) => day.date === lastYearsMostAdequateDay,
-          )
-        : null;
-    const oneYearAgoChange =
-      lastYearsDay && currentFullDay && lastYearsMostAdequateDay
+    const yoyWeekChange =
+      lastYearsReferenceWeekStats && recentFullWeek
         ? {
-            nominal: currentFullDay.count - lastYearsDay.count,
+            nominal: recentFullWeek.count - lastYearsReferenceWeekStats.count,
             percentage: getPercentChange(
-              currentFullDay.count,
-              lastYearsDay.count,
+              recentFullWeek.count,
+              lastYearsReferenceWeekStats.count,
             ),
-            currentFullDay: format(currentFullDay.date, DATE_FORMAT),
-            lastYearsMostAdequateDay,
+          }
+        : null;
+
+    const yoyMonthChange =
+      lastYearsReferenceMonthStats && recentFullMonth
+        ? {
+            nominal: recentFullMonth.count - lastYearsReferenceMonthStats.count,
+            percentage: getPercentChange(
+              recentFullMonth.count,
+              lastYearsReferenceMonthStats.count,
+            ),
           }
         : null;
 
@@ -149,7 +213,8 @@ export default function getStatsMatrix(
       weeklyChange,
       monthlyChange,
       yearlyChange,
-      oneYearAgoChange,
+      yoyWeekChange,
+      yoyMonthChange,
       breakDropIndicator,
       color,
     };
@@ -166,4 +231,9 @@ export default function getStatsMatrix(
     acc.push(result);
     return acc;
   }, []);
+
+  return {
+    stats: statsData,
+    dates: collectedDates,
+  };
 }

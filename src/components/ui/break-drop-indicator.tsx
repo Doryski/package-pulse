@@ -70,7 +70,7 @@ export default function BreakDropIndicatorComponent({
             </div>
           }
         >
-          <InfoCircledIcon className="size-3 cursor-help" />
+          <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
         </SimpleTooltip>
       </div>
     );

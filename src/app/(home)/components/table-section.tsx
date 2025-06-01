@@ -6,8 +6,9 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
+import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
-import useProjectsStats, {
+import {
   ProjectStatsQuery,
   sortStatsMatrix,
 } from "@/lib/queries/useProjectsStats";
@@ -19,10 +20,8 @@ import {
   DownloadIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
-import { useTheme } from "next-themes";
 import { memo, useMemo } from "react";
-import { useFormContext, UseFormReturn } from "react-hook-form";
-import getStatsMatrix from "../utils/getStatsMatrix";
+import { useFormContext } from "react-hook-form";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 import ProjectsInfoTable from "./projects-info-table";
 import ProjectsStatsTable from "./projects-stats-table";
@@ -31,12 +30,10 @@ type TableSectionProps = {
   projectsStats: ProjectStatsQuery[];
 };
 
-function useExportData(
-  selectedProjects: string[],
-  form: UseFormReturn<ProjectsSearchFormValues>,
-) {
-  const { resolvedTheme } = useTheme();
-  const projectsStats = useProjectsStats(selectedProjects, form);
+function useExportData(projectsStats: ProjectStatsQuery[]) {
+  const form = useFormContext<ProjectsSearchFormValues>();
+  const selectedProjects = form.watch("projects");
+  const statsMatrix = useStatsMatrix(projectsStats);
   const sortColumn = getLocalStorageValue(
     LocalStorageKey.TABLE_SORT_COLUMN,
     SortColumnSchema,
@@ -44,10 +41,6 @@ function useExportData(
   const sortDirection = getLocalStorageValue(
     LocalStorageKey.TABLE_SORT_DIRECTION,
     SortDirectionSchema,
-  );
-  const statsMatrix = useMemo(
-    () => getStatsMatrix(projectsStats, resolvedTheme),
-    [projectsStats, resolvedTheme],
   );
   const sortedStatsMatrix = useMemo(
     () =>
@@ -68,8 +61,10 @@ function useExportData(
     monthlyChange_percentage: number | null;
     yearlyChange_nominal: number | null;
     yearlyChange_percentage: number | null;
-    oneYearAgoChange_nominal: number | null;
-    oneYearAgoChange_percentage: number | null;
+    yoyWeekChange_nominal: number | null;
+    yoyWeekChange_percentage: number | null;
+    yoyMonthChange_nominal: number | null;
+    yoyMonthChange_percentage: number | null;
     breakDropPercentage: number;
     weekendDropPercentage: number;
     corporateUsageScore: number;
@@ -89,14 +84,16 @@ function useExportData(
   const data = sortedStatsMatrix.reduce<StatsRow[]>((acc, project) => {
     let itemData: StatsRow = {
       projectName: project.projectName,
-      weeklyChange_nominal: project.weeklyChange?.nominal ?? 0,
-      weeklyChange_percentage: project.weeklyChange?.percentage ?? 0,
-      monthlyChange_nominal: project.monthlyChange?.nominal ?? 0,
-      monthlyChange_percentage: project.monthlyChange?.percentage ?? 0,
-      yearlyChange_nominal: project.yearlyChange?.nominal ?? 0,
-      yearlyChange_percentage: project.yearlyChange?.percentage ?? 0,
-      oneYearAgoChange_nominal: project.oneYearAgoChange?.nominal ?? 0,
-      oneYearAgoChange_percentage: project.oneYearAgoChange?.percentage ?? 0,
+      weeklyChange_nominal: project.weeklyChange?.nominal ?? null,
+      weeklyChange_percentage: project.weeklyChange?.percentage ?? null,
+      monthlyChange_nominal: project.monthlyChange?.nominal ?? null,
+      monthlyChange_percentage: project.monthlyChange?.percentage ?? null,
+      yearlyChange_nominal: project.yearlyChange?.nominal ?? null,
+      yearlyChange_percentage: project.yearlyChange?.percentage ?? null,
+      yoyWeekChange_nominal: project.yoyWeekChange?.nominal ?? null,
+      yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
+      yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
+      yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
       breakDropPercentage: project.breakDropIndicator.christmasDropPercentage,
       weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
       corporateUsageScore: project.breakDropIndicator.corporateUsageScore,
@@ -147,9 +144,7 @@ function useExportData(
 }
 
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
-  const form = useFormContext<ProjectsSearchFormValues>();
-  const selectedProjects = form.watch("projects");
-  const exportToFile = useExportData(selectedProjects, form);
+  const exportToFile = useExportData(projectsStats);
   const isLoading = projectsStats.some((project) => project.isLoading);
   const [isInfoTableVisible, showInfoTable, hideInfoTable] =
     useBooleanState(false);

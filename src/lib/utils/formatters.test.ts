@@ -21,6 +21,9 @@ describe("formatInteger", () => {
 
   it("handles zero correctly", () => {
     expect(formatInteger(0)).toBe("0");
+    expect(formatInteger(0.0)).toBe("0");
+    expect(formatInteger(-0)).toBe("0");
+    expect(formatInteger(-0.0)).toBe("0");
   });
 
   it("handles large numbers correctly", () => {
@@ -35,7 +38,7 @@ describe("formatInteger", () => {
 
   it("rounds floating point numbers to integers", () => {
     expect(formatInteger(1000.5)).toBe(nbsp("1 001"));
-    expect(formatInteger(-1000.5)).toBe(nbsp("-1 000"));
+    expect(formatInteger(-1000.5)).toBe(nbsp("-1 001"));
     expect(formatInteger(1000.4)).toBe(nbsp("1 000"));
     expect(formatInteger(-1000.6)).toBe(nbsp("-1 001"));
   });

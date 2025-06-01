@@ -1,5 +1,7 @@
+import { SimpleTooltip } from "@/components/simple-tooltip";
 import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils/cn";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { memo, PropsWithChildren } from "react";
 import { z } from "zod";
 
@@ -8,7 +10,8 @@ const sortColumnOptions = [
   "weekly",
   "monthly",
   "yearly",
-  "oneYearAgo",
+  "yoyWeek",
+  "yoyMonth",
   "breakDrop",
 ] as const;
 const sortDirectionOptions = ["asc", "desc"] as const;
@@ -26,6 +29,7 @@ type TableHeadSortableProps = PropsWithChildren<
     isSorted: boolean;
     sortDirection: SortDirection;
     contentClassName?: string;
+    tooltip?: React.ReactNode;
   } & React.ThHTMLAttributes<HTMLTableCellElement>
 >;
 
@@ -37,6 +41,7 @@ const TableHeadSortable = memo(
     isSorted,
     sortDirection,
     contentClassName,
+    tooltip,
     ...props
   }: TableHeadSortableProps) => {
     return (
@@ -51,11 +56,16 @@ const TableHeadSortable = memo(
       >
         <div
           className={cn(
-            "flex items-center justify-center gap-2 text-xs md:text-sm",
+            "flex items-center justify-center gap-1 text-xs md:text-sm",
             contentClassName,
           )}
         >
           {children}
+          {tooltip && (
+            <SimpleTooltip content={tooltip}>
+              <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
+            </SimpleTooltip>
+          )}
           <span className="text-[10px] md:text-xs">
             {isSorted && (sortDirection === "desc" ? "▼" : "▲")}
           </span>

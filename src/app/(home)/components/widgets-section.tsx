@@ -23,7 +23,7 @@ import PieChartWidget from "./widgets/pie-chart-widget";
 import StatsCardsWidget, {
   StatsCardsWidgetRef,
 } from "./widgets/stats-cards-widget";
-import TrendWidget from "./widgets/trend-widget";
+import TrendWidget, { TrendWidgetRef } from "./widgets/trend-widget";
 
 type WidgetsSectionProps = {
   projectsStats: ProjectStatsQuery[];
@@ -126,6 +126,7 @@ const WidgetCard = memo(
   }) => {
     const cardRef = useRef<HTMLDivElement>(null);
     const statsCardsRef = useRef<StatsCardsWidgetRef>(null);
+    const trendWidgetRef = useRef<TrendWidgetRef>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [barChartMode, setBarChartMode] = useState<BarChartMode>("growth");
 
@@ -137,13 +138,23 @@ const WidgetCard = memo(
     };
 
     const handleDownloadProjectCard = async (projectName: string) => {
-      if (!statsCardsRef.current) return;
-      const projectCardElement =
-        statsCardsRef.current.getProjectCardElement(projectName);
+      let projectCardElement: HTMLElement | null = null;
+
+      if (widget.id === "stats-cards" && statsCardsRef.current) {
+        projectCardElement =
+          statsCardsRef.current.getProjectCardElement(projectName);
+      } else if (widget.id === "trend" && trendWidgetRef.current) {
+        projectCardElement =
+          trendWidgetRef.current.getTrendCardElement(projectName);
+      }
+
       if (!projectCardElement) return;
 
       setIsLoading(true);
-      await downloadAsImage(projectCardElement, `${projectName}-card`);
+      await downloadAsImage(
+        projectCardElement,
+        `${projectName}-${widget.id}-card`,
+      );
       setIsLoading(false);
     };
 
@@ -155,9 +166,16 @@ const WidgetCard = memo(
     };
 
     const handleCopyProjectCard = async (projectName: string) => {
-      if (!statsCardsRef.current) return;
-      const projectCardElement =
-        statsCardsRef.current.getProjectCardElement(projectName);
+      let projectCardElement: HTMLElement | null = null;
+
+      if (widget.id === "stats-cards" && statsCardsRef.current) {
+        projectCardElement =
+          statsCardsRef.current.getProjectCardElement(projectName);
+      } else if (widget.id === "trend" && trendWidgetRef.current) {
+        projectCardElement =
+          trendWidgetRef.current.getTrendCardElement(projectName);
+      }
+
       if (!projectCardElement) return;
 
       setIsLoading(true);
@@ -170,6 +188,8 @@ const WidgetCard = memo(
       .map((project) => project.data!.projectName);
 
     const isStatsCardsWidget = widget.id === "stats-cards";
+    const isTrendWidget = widget.id === "trend";
+    const hasIndividualCards = isStatsCardsWidget || isTrendWidget;
 
     return (
       <Card className="relative">
@@ -195,7 +215,7 @@ const WidgetCard = memo(
                   <ToggleGroupItem value="growth">Growth</ToggleGroupItem>
                 </ToggleGroup>
               )}
-              {isStatsCardsWidget && availableProjects.length > 0 ? (
+              {hasIndividualCards && availableProjects.length > 0 ? (
                 <div className="flex">
                   <SimpleTooltip content="Download as PNG">
                     <Button
@@ -228,7 +248,7 @@ const WidgetCard = memo(
                         >
                           <span>Download</span>
                           <span className="italic">{projectName}</span>
-                          <span>card</span>
+                          <span>{isStatsCardsWidget ? "card" : "trend"}</span>
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -247,7 +267,7 @@ const WidgetCard = memo(
                 </SimpleTooltip>
               )}
 
-              {isStatsCardsWidget && availableProjects.length > 0 ? (
+              {hasIndividualCards && availableProjects.length > 0 ? (
                 <div className="flex">
                   <SimpleTooltip content="Copy as image">
                     <Button
@@ -307,6 +327,8 @@ const WidgetCard = memo(
               ref={statsCardsRef}
               projectsStats={projectsStats}
             />
+          ) : isTrendWidget ? (
+            <TrendWidget ref={trendWidgetRef} projectsStats={projectsStats} />
           ) : (
             <widget.component
               projectsStats={projectsStats}

@@ -26,7 +26,7 @@ export function formatLargeNumber(value: unknown): string {
 }
 
 export function formatInteger(value: number): string {
-  const roundedValue = round(value);
+  const roundedValue = round(value, 0);
   return new Intl.NumberFormat("pl-PL", {
     useGrouping: true,
     maximumFractionDigits: 0,

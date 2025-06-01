@@ -2,8 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { formatInteger } from "@/lib/utils/formatters";
-import { max } from "@/lib/utils/math";
 import { forwardRef, memo, useImperativeHandle, useRef } from "react";
+import getPeakAndLatestDownloads from "../../utils/getPeakAndLatestStats";
 
 type StatsCardsWidgetProps = {
   projectsStats: ProjectStatsQuery[];
@@ -18,19 +18,9 @@ const StatsCardsWidget = memo(
     ({ projectsStats }, ref) => {
       const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-      const stats = projectsStats
-        .filter((project) => project.data)
-        .map((project) => {
-          const data = project.data!;
-          const latestDownloads = data.rawSortedData.slice(-2)[0]?.count || 0;
-          const peakDownloads = max(data.rawSortedData, (item) => item.count);
-
-          return {
-            name: data.projectName,
-            latestDownloads,
-            peakDownloads: peakDownloads?.count || 0,
-          };
-        });
+      const peakAndLatestStats = getPeakAndLatestDownloads(
+        projectsStats,
+      ).toSorted((a, b) => b.latestDownloads - a.latestDownloads);
 
       useImperativeHandle(ref, () => ({
         getProjectCardElement: (projectName: string) => {
@@ -38,7 +28,7 @@ const StatsCardsWidget = memo(
         },
       }));
 
-      if (stats.length === 0) {
+      if (peakAndLatestStats.length === 0) {
         return (
           <div className="py-8 text-center text-muted-foreground">
             No data available
@@ -48,7 +38,7 @@ const StatsCardsWidget = memo(
 
       return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {stats.map((stat, index) => (
+          {peakAndLatestStats.map((stat, index) => (
             <Card
               key={stat.name}
               ref={(el) => {
@@ -59,7 +49,8 @@ const StatsCardsWidget = memo(
                 }
               }}
               className={`relative overflow-hidden shadow-none ${
-                stats.length % 2 === 1 && index === stats.length - 1
+                peakAndLatestStats.length % 2 === 1 &&
+                index === peakAndLatestStats.length - 1
                   ? "sm:col-span-2 sm:w-full sm:max-w-[calc(50%-0.5rem)] sm:justify-self-center"
                   : ""
               }`}

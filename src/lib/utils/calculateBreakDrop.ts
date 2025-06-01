@@ -7,12 +7,10 @@ import {
   startOfYear,
   subBusinessDays,
 } from "date-fns";
-import { sum } from "lodash";
+import { DownloadStat } from "./groupByPeriod";
+import { average, sum } from "./math";
 
-type DownloadData = {
-  date: string;
-  count: number;
-};
+const INSUFFICIENT_DATA_THRESHOLD = 5000;
 
 export type BreakDropIndicator = {
   christmasDropPercentage: number;
@@ -21,10 +19,6 @@ export type BreakDropIndicator = {
   corporateUsageLevel: "very_high" | "high" | "moderate" | "low" | "very_low";
   hasEnoughData: boolean;
 };
-
-function average<T>(arr: T[], fn: (item: T) => number): number {
-  return arr.reduce((sum, item) => sum + fn(item), 0) / arr.length;
-}
 
 export const getLast5ChristmasYears = () => {
   const today = new Date();
@@ -42,12 +36,15 @@ export const getLast5ChristmasYears = () => {
 };
 
 export function calculateBreakDrop(
-  rawData: DownloadData[],
+  rawData: DownloadStat[],
 ): BreakDropIndicator {
   const last365Days = rawData.slice(-365);
   const last365DaysAverage = average(last365Days, (item) => item.count);
 
-  if (last365Days.length < 365 || last365DaysAverage < 10000) {
+  if (
+    last365Days.length < 365 ||
+    last365DaysAverage < INSUFFICIENT_DATA_THRESHOLD
+  ) {
     return {
       christmasDropPercentage: 0,
       weekendDropPercentage: 0,
@@ -70,7 +67,7 @@ export function calculateBreakDrop(
   });
 
   const onlySufficientFromLast5Years = dataPerYear.filter(
-    (item) => item.average > 10000,
+    (item) => item.average > INSUFFICIENT_DATA_THRESHOLD,
   );
 
   const last5YearsAverageChristmasDrop = average(
@@ -104,8 +101,8 @@ export function calculateBreakDrop(
   ];
 
   const corporateUsageScore =
-    sum(data.map((item) => item.value * item.wage)) /
-    sum(data.map((item) => item.wage));
+    sum(data, (item) => item.value * item.wage) /
+    sum(data, (item) => item.wage);
 
   const corporateUsageLevel = determineCorporateUsageLevel(corporateUsageScore);
 
@@ -119,7 +116,7 @@ export function calculateBreakDrop(
 }
 
 function calculateChristmasDropForYear(
-  rawData: DownloadData[],
+  rawData: DownloadStat[],
   year: number,
 ): number {
   // Christmas period: December 21-29
@@ -171,7 +168,7 @@ function calculateChristmasDropForYear(
   return Math.max(0, dropPercentage);
 }
 
-function calculateWeekendDrop(rawData: DownloadData[]): number {
+function calculateWeekendDrop(rawData: DownloadStat[]): number {
   const weekdayData: number[] = [];
   const weekendData: number[] = [];
 

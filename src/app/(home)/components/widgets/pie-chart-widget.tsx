@@ -196,14 +196,14 @@ CustomTooltip.displayName = "CustomTooltip";
 
 const CustomLegend = ({ payload }: any) => {
   return (
-    <div className="flex items-center justify-center gap-x-4 px-4">
+    <div className="mx-auto flex max-w-[50%] flex-wrap items-center justify-center gap-x-4 px-4">
       {payload.map((entry: any, index: number) => {
         const fillColor = `var(--color-${entry.payload.normalizedName})`;
 
         return (
           <div key={index} className="flex items-center gap-1">
             <div
-              className="size-3 rounded-full text-sm"
+              className="min-w-3 size-3 rounded-full text-sm"
               style={{ backgroundColor: fillColor }}
             />
             <span className="text-sm font-medium text-foreground">

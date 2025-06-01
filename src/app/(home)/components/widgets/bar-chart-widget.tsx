@@ -1,4 +1,5 @@
 "use client";
+import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import {
   formatInteger,
@@ -16,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import getPeakAndLatestDownloads from "../../utils/getPeakAndLatestStats";
 
 export type BarChartMode = "downloads" | "growth";
 
@@ -26,31 +28,28 @@ export type BarChartWidgetProps = {
 
 const BarChartWidget = memo(
   ({ projectsStats, comparisonMode = "growth" }: BarChartWidgetProps) => {
-    const data = projectsStats
-      .filter((project) => project.data)
-      .map((project, index) => {
-        const projectData = project.data!;
-        const sortedData = projectData.rawSortedData;
-        const latestDownloads = sortedData.slice(-2)[0]?.count || 0;
-        const previousDownloads = sortedData.slice(-3)[0]?.count || 0;
+    const statsMatrix = useStatsMatrix(projectsStats);
+    const peakAndLatestStats = getPeakAndLatestDownloads(projectsStats);
+    const data = statsMatrix.stats
+      .map((projectData, index) => {
+        const latestDownloads = peakAndLatestStats.find(
+          (stat) => stat.name === projectData.projectName,
+        )?.latestDownloads;
 
-        const growthRate =
-          previousDownloads > 0
-            ? ((latestDownloads - previousDownloads) / previousDownloads) * 100
-            : 0;
+        const growthRate = projectData.weeklyChange?.percentage;
 
         return {
           name: projectData.projectName,
           downloads: latestDownloads,
-          growth: round(growthRate, 2),
+          growth: growthRate ? round(growthRate, 2) : undefined,
           fill: `hsl(var(--chart-${(index % 10) + 1}))`,
         };
       })
       .sort((a, b) => {
         if (comparisonMode === "growth") {
-          return b.growth - a.growth;
+          return (b.growth ?? 0) - (a.growth ?? 0);
         }
-        return b.downloads - a.downloads;
+        return (b.downloads ?? 0) - (a.downloads ?? 0);
       });
 
     if (data.length === 0) {

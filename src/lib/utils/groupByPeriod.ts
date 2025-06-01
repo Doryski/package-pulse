@@ -1,3 +1,4 @@
+import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
 import {
   addDays,
   addMonths,
@@ -11,15 +12,28 @@ import {
   startOfMonth,
   startOfWeek,
   startOfYear,
+  subDays,
 } from "date-fns";
 import { getPeriodStartByDays } from "./getPeriodStartByDays";
 
-export function groupByDays<
-  T extends {
-    date: string;
-    count: number;
-  },
->(stats: T[], periodLength: number) {
+export type Period = {
+  start: string;
+  end: string;
+};
+
+export type PeriodStat = Period & {
+  count: number;
+};
+
+export type DownloadStat = {
+  date: string;
+  count: number;
+};
+
+export function groupByDays<T extends DownloadStat>(
+  stats: T[],
+  periodLength: number,
+) {
   return groupByPeriod(
     stats,
     periodLength,
@@ -29,27 +43,13 @@ export function groupByDays<
   );
 }
 
-export function groupByWeeks<
-  T extends {
-    date: string;
-    count: number;
-  }[],
->(stats: T) {
-  return groupByPeriod(
-    stats,
-    1,
-    addWeeks,
-    differenceInCalendarWeeks,
-    startOfWeek,
+export function groupByWeeks<T extends DownloadStat[]>(stats: T) {
+  return groupByPeriod(stats, 1, addWeeks, differenceInCalendarWeeks, (date) =>
+    startOfWeek(date, { weekStartsOn: 1 }),
   );
 }
 
-export function groupByMonths<
-  T extends {
-    date: string;
-    count: number;
-  },
->(stats: T[]) {
+export function groupByMonths<T extends DownloadStat>(stats: T[]) {
   return groupByPeriod(
     stats,
     1,
@@ -59,12 +59,7 @@ export function groupByMonths<
   );
 }
 
-export function groupByYears<
-  T extends {
-    date: string;
-    count: number;
-  },
->(stats: T[]) {
+export function groupByYears<T extends DownloadStat>(stats: T[]) {
   return groupByPeriod(
     stats,
     1,
@@ -74,12 +69,7 @@ export function groupByYears<
   );
 }
 
-export function groupStats<
-  T extends {
-    date: string;
-    count: number;
-  },
->(stats: T[]) {
+export function groupStats<T extends DownloadStat>(stats: T[]) {
   return {
     byDays: groupByDays(stats, 1),
     byThreeDays: groupByDays(stats, 3),
@@ -104,23 +94,34 @@ export const calculatePeriodStartDate = (
   return addPeriodFn(startPeriodDate, periodsToAdd * periodLength);
 };
 
+export const createPeriodKey = (start: string, end: string) => {
+  const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateFormatRegex.test(start) || !dateFormatRegex.test(end)) {
+    throw new Error("Invalid date format");
+  }
+  return `${start}:${end}`;
+};
+
+export const calculatePeriodEndDate = (
+  periodStart: Date,
+  periodLength: number,
+  addPeriodFn: (date: Date, periodLength: number) => Date,
+): Date => {
+  return subDays(addPeriodFn(periodStart, periodLength), 1);
+};
 export const updateGroupedStats = (
-  grouped: Record<string, { date: string; count: number }>,
-  periodKey: string,
+  grouped: Record<string, PeriodStat>,
+  period: Period,
   count: number,
 ): void => {
+  const periodKey = createPeriodKey(period.start, period.end);
   if (!grouped[periodKey]) {
-    grouped[periodKey] = { date: periodKey, count: 0 };
+    grouped[periodKey] = { start: period.start, end: period.end, count: 0 };
   }
   grouped[periodKey].count += count;
 };
 
-export default function groupByPeriod<
-  T extends {
-    date: string;
-    count: number;
-  },
->(
+export default function groupByPeriod<T extends DownloadStat>(
   stats: T[],
   periodLength: number,
   addPeriodFn: (date: Date, periodLength: number) => Date,
@@ -128,22 +129,38 @@ export default function groupByPeriod<
   startOfPeriodFn: (date: Date) => Date = (date) =>
     getPeriodStartByDays(date, periodLength),
 ) {
-  return Object.values(
-    stats.reduce<Record<string, { date: string; count: number }>>(
-      (grouped, { date, count }) => {
-        const periodStartDate = calculatePeriodStartDate(
-          date,
-          periodLength,
-          startOfPeriodFn,
-          differenceFn,
-          addPeriodFn,
-        );
+  const todayUTC = format(new Date(), DATE_FORMAT);
 
-        const periodKey = format(periodStartDate, "yyyy-MM-dd");
-        updateGroupedStats(grouped, periodKey, count);
-        return grouped;
-      },
-      {},
-    ),
+  return Object.values(
+    stats.reduce<Record<string, PeriodStat>>((grouped, { date, count }) => {
+      const periodStartDate = calculatePeriodStartDate(
+        date,
+        periodLength,
+        startOfPeriodFn,
+        differenceFn,
+        addPeriodFn,
+      );
+
+      const periodEndDate = calculatePeriodEndDate(
+        periodStartDate,
+        periodLength,
+        addPeriodFn,
+      );
+      const periodStart = format(periodStartDate, DATE_FORMAT);
+      const periodEnd = format(periodEndDate, DATE_FORMAT);
+
+      if (periodStart <= todayUTC) {
+        updateGroupedStats(
+          grouped,
+          {
+            start: periodStart,
+            end: periodEnd,
+          },
+          count,
+        );
+      }
+
+      return grouped;
+    }, {}),
   );
 }

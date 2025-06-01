@@ -1,10 +1,14 @@
 import fetchNPMDownloads from "@/api/fetchNPMDownloads";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
-import { StatsRow } from "@/app/(home)/utils/getStatsMatrix";
+import { GetStatsMatrixResult } from "@/app/(home)/utils/getStatsMatrix";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import AppError from "@/lib/utils/AppError";
-import { groupByWeeks } from "@/lib/utils/groupByPeriod";
+import {
+  DownloadStat,
+  groupByWeeks,
+  PeriodStat,
+} from "@/lib/utils/groupByPeriod";
 import sortByDate from "@/lib/utils/sortByDate";
 import {
   QueryObserverSuccessResult,
@@ -16,8 +20,8 @@ import { toast } from "sonner";
 
 export type ProjectStats = {
   projectName: string;
-  groupedByWeekData: { date: string; count: number }[];
-  rawSortedData: { date: string; count: number }[];
+  groupedByWeekData: PeriodStat[];
+  rawSortedData: DownloadStat[];
 };
 export type ProjectStatsQuery = UseQueryResult<ProjectStats, Error>;
 
@@ -66,11 +70,11 @@ export default function useProjectsStats(
 }
 
 export function sortStatsMatrix(
-  statsMatrix: StatsRow[],
+  statsMatrix: GetStatsMatrixResult,
   sortColumn: SortColumn,
   sortDirection: SortDirection,
 ) {
-  return statsMatrix.toSorted((a, b) => {
+  return statsMatrix.stats.toSorted((a, b) => {
     if (sortColumn === "projectName") {
       return sortDirection === "desc"
         ? b.projectName.localeCompare(a.projectName)

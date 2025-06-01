@@ -11,12 +11,12 @@ export default function prepareChartData(
       const projectName = project.data.projectName;
 
       projectData.forEach((data) => {
-        const existingData = acc.find((d) => d.time === data.date);
+        const existingData = acc.find((d) => d.time === data.start);
         if (existingData) {
           existingData[projectName] = data.count;
         } else {
           const newData = {
-            time: data.date,
+            time: data.start,
             [projectName]: data.count,
           } as ChartData;
           acc.push(newData);
