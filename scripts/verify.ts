@@ -1,23 +1,55 @@
-import { exec } from "child_process";
-import { promisify } from "util";
-const execAsync = promisify(exec);
+import { ChildProcess, spawn } from "child_process";
 
-// TODO: stream output to console real-time so user sees progress
-export async function runCommand(command: string, description: string) {
+export async function runCommand(
+  command: string,
+  description: string,
+): Promise<string> {
   console.info(`\n🚀 ${description}...`);
-  try {
-    const { stdout, stderr } = await execAsync(command);
-    if (stderr) console.error(stderr);
-    console.info(stdout);
-    console.info(`✅ ${description} completed successfully.`);
-    return stdout.trim();
-  } catch (error) {
-    console.error(
-      `❌ ${description} failed:`,
-      error instanceof Error ? error.message : error,
-    );
-    throw error;
-  }
+
+  return new Promise((resolve, reject) => {
+    const args = command.split(" ");
+    const cmd = args.shift();
+
+    if (!cmd) {
+      reject(new Error("No command provided"));
+      return;
+    }
+
+    const child: ChildProcess = spawn(cmd, args, {
+      stdio: ["inherit", "pipe", "pipe"],
+      shell: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data: Buffer) => {
+      const output = data.toString();
+      process.stdout.write(output);
+      stdout += output;
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      const output = data.toString();
+      process.stderr.write(output);
+      stderr += output;
+    });
+
+    child.on("close", (code: number | null) => {
+      if (code === 0) {
+        console.info(`✅ ${description} completed successfully.`);
+        resolve(stdout.trim());
+      } else {
+        console.error(`❌ ${description} failed with exit code ${code}`);
+        reject(new Error(`Command failed with exit code ${code}`));
+      }
+    });
+
+    child.on("error", (error: Error) => {
+      console.error(`❌ ${description} failed:`, error.message);
+      reject(error);
+    });
+  });
 }
 
 async function runPlaywrightTests() {
