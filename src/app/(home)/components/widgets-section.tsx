@@ -248,7 +248,7 @@ const WidgetCard = memo(
                         >
                           <span>Download</span>
                           <span className="italic">{projectName}</span>
-                          <span>{isStatsCardsWidget ? "card" : "trend"}</span>
+                          <span>card</span>
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>

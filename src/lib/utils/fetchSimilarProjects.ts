@@ -59,31 +59,49 @@ const SimilarProjectsSchema = z.object({
 export async function fetchSimilarProjects(
   packagesInfo: Pick<PackageInfo, "projectName" | "keywords" | "description">[],
 ): Promise<string[]> {
-  const openaiClient = new OpenAI();
+  if (!packagesInfo.length) {
+    return [];
+  }
 
-  const response = await openaiClient.responses.create(
-    {
-      model: "gpt-4.1-nano",
-      input: createPrompt(packagesInfo),
-      text: {
-        format: zodTextFormat(SimilarProjectsSchema, "similar_projects"),
+  try {
+    const openaiClient = new OpenAI();
+
+    const response = await openaiClient.responses.create(
+      {
+        model: "gpt-4.1-nano",
+        input: createPrompt(packagesInfo),
+        text: {
+          format: zodTextFormat(SimilarProjectsSchema, "similar_projects"),
+        },
       },
-    },
-    { timeout: 10000 },
-  );
-
-  const parsedResponse = safeParse(
-    JSON.parse(response.output_text),
-    SimilarProjectsSchema,
-  );
-  const similarProjects = parsedResponse.similarProjects
-    .map((project) => project.trim().toLowerCase())
-    .filter(
-      (project) =>
-        !!project && !packagesInfo.find((info) => info.projectName === project),
+      { timeout: 10000 },
     );
 
-  return similarProjects;
+    const parsedResponse = safeParse(
+      JSON.parse(response.output_text),
+      SimilarProjectsSchema,
+    );
+
+    const similarProjects = parsedResponse.similarProjects
+      .map((project) => project.trim().toLowerCase())
+      .filter(
+        (project) =>
+          !!project &&
+          project.length > 0 &&
+          !packagesInfo.find((info) => info.projectName === project),
+      );
+
+    const validatedProjects = await Promise.all(
+      similarProjects.map(async (project) => {
+        const exists = await validatePackageExistence(project);
+        return exists ? project : null;
+      }),
+    );
+    return validatedProjects.filter((v) => v != null);
+  } catch (error) {
+    console.error("Error fetching similar projects:", error);
+    return [];
+  }
 }
 
 export async function validatePackageExistence(packageName: string) {
