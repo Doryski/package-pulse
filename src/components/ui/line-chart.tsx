@@ -10,6 +10,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import chartScales, { ChartScale } from "@/lib/enums/ChartScale";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
@@ -45,10 +46,11 @@ import {
   SelectValue,
 } from "./select";
 import { Separator } from "./separator";
+import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 
 export type ChartData = {
   time: string | Date;
-} & Record<string, number>;
+} & Record<string, number | null>;
 
 export type VersionData = {
   version: string;
@@ -126,6 +128,7 @@ type MultipleLineChartProps = {
 
 function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
+  const [chartScale, setChartScale] = useState<ChartScale>("linear");
   const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
@@ -162,10 +165,73 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     [data],
   );
 
+  const formatYAxisTick = useCallback(
+    (value: number) => {
+      if (chartScale === "logarithmic" && value <= 0) {
+        return "0";
+      }
+      return formatLargeNumber(value);
+    },
+    [chartScale],
+  );
+
+  const getYAxisDomain = useCallback(() => {
+    if (chartScale === "logarithmic") {
+      const allValues = chartData.flatMap((item) =>
+        Object.keys(item)
+          .filter((key) => key !== "time")
+          .map((key) => item[key])
+          .filter(
+            (value): value is number => typeof value === "number" && value > 0,
+          ),
+      );
+
+      if (allValues.length === 0) {
+        return [1, 100];
+      }
+
+      const minValue = Math.min(...allValues);
+      const maxValue = Math.max(...allValues);
+
+      const domain = [
+        Math.max(1, Math.floor(minValue * 0.9)),
+        Math.ceil(maxValue * 1.1),
+      ];
+
+      return domain;
+    }
+
+    return ["auto", "auto"];
+  }, [chartData, chartScale]);
+
+  const getTransformedData = useCallback(() => {
+    if (chartScale === "logarithmic") {
+      const transformedData = chartData.map((item) => {
+        const newItem = { ...item } as ChartData;
+        Object.keys(newItem).forEach((key) => {
+          if (key !== "time" && newItem[key] === 0) {
+            newItem[key] = null;
+          }
+        });
+        return newItem;
+      });
+
+      return transformedData;
+    }
+
+    return chartData;
+  }, [chartData, chartScale]);
+
   useLocalStorage(LocalStorageKey.TIME_PERIOD, timePeriod);
+  useLocalStorage(LocalStorageKey.CHART_SCALE, chartScale);
+
   useEffect(() => {
     handleTimePeriodChange(timePeriod);
   }, [handleTimePeriodChange, timePeriod]);
+
+  const yAxisScale = chartScale === "logarithmic" ? "log" : "linear";
+  const yAxisDomain = getYAxisDomain();
+  const transformedData = getTransformedData();
 
   return (
     <div
@@ -174,37 +240,59 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
         data.length === 0 && "hidden",
       )}
     >
-      <div className="flex items-center gap-2">
-        <label
-          htmlFor="time-period-select"
-          className="text-nowrap text-sm font-medium"
-        >
-          Time period
-        </label>
-        <Select
-          value={timePeriod}
-          onValueChange={(value) => setTimePeriod(value as TimePeriod)}
-        >
-          <SelectTrigger
-            id="time-period-select"
-            className="w-full md:w-[180px]"
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="time-period-select"
+            className="text-nowrap text-sm font-medium"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {timePeriods.map((timePeriod) => (
-              <SelectItem key={timePeriod.value} value={timePeriod.value}>
-                {timePeriod.label}
-              </SelectItem>
+            Time period
+          </label>
+          <Select
+            value={timePeriod}
+            onValueChange={(value) => setTimePeriod(value as TimePeriod)}
+          >
+            <SelectTrigger
+              id="time-period-select"
+              className="w-full md:w-[180px]"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {timePeriods.map((timePeriod) => (
+                <SelectItem key={timePeriod.value} value={timePeriod.value}>
+                  {timePeriod.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-nowrap text-sm font-medium">Scale</label>
+          <ToggleGroup
+            type="single"
+            value={chartScale}
+            onValueChange={(value) => {
+              value && setChartScale(value as ChartScale);
+            }}
+            variant="outline"
+            size="sm"
+          >
+            {chartScales.map((scale) => (
+              <ToggleGroupItem key={scale.value} value={scale.value}>
+                {scale.label}
+              </ToggleGroupItem>
             ))}
-          </SelectContent>
-        </Select>
+          </ToggleGroup>
+        </div>
       </div>
+
       <div className={cn("relative mx-auto w-full h-full")}>
         <ChartContainer config={config} className="max-h-[450px] w-full">
           <LineChart
             accessibilityLayer
-            data={chartData}
+            data={transformedData}
             margin={{
               left: 4,
               right: 12,
@@ -234,8 +322,10 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => formatLargeNumber(value)}
+              tickFormatter={formatYAxisTick}
               tickCount={12}
+              scale={yAxisScale}
+              domain={yAxisDomain}
             />
             <ChartTooltip
               cursor={false}
