@@ -688,11 +688,14 @@ describe("createPeriodKey", () => {
 
 describe("groupByPeriod future period filtering", () => {
   it("should not create periods that start in the future", () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowString = format(tomorrow, DATE_FORMAT);
+    const today = new Date();
+    const nextMonday = new Date(today);
+    const daysUntilNextMonday = (8 - today.getDay()) % 7 || 7;
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
 
-    const stats: DownloadStat[] = [{ date: tomorrowString, count: 5 }];
+    const nextMondayString = format(nextMonday, DATE_FORMAT);
+
+    const stats: DownloadStat[] = [{ date: nextMondayString, count: 5 }];
 
     const result = groupByWeeks(stats);
 

@@ -65,7 +65,7 @@ const TrendWidget = memo(
                 cardRefs.current.delete(trend.name);
               }
             }}
-            className="flex items-center justify-between rounded-lg border p-4 transition-colors bg-background hover:bg-muted/50"
+            className="flex items-center justify-between rounded-lg border bg-background p-4 transition-colors hover:bg-muted/50"
           >
             <div className="flex items-center gap-3">
               <div

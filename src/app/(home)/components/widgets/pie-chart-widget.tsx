@@ -203,7 +203,7 @@ const CustomLegend = ({ payload }: any) => {
         return (
           <div key={index} className="flex items-center gap-1">
             <div
-              className="min-w-3 size-3 rounded-full text-sm"
+              className="size-3 min-w-3 rounded-full text-sm"
               style={{ backgroundColor: fillColor }}
             />
             <span className="text-sm font-medium text-foreground">
