@@ -10,13 +10,19 @@ import {
 import { DownloadStat } from "./groupByPeriod";
 import { average, sum } from "./math";
 
-const INSUFFICIENT_DATA_THRESHOLD = 5000;
+export const INSUFFICIENT_DATA_THRESHOLD = 5000;
 
 export type BreakDropIndicator = {
-  christmasDropPercentage: number;
+  christmasDropPercentage: number | null;
   weekendDropPercentage: number;
-  corporateUsageScore: number;
-  corporateUsageLevel: "very_high" | "high" | "moderate" | "low" | "very_low";
+  corporateUsageScore: number | null;
+  corporateUsageLevel:
+    | "very_high"
+    | "high"
+    | "moderate"
+    | "low"
+    | "very_low"
+    | null;
   hasEnoughData: boolean;
 };
 
@@ -63,26 +69,17 @@ export function calculateBreakDrop(
         end: endOfYear(new Date(year, 0, 1)),
       });
     });
-    return { year, data, average: average(data, (item) => item.count) };
+    const yearAverage = average(data, (item) => item.count);
+    return { year, data, average: yearAverage };
   });
 
   const onlySufficientFromLast5Years = dataPerYear.filter(
     (item) => item.average > INSUFFICIENT_DATA_THRESHOLD,
   );
-
   const last5YearsAverageChristmasDrop = average(
     onlySufficientFromLast5Years,
     (item) => calculateChristmasDropForYear(item.data, item.year),
   );
-  if (isNaN(last5YearsAverageChristmasDrop)) {
-    return {
-      christmasDropPercentage: 0,
-      weekendDropPercentage: 0,
-      corporateUsageScore: 0,
-      corporateUsageLevel: "very_low",
-      hasEnoughData: false,
-    };
-  }
 
   const last365DaysDataExcludingChristmas = last365Days.filter((item) => {
     const date = parseISO(item.date);
@@ -100,14 +97,17 @@ export function calculateBreakDrop(
     { value: weekendDropPercentage, wage: 1.5 },
   ];
 
-  const corporateUsageScore =
-    sum(data, (item) => item.value * item.wage) /
-    sum(data, (item) => item.wage);
+  const corporateUsageScore = isNaN(last5YearsAverageChristmasDrop)
+    ? null
+    : sum(data, (item) => item.value * item.wage) /
+      sum(data, (item) => item.wage);
 
   const corporateUsageLevel = determineCorporateUsageLevel(corporateUsageScore);
 
   return {
-    christmasDropPercentage: last5YearsAverageChristmasDrop,
+    christmasDropPercentage: isNaN(last5YearsAverageChristmasDrop)
+      ? null
+      : last5YearsAverageChristmasDrop,
     weekendDropPercentage,
     corporateUsageScore,
     corporateUsageLevel,
@@ -203,8 +203,9 @@ function calculateWeekendDrop(rawData: DownloadStat[]): number {
 }
 
 function determineCorporateUsageLevel(
-  score: number,
-): "very_high" | "high" | "moderate" | "low" | "very_low" {
+  score: number | null,
+): "very_high" | "high" | "moderate" | "low" | "very_low" | null {
+  if (score === null) return null;
   if (score >= 80) return "very_high";
   if (score >= 70) return "high";
   if (score >= 60) return "moderate";
