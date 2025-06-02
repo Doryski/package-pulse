@@ -8,11 +8,11 @@ import {
   SELECTED_PROJECTS_LIMIT,
 } from "@/lib/config/constants";
 import useDebounce from "@/lib/hooks/useDebounce";
-import useSearchNPMRegistryQuery from "@/lib/queries/useSearchNPMRegistryQuery";
+import useSearchNPMRegistry from "@/lib/queries/useSearchNPMRegistry";
 import { cn } from "@/lib/utils/cn";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
-import { isSingleItemArray } from "../utils/typeArray";
+import { isSingleItemArray } from "../utils/array-utils";
 import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 
@@ -31,7 +31,7 @@ type ComboboxFormProps = {
 const ComboboxForm = ({ form }: ComboboxFormProps) => {
   const search = form.watch("search");
   const debouncedSearch = useDebounce(search, 400);
-  const npmRegistry = useSearchNPMRegistryQuery(debouncedSearch);
+  const npmRegistry = useSearchNPMRegistry(debouncedSearch);
 
   const selectedProjects = form.watch("projects");
   const hasExceededSelectedProjectsLimit =

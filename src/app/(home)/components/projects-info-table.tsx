@@ -1,10 +1,4 @@
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
-import {
-  fetchContributorsCount,
-  fetchGithubPullRequestsCount,
-  fetchGithubRepoInfo,
-  fetchPackageInfo,
-} from "@/api/fetchPackageInfo";
+import { fetchPackageInfo } from "@/api/fetchPackageInfo";
 import Loader from "@/components/loader";
 import { SimpleTooltip } from "@/components/simple-tooltip";
 import PulsatingDotIndicator from "@/components/ui/PulsatingDotIndicator";
@@ -18,21 +12,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import TextLink from "@/components/ui/text-link";
+import useGithubContributorsCount from "@/lib/queries/useGithubContributorsCount";
+import useGithubPullRequestsCount from "@/lib/queries/useGithubPullRequestsCount";
+import useGithubRepoInfo from "@/lib/queries/useGithubRepoInfo";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import getChartColor from "@/lib/utils/getChartColor";
 import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
-import { differenceInDays, format, formatDistanceToNow } from "date-fns";
+import { UseQueryResult } from "@tanstack/react-query";
+import { differenceInDays, formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { useFormContext } from "react-hook-form";
 import ReactMarkdown from "react-markdown";
+import { formatDate } from "../utils/date-utils";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 import { ProjectNameCell } from "./projects-stats-table";
 
 const getNpmLink = (projectName: string) =>
   `https://www.npmjs.com/package/${projectName}`;
+
+const getPulsatingDotIndicatorColor = (lastReleaseDate: string | undefined) => {
+  if (!lastReleaseDate) return "gray";
+  const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
+  if (diff < 90) return "green";
+  if (diff < 180) return "yellow";
+  if (diff < 365) return "orange";
+  return "red";
+};
 
 const ProjectsInfoTable = memo(() => {
   const form = useFormContext<ProjectsSearchFormValues>();
@@ -86,49 +93,21 @@ type ProjectInfoRowProps = {
 const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
   const { resolvedTheme } = useTheme();
 
-  const githubRepo = useQuery({
-    enabled: !!npmPackage.data?.repoName,
-    queryKey: ["githubReposInfo", npmPackage.data?.repoName!],
-    queryFn: async () => ({
-      info: await fetchGithubRepoInfo(npmPackage.data?.repoName!),
-      name: npmPackage.data?.projectName,
-    }),
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-  });
+  const githubRepo = useGithubRepoInfo(
+    npmPackage.data?.repoName!,
+    npmPackage.data?.projectName!,
+  );
 
-  const githubPullRequestsCount = useQuery({
-    enabled: !!npmPackage.data?.repoName && !!githubRepo.data,
-    queryKey: ["githubPullRequestsCount", npmPackage.data?.repoName!],
-    queryFn: async () => ({
-      count: await fetchGithubPullRequestsCount(npmPackage.data?.repoName!),
-      name: npmPackage.data?.projectName,
-    }),
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-  });
+  const githubPullRequestsCount = useGithubPullRequestsCount(
+    npmPackage.data?.repoName!,
+    npmPackage.data?.projectName!,
+    !!npmPackage.data?.repoName && !!githubRepo.data,
+  );
 
-  const githubContributorsCount = useQuery({
-    enabled: !!npmPackage.data?.repoName && !!githubRepo.data,
-    queryKey: ["githubContributorsCount", npmPackage.data?.repoName!],
-    queryFn: async () => ({
-      count: await fetchContributorsCount(npmPackage.data?.repoName!),
-      name: npmPackage.data?.projectName,
-    }),
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-  });
-
-  const getPulsatingDotIndicatorColor = useCallback(
-    (lastReleaseDate: string | undefined) => {
-      if (!lastReleaseDate) return "gray";
-      const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
-      if (diff < 90) return "green";
-      if (diff < 180) return "yellow";
-      if (diff < 365) return "orange";
-      return "red";
-    },
-    [],
+  const githubContributorsCount = useGithubContributorsCount(
+    npmPackage.data?.repoName!,
+    npmPackage.data?.projectName!,
+    !!npmPackage.data?.repoName && !!githubRepo.data,
   );
 
   return (
@@ -154,7 +133,7 @@ const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
                     )}
                   />
                   <span className="text-nowrap">
-                    {format(npmPackage.data.lastReleaseDate, DATE_FORMAT)}
+                    {formatDate(npmPackage.data.lastReleaseDate)}
                   </span>
                 </div>
                 <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.lastReleaseDate)} ago)`}</span>
@@ -173,7 +152,7 @@ const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
           {npmPackage.data?.createdAt ? (
             <>
               <span className="text-nowrap">
-                {format(npmPackage.data.createdAt, DATE_FORMAT)}
+                {formatDate(npmPackage.data.createdAt)}
               </span>
               <br />
               <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.createdAt)} ago)`}</span>

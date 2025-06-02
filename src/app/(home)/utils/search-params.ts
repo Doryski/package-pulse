@@ -1,3 +1,4 @@
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import LocalStorageKey from "../../../lib/enums/LocalStorageKey";
@@ -28,8 +29,8 @@ export function getInitialProjects(
     .split(delimiter)
     .map(decodeProjectName);
 
-  if (decodedProjectsParam.length > 10)
-    return decodedProjectsParam.slice(0, 10);
+  if (decodedProjectsParam.length > SELECTED_PROJECTS_LIMIT)
+    return decodedProjectsParam.slice(0, SELECTED_PROJECTS_LIMIT);
   if (decodedProjectsParam.length > 0) return decodedProjectsParam;
   return [];
 }

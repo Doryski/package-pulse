@@ -1,4 +1,4 @@
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
+import { formatDate } from "@/app/(home)/utils/date-utils";
 import {
   addDays,
   addMonths,
@@ -8,7 +8,6 @@ import {
   differenceInCalendarMonths,
   differenceInCalendarWeeks,
   differenceInCalendarYears,
-  format,
   startOfMonth,
   startOfWeek,
   startOfYear,
@@ -154,8 +153,8 @@ describe("groupByPeriod", () => {
 
       const expected: PeriodStat[] = [
         {
-          start: format(actualPeriodStartDate, DATE_FORMAT),
-          end: format(periodEndDate, DATE_FORMAT),
+          start: formatDate(actualPeriodStartDate),
+          end: formatDate(periodEndDate),
           count: 5,
         },
       ];
@@ -193,8 +192,8 @@ describe("groupByPeriod", () => {
 
       const expected: PeriodStat[] = [
         {
-          start: format(actualPeriodStartDate, DATE_FORMAT),
-          end: format(periodEndDate, DATE_FORMAT),
+          start: formatDate(actualPeriodStartDate),
+          end: formatDate(periodEndDate),
           count: 5,
         },
       ];
@@ -232,8 +231,8 @@ describe("groupByPeriod", () => {
 
       const expected: PeriodStat[] = [
         {
-          start: format(actualPeriodStartDate, DATE_FORMAT),
-          end: format(periodEndDate, DATE_FORMAT),
+          start: formatDate(actualPeriodStartDate),
+          end: formatDate(periodEndDate),
           count: 5,
         },
       ];
@@ -269,8 +268,8 @@ describe("groupByPeriod", () => {
         addYears,
       );
 
-      const periodStartDateString = format(actualPeriodStartDate, DATE_FORMAT);
-      const todayUTC = format(new Date(), DATE_FORMAT);
+      const periodStartDateString = formatDate(actualPeriodStartDate);
+      const todayUTC = formatDate(new Date());
 
       if (periodStartDateString > todayUTC) {
         expect(result).toEqual([]);
@@ -278,7 +277,7 @@ describe("groupByPeriod", () => {
         const expected: PeriodStat[] = [
           {
             start: periodStartDateString,
-            end: format(periodEndDate, DATE_FORMAT),
+            end: formatDate(periodEndDate),
             count: 5,
           },
         ];
@@ -293,31 +292,31 @@ describe("calculatePeriodEndDate", () => {
     it("should calculate correct end date for 1-day period", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 1, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-15");
+      expect(formatDate(result)).toEqual("2023-05-15");
     });
 
     it("should calculate correct end date for 3-day period", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 3, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-17");
+      expect(formatDate(result)).toEqual("2023-05-17");
     });
 
     it("should calculate correct end date for 7-day period", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 7, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-21");
+      expect(formatDate(result)).toEqual("2023-05-21");
     });
 
     it("should handle month boundary crossing", () => {
       const periodStart = new Date("2023-05-30");
       const result = calculatePeriodEndDate(periodStart, 3, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-06-01");
+      expect(formatDate(result)).toEqual("2023-06-01");
     });
 
     it("should handle year boundary crossing", () => {
       const periodStart = new Date("2023-12-30");
       const result = calculatePeriodEndDate(periodStart, 3, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2024-01-01");
+      expect(formatDate(result)).toEqual("2024-01-01");
     });
   });
 
@@ -325,25 +324,25 @@ describe("calculatePeriodEndDate", () => {
     it("should calculate correct end date for 1-week period", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 1, addWeeks);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-21");
+      expect(formatDate(result)).toEqual("2023-05-21");
     });
 
     it("should calculate correct end date for 2-week period", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 2, addWeeks);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-28");
+      expect(formatDate(result)).toEqual("2023-05-28");
     });
 
     it("should calculate correct end date for 4-week period", () => {
       const periodStart = new Date("2023-05-01");
       const result = calculatePeriodEndDate(periodStart, 4, addWeeks);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-28");
+      expect(formatDate(result)).toEqual("2023-05-28");
     });
 
     it("should handle month boundary crossing for weekly periods", () => {
       const periodStart = new Date("2023-05-29");
       const result = calculatePeriodEndDate(periodStart, 1, addWeeks);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-06-04");
+      expect(formatDate(result)).toEqual("2023-06-04");
     });
   });
 
@@ -351,37 +350,37 @@ describe("calculatePeriodEndDate", () => {
     it("should calculate correct end date for 1-month period", () => {
       const periodStart = new Date("2023-05-01");
       const result = calculatePeriodEndDate(periodStart, 1, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-31");
+      expect(formatDate(result)).toEqual("2023-05-31");
     });
 
     it("should calculate correct end date for 3-month period", () => {
       const periodStart = new Date("2023-01-01");
       const result = calculatePeriodEndDate(periodStart, 3, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-03-31");
+      expect(formatDate(result)).toEqual("2023-03-31");
     });
 
     it("should handle February in non-leap year", () => {
       const periodStart = new Date("2023-02-01");
       const result = calculatePeriodEndDate(periodStart, 1, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-02-28");
+      expect(formatDate(result)).toEqual("2023-02-28");
     });
 
     it("should handle February in leap year", () => {
       const periodStart = new Date("2024-02-01");
       const result = calculatePeriodEndDate(periodStart, 1, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2024-02-29");
+      expect(formatDate(result)).toEqual("2024-02-29");
     });
 
     it("should handle year boundary crossing for monthly periods", () => {
       const periodStart = new Date("2023-12-01");
       const result = calculatePeriodEndDate(periodStart, 2, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2024-01-31");
+      expect(formatDate(result)).toEqual("2024-01-31");
     });
 
     it("should handle different month lengths", () => {
       const periodStart = new Date("2023-01-31");
       const result = calculatePeriodEndDate(periodStart, 1, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-02-27");
+      expect(formatDate(result)).toEqual("2023-02-27");
     });
   });
 
@@ -389,25 +388,25 @@ describe("calculatePeriodEndDate", () => {
     it("should calculate correct end date for 1-year period", () => {
       const periodStart = new Date("2023-01-01");
       const result = calculatePeriodEndDate(periodStart, 1, addYears);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-12-31");
+      expect(formatDate(result)).toEqual("2023-12-31");
     });
 
     it("should calculate correct end date for 2-year period", () => {
       const periodStart = new Date("2023-01-01");
       const result = calculatePeriodEndDate(periodStart, 2, addYears);
-      expect(format(result, DATE_FORMAT)).toEqual("2024-12-31");
+      expect(formatDate(result)).toEqual("2024-12-31");
     });
 
     it("should handle leap year to non-leap year transition", () => {
       const periodStart = new Date("2024-02-29");
       const result = calculatePeriodEndDate(periodStart, 1, addYears);
-      expect(format(result, DATE_FORMAT)).toEqual("2025-02-27");
+      expect(formatDate(result)).toEqual("2025-02-27");
     });
 
     it("should handle non-leap year to leap year transition", () => {
       const periodStart = new Date("2023-02-28");
       const result = calculatePeriodEndDate(periodStart, 1, addYears);
-      expect(format(result, DATE_FORMAT)).toEqual("2024-02-27");
+      expect(formatDate(result)).toEqual("2024-02-27");
     });
   });
 
@@ -415,25 +414,25 @@ describe("calculatePeriodEndDate", () => {
     it("should handle period length of 0", () => {
       const periodStart = new Date("2023-05-15");
       const result = calculatePeriodEndDate(periodStart, 0, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-05-14");
+      expect(formatDate(result)).toEqual("2023-05-14");
     });
 
     it("should handle very large period lengths", () => {
       const periodStart = new Date("2023-01-01");
       const result = calculatePeriodEndDate(periodStart, 365, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("2023-12-31");
+      expect(formatDate(result)).toEqual("2023-12-31");
     });
 
     it("should handle start date at beginning of time", () => {
       const periodStart = new Date("1970-01-01");
       const result = calculatePeriodEndDate(periodStart, 1, addDays);
-      expect(format(result, DATE_FORMAT)).toEqual("1970-01-01");
+      expect(formatDate(result)).toEqual("1970-01-01");
     });
 
     it("should handle start date far in the future", () => {
       const periodStart = new Date("2099-12-01");
       const result = calculatePeriodEndDate(periodStart, 1, addMonths);
-      expect(format(result, DATE_FORMAT)).toEqual("2099-12-31");
+      expect(formatDate(result)).toEqual("2099-12-31");
     });
   });
 });
@@ -447,7 +446,7 @@ describe("calculatePeriodStartDate", () => {
       differenceInCalendarDays,
       addDays,
     );
-    expect(format(result, DATE_FORMAT)).toEqual("2023-05-15");
+    expect(formatDate(result)).toEqual("2023-05-15");
   });
 
   it("should calculate correct start date for 3-day periods", () => {
@@ -459,7 +458,7 @@ describe("calculatePeriodStartDate", () => {
       addDays,
     );
 
-    expect(format(result, DATE_FORMAT)).toEqual("2023-05-14");
+    expect(formatDate(result)).toEqual("2023-05-14");
   });
 
   it("should calculate correct start date for weekly periods", () => {
@@ -470,7 +469,7 @@ describe("calculatePeriodStartDate", () => {
       differenceInCalendarWeeks,
       addWeeks,
     );
-    expect(format(result, DATE_FORMAT)).toEqual("2023-05-14");
+    expect(formatDate(result)).toEqual("2023-05-14");
   });
 
   it("should calculate correct start date for monthly periods", () => {
@@ -481,7 +480,7 @@ describe("calculatePeriodStartDate", () => {
       differenceInCalendarMonths,
       addMonths,
     );
-    expect(format(result, DATE_FORMAT)).toEqual("2023-05-01");
+    expect(formatDate(result)).toEqual("2023-05-01");
   });
 
   it("should calculate correct start date for yearly periods", () => {
@@ -492,7 +491,7 @@ describe("calculatePeriodStartDate", () => {
       differenceInCalendarYears,
       addYears,
     );
-    expect(format(result, DATE_FORMAT)).toEqual("2023-01-01");
+    expect(formatDate(result)).toEqual("2023-01-01");
   });
 
   it("should handle leap years correctly", () => {
@@ -503,7 +502,7 @@ describe("calculatePeriodStartDate", () => {
       differenceInCalendarYears,
       addYears,
     );
-    expect(format(result, DATE_FORMAT)).toEqual("2024-01-01");
+    expect(formatDate(result)).toEqual("2024-01-01");
   });
 });
 
@@ -693,7 +692,7 @@ describe("groupByPeriod future period filtering", () => {
     const daysUntilNextMonday = (8 - today.getDay()) % 7 || 7;
     nextMonday.setDate(today.getDate() + daysUntilNextMonday);
 
-    const nextMondayString = format(nextMonday, DATE_FORMAT);
+    const nextMondayString = formatDate(nextMonday);
 
     const stats: DownloadStat[] = [{ date: nextMondayString, count: 5 }];
 
@@ -704,7 +703,7 @@ describe("groupByPeriod future period filtering", () => {
 
   it("should create periods that start today or in the past (even if they end in the future)", () => {
     const today = new Date();
-    const todayString = format(today, DATE_FORMAT);
+    const todayString = formatDate(today);
 
     const stats: DownloadStat[] = [{ date: todayString, count: 5 }];
 

@@ -1,4 +1,4 @@
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
+import { formatDate } from "@/app/(home)/utils/date-utils";
 import {
   addDays,
   addMonths,
@@ -8,12 +8,12 @@ import {
   differenceInCalendarMonths,
   differenceInCalendarWeeks,
   differenceInCalendarYears,
-  format,
   startOfMonth,
   startOfWeek,
   startOfYear,
   subDays,
 } from "date-fns";
+import AppError from "./AppError";
 import { getPeriodStartByDays } from "./getPeriodStartByDays";
 
 export type Period = {
@@ -97,7 +97,7 @@ export const calculatePeriodStartDate = (
 export const createPeriodKey = (start: string, end: string) => {
   const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateFormatRegex.test(start) || !dateFormatRegex.test(end)) {
-    throw new Error("Invalid date format");
+    throw new AppError("Invalid date format");
   }
   return `${start}:${end}`;
 };
@@ -129,7 +129,7 @@ export default function groupByPeriod<T extends DownloadStat>(
   startOfPeriodFn: (date: Date) => Date = (date) =>
     getPeriodStartByDays(date, periodLength),
 ) {
-  const todayUTC = format(new Date(), DATE_FORMAT);
+  const todayUTC = formatDate(new Date());
 
   return Object.values(
     stats.reduce<Record<string, PeriodStat>>((grouped, { date, count }) => {
@@ -146,8 +146,8 @@ export default function groupByPeriod<T extends DownloadStat>(
         periodLength,
         addPeriodFn,
       );
-      const periodStart = format(periodStartDate, DATE_FORMAT);
-      const periodEnd = format(periodEndDate, DATE_FORMAT);
+      const periodStart = formatDate(periodStartDate);
+      const periodEnd = formatDate(periodEndDate);
 
       if (periodStart <= todayUTC) {
         updateGroupedStats(

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { isEmptyArray } from "../../utils/array-utils";
 
 type PieChartWidgetProps = {
   projectsStats: ProjectStatsQuery[];
@@ -160,44 +161,63 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
 
 PieChartWidget.displayName = "PieChartWidget";
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    const fillColor = `var(--color-${data.payload.normalizedName})`;
+type Payload = {
+  payload: {
+    normalizedName: string;
+    name: string;
+    total: number;
+  };
+  value: number;
+}[];
 
-    return (
-      <div className="min-w-[120px] rounded-lg border border-border bg-background/95 p-3 shadow-lg backdrop-blur-sm">
-        <div className="mb-1 flex items-center gap-2">
-          <div
-            className="size-3 rounded-full"
-            style={{ backgroundColor: fillColor }}
-          />
-          <p className="text-sm font-semibold">{data.payload.name}</p>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Downloads:{" "}
-          <span className="font-mono font-semibold text-foreground">
-            {formatInteger(data.value)}
-          </span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Share:{" "}
-          <span className="font-semibold text-foreground">
-            {formatPercentage((data.value / data.payload.total) * 100, 1)}
-          </span>
-        </p>
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: Payload;
+};
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
+  if (!payload || !active || isEmptyArray(payload)) return null;
+  const data = payload.at(0);
+  if (!data) return null;
+
+  const fillColor = `var(--color-${data.payload.normalizedName})`;
+
+  return (
+    <div className="min-w-[120px] rounded-lg border border-border bg-background/95 p-3 shadow-lg backdrop-blur-sm">
+      <div className="mb-1 flex items-center gap-2">
+        <div
+          className="size-3 rounded-full"
+          style={{ backgroundColor: fillColor }}
+        />
+        <p className="text-sm font-semibold">{data.payload.name}</p>
       </div>
-    );
-  }
-  return null;
+      <p className="text-xs text-muted-foreground">
+        Downloads:{" "}
+        <span className="font-mono font-semibold text-foreground">
+          {formatInteger(data.value)}
+        </span>
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Share:{" "}
+        <span className="font-semibold text-foreground">
+          {formatPercentage((data.value / data.payload.total) * 100, 1)}
+        </span>
+      </p>
+    </div>
+  );
 };
 
 CustomTooltip.displayName = "CustomTooltip";
 
-const CustomLegend = ({ payload }: any) => {
+type CustomLegendProps = {
+  payload?: Payload;
+};
+
+const CustomLegend = ({ payload }: CustomLegendProps) => {
+  if (!payload || isEmptyArray(payload)) return null;
   return (
     <div className="mx-auto flex max-w-[50%] flex-wrap items-center justify-center gap-x-4 px-4">
-      {payload.map((entry: any, index: number) => {
+      {payload.map((entry, index) => {
         const fillColor = `var(--color-${entry.payload.normalizedName})`;
 
         return (

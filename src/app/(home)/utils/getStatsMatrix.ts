@@ -7,7 +7,11 @@ import { UseQueryResult } from "@tanstack/react-query";
 import { isWithinInterval, subYears } from "date-fns";
 import getChartColor from "../../../lib/utils/getChartColor";
 import getPercentChange from "../../../lib/utils/getPercentChange";
-import { groupStats, PeriodStat } from "../../../lib/utils/groupByPeriod";
+import {
+  DownloadStat,
+  groupStats,
+  PeriodStat,
+} from "../../../lib/utils/groupByPeriod";
 
 const statsCache = new Map<string, StatsRow>();
 const groupStatsCache = new Map<string, ReturnType<typeof groupStats>>();
@@ -27,7 +31,7 @@ export type StatsRow = {
   breakDropIndicator: BreakDropIndicator;
 };
 
-function getCachedGroupStats(projectName: string, rawData: any[]) {
+function getCachedGroupStats(projectName: string, rawData: DownloadStat[]) {
   const cacheKey = `${projectName}-${rawData.length}-${rawData[0]?.date || ""}-${rawData[rawData.length - 1]?.date || ""}`;
 
   if (groupStatsCache.has(cacheKey)) {

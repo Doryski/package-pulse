@@ -1,3 +1,8 @@
+import { formatDate, parseDate } from "@/app/(home)/utils/date-utils";
+import {
+  NPM_API_FIRST_DAY,
+  NPM_RANGE_API_PERIOD_MONTHS,
+} from "@/lib/config/constants";
 import {
   NPMDownloadCount,
   NPMDownloadPeriodSchema,
@@ -5,14 +10,8 @@ import {
 import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import safeParse from "@/lib/utils/safeParse";
-import { format, isValid, parseISO, startOfDay } from "date-fns";
+import { isValid, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-export const NPM_API_FIRST_DAY = "2015-01-10";
-export const NPM_RANGE_API_PERIOD_MONTHS = 18;
-export const DATE_FORMAT = "yyyy-MM-dd";
-
-const parseDate = (dateString: string) => parseISO(dateString);
-const formatDate = (date: Date) => format(date, DATE_FORMAT);
 
 export default async function fetchNPMDownloads(
   packageName: string,

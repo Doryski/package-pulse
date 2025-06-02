@@ -1,6 +1,5 @@
 "use client";
-
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
+import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   ChartContainer,
@@ -18,7 +17,7 @@ import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
 import { formatLargeNumber } from "@/lib/utils/formatters";
 import sortByVersion from "@/lib/utils/sortByVersion";
-import { format, isAfter, startOfWeek, subMonths, subYears } from "date-fns";
+import { isAfter, subMonths, subYears } from "date-fns";
 import {
   Fragment,
   memo,
@@ -116,7 +115,7 @@ const getLatestVersion = (versions?: VersionData[]) => {
 };
 
 const formatVersion = (version: VersionData) => {
-  const formattedDate = format(version.date, DATE_FORMAT);
+  const formattedDate = formatDate(version.date);
   return `${version.version} (${formattedDate})`;
 };
 
@@ -316,7 +315,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => format(value, DATE_FORMAT)}
+              tickFormatter={(value) => formatDate(value)}
             />
             <YAxis
               tickLine={false}
@@ -392,9 +391,8 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                         sortByVersion(projectConfig.versions)
                           .slice(-1)
                           .map((version) => {
-                            const weekStart = format(
-                              startOfWeek(version.date, { weekStartsOn: 1 }),
-                              DATE_FORMAT,
+                            const weekStart = formatDate(
+                              startOfWeek(version.date),
                             );
 
                             return (

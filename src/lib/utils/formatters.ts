@@ -1,3 +1,4 @@
+import AppError from "./AppError";
 import { round } from "./math";
 
 export function formatPercentage(value: number, precision = 2): string {
@@ -37,7 +38,7 @@ export function formatInteger(
 
   if (thousandSeparator) {
     if (thousandSeparator === ".") {
-      throw new Error("Thousand separator cannot be a dot");
+      throw new AppError("Thousand separator cannot be a dot");
     }
     return formattedValue.replace(/\s/g, thousandSeparator);
   }

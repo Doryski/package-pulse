@@ -13,14 +13,14 @@ export const downloadFile = (filename: string, blobOrUrl: Blob | string) => {
   URL.revokeObjectURL(url);
 };
 
-export const exportJson = (filename: string, data: any[]) => {
+export const exportJson = (filename: string, data: unknown[]) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
   });
   downloadFile(`${filename}.json`, blob);
 };
 
-export const exportCsv = (filename: string, data: any[]) => {
+export const exportCsv = (filename: string, data: unknown[]) => {
   if (!data || data.length === 0) {
     console.warn("No data provided for CSV export");
     return;
@@ -35,7 +35,7 @@ export const exportCsv = (filename: string, data: any[]) => {
   downloadFile(`${filename}.csv`, blob);
 };
 
-export const exportExcel = (filename: string, data: any[]) => {
+export const exportExcel = (filename: string, data: unknown[]) => {
   if (!data || data.length === 0) {
     console.warn("No data provided for Excel export");
     return;

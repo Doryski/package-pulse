@@ -22,6 +22,24 @@ export const getRepoNameFromUrl = (gitUrl: string) => {
     .replace("https://github.com/", "");
 };
 
+const processPackageVersions = (
+  versionsData: Record<string, unknown> | undefined,
+  timeData: Record<string, string> | undefined,
+): Array<{ version: string; date: string }> => {
+  if (!versionsData) return [];
+
+  return Object.entries(versionsData)
+    .reduce<Array<{ version: string; date: string }>>((acc, [version, _]) => {
+      if (!/^\d+\.\d+\.\d+$/.test(version)) return acc;
+      const date = timeData?.[version];
+      if (!date) return acc;
+      return [...acc, { version, date }];
+    }, [])
+    .toSorted(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+};
+
 export const fetchPackageInfo = async (projectName: string) => {
   try {
     return await npmApiQueue.add(async () => {
@@ -53,21 +71,10 @@ export const fetchPackageInfo = async (projectName: string) => {
       const description = parsedData.description;
       const createdAt = parsedData.time?.created;
       const repoName = repositoryUrl ? getRepoNameFromUrl(repositoryUrl) : null;
-      const versions = parsedData.versions
-        ? Object.entries(parsedData.versions)
-            .reduce<Array<{ version: string; date: string }>>(
-              (acc, [version, _]) => {
-                if (!/^\d+\.\d+\.\d+$/.test(version)) return acc;
-                const date = parsedData.time?.[version];
-                if (!date) return acc;
-                return [...acc, { version, date }];
-              },
-              [],
-            )
-            .toSorted(
-              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-            )
-        : [];
+      const versions = processPackageVersions(
+        parsedData.versions,
+        parsedData.time,
+      );
 
       const keywords = parsedData.keywords ?? latestVersion?.keywords;
 

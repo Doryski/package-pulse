@@ -1,7 +1,5 @@
-import { getItem } from "@/app/(home)/utils/typeArray";
-
 export function max<T>(arr: T[], fn: (item: T) => number): T | undefined {
-  const firstItem = getItem(arr, 0);
+  const firstItem = arr.at(0);
   if (!firstItem) return undefined;
   return arr.reduce(
     (maxValue, item) => (fn(item) > fn(maxValue) ? item : maxValue),

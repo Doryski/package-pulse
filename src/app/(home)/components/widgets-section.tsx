@@ -77,7 +77,7 @@ async function convertHtmlToImage(element: HTMLElement) {
     scale: 2,
     useCORS: true,
     allowTaint: true,
-  } as any);
+  });
 }
 
 const downloadAsImage = async (element: HTMLElement, filename: string) => {

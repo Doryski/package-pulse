@@ -13,13 +13,8 @@ export default async function searchNPMRegistry(
       `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(search)}&size=20&popularity=1.0`,
     );
     const data = await res.json();
-    try {
-      const { objects } = safeParse(data, NPMPackageSearchSchema);
-      return objects;
-    } catch (error) {
-      console.error(error);
-      return [];
-    }
+    const parsedData = safeParse(data, NPMPackageSearchSchema);
+    return parsedData.objects;
   } catch (error) {
     console.error(error);
     return [];

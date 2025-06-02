@@ -1,3 +1,4 @@
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { expect, Page, test } from "@playwright/test";
 import { projectNames, projectNamesExcessive, projectNamesLimit } from "./data";
 import {
@@ -136,7 +137,7 @@ test.describe("Search Projects Form", () => {
     await goToProjectsPage(page, projectNamesLimit);
 
     const limitMessage = page.getByText(
-      "You cannot select more than 10 projects",
+      `You cannot select more than ${SELECTED_PROJECTS_LIMIT} projects`,
     );
     await expect(limitMessage).toBeVisible();
 
@@ -203,7 +204,7 @@ test.describe("Search Projects Form", () => {
     await expect(selectedProject).toBeVisible();
   });
 
-  test("should limit the number of projects to 10 when more than 10 are provided in the URL", async ({
+  test(`should limit the number of projects to ${SELECTED_PROJECTS_LIMIT} when more than ${SELECTED_PROJECTS_LIMIT} are provided in the URL`, async ({
     page,
   }) => {
     await goToProjectsPage(page, projectNamesExcessive);
@@ -211,16 +212,20 @@ test.describe("Search Projects Form", () => {
 
     const tags = getTags(page);
     const visibleTags = await tags.all();
-    expect(visibleTags).toHaveLength(10);
+    expect(visibleTags).toHaveLength(SELECTED_PROJECTS_LIMIT);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < SELECTED_PROJECTS_LIMIT; i++) {
       const projectName = projectNamesExcessive[i];
       expect(projectName).not.toBeUndefined();
       if (!projectName) continue;
       await expect(tags.getByText(projectName, { exact: true })).toBeVisible();
     }
 
-    for (let i = 10; i < projectNamesExcessive.length; i++) {
+    for (
+      let i = SELECTED_PROJECTS_LIMIT;
+      i < projectNamesExcessive.length;
+      i++
+    ) {
       const projectName = projectNamesExcessive[i];
       expect(projectName).not.toBeUndefined();
       if (!projectName) continue;
@@ -232,9 +237,9 @@ test.describe("Search Projects Form", () => {
     const url = page.url();
     const urlProjects =
       new URL(url).searchParams.get("projects")?.split(",") || [];
-    expect(urlProjects).toHaveLength(10);
+    expect(urlProjects).toHaveLength(SELECTED_PROJECTS_LIMIT);
 
-    const remainingProjects = urlProjects.slice(10);
+    const remainingProjects = urlProjects.slice(SELECTED_PROJECTS_LIMIT);
     for (const projectName of remainingProjects) {
       expect(tags.getByText(projectName, { exact: true })).not.toBeVisible();
     }

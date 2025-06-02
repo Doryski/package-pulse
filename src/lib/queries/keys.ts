@@ -1,11 +1,10 @@
-import { DATE_FORMAT } from "@/api/fetchNPMDownloads";
-import { format } from "date-fns";
+import { formatDate } from "@/app/(home)/utils/date-utils";
 import { toZonedTime } from "date-fns-tz";
 
 export const getProjectStatsQueryKey = (projectName: string) => [
   "project-stats",
   projectName,
-  format(toZonedTime(new Date(), "UTC"), DATE_FORMAT),
+  formatDate(toZonedTime(new Date(), "UTC")),
 ];
 
 export const getSearchNPMRegistryQueryKey = (search: string) => [
