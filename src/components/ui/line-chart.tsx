@@ -393,7 +393,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                           .slice(-1)
                           .map((version) => {
                             const weekStart = format(
-                              startOfWeek(version.date),
+                              startOfWeek(version.date, { weekStartsOn: 1 }),
                               DATE_FORMAT,
                             );
 
