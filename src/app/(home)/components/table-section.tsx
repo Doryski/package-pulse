@@ -65,10 +65,10 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
     yoyWeekChange_percentage: number | null;
     yoyMonthChange_nominal: number | null;
     yoyMonthChange_percentage: number | null;
-    breakDropPercentage: number;
-    weekendDropPercentage: number;
-    corporateUsageScore: number;
-    corporateUsageLevel: string;
+    breakDropPercentage: number | null;
+    weekendDropPercentage: number | null;
+    corporateUsageScore: number | null;
+    corporateUsageLevel: string | null;
     repoName: string | null;
     latestVersion: string | null;
     lastReleaseDate: string | null;
@@ -94,10 +94,13 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
       yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
       yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
       yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
-      breakDropPercentage: project.breakDropIndicator.christmasDropPercentage,
+      breakDropPercentage:
+        project.breakDropIndicator.christmasDropPercentage ?? null,
       weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
-      corporateUsageScore: project.breakDropIndicator.corporateUsageScore,
-      corporateUsageLevel: project.breakDropIndicator.corporateUsageLevel,
+      corporateUsageScore:
+        project.breakDropIndicator.corporateUsageScore ?? null,
+      corporateUsageLevel:
+        project.breakDropIndicator.corporateUsageLevel ?? null,
       repoName: null,
       latestVersion: null,
       lastReleaseDate: null,
