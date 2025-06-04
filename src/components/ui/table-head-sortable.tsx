@@ -46,17 +46,14 @@ const TableHeadSortable = memo(
   }: TableHeadSortableProps) => {
     return (
       <TableHead
-        className={cn(
-          "cursor-pointer bg-slate-100 dark:bg-slate-900",
-          props.className,
-        )}
+        className={cn("cursor-pointer", props.className)}
         data-column-name={column}
         onClick={() => handleSort(column)}
         {...props}
       >
         <div
           className={cn(
-            "flex items-center justify-center gap-1 text-xs md:text-sm",
+            "flex items-center justify-center gap-1",
             contentClassName,
           )}
         >

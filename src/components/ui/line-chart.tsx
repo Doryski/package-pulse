@@ -267,7 +267,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
           </Select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 sm:justify-start">
           <label className="text-nowrap text-sm font-medium">Scale</label>
           <ToggleGroup
             type="single"
@@ -277,9 +277,14 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             }}
             variant="outline"
             size="sm"
+            className="w-full sm:w-auto"
           >
             {chartScales.map((scale) => (
-              <ToggleGroupItem key={scale.value} value={scale.value}>
+              <ToggleGroupItem
+                key={scale.value}
+                value={scale.value}
+                className="w-full sm:w-auto"
+              >
                 {scale.label}
               </ToggleGroupItem>
             ))}
@@ -292,6 +297,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
           <LineChart
             accessibilityLayer
             data={transformedData}
+            className="-ml-2 sm:ml-0"
             margin={{
               left: 4,
               right: 12,
@@ -300,13 +306,14 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             <ChartLegend
               content={
                 <ChartLegendContent chartKey={chartKey}>
-                  <div className="flex items-center gap-1.5 text-sm text-foreground">
+                  <div className="flex items-center gap-1.5 text-xs text-foreground md:text-sm">
                     <Dash />
                     <span>Last release date</span>
                   </div>
                 </ChartLegendContent>
               }
               layout="horizontal"
+              className="max-w-[100vw] flex-wrap"
               verticalAlign="top"
             />
             <CartesianGrid vertical={false} />

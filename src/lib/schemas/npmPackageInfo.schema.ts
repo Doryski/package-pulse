@@ -34,9 +34,12 @@ export const VersionSchema = z.object({
     ])
     .optional(),
   bugs: z
-    .object({
-      url: z.string().optional(),
-    })
+    .union([
+      z.object({
+        url: z.string(),
+      }),
+      z.string(),
+    ])
     .optional(),
   homepage: z.string().optional(),
   devDependencies: z.record(z.string()).optional(),
@@ -63,13 +66,15 @@ export const VersionSchema = z.object({
   dist: z.object({
     shasum: z.string(),
     tarball: z.string(),
-    integrity: z.string(),
-    signatures: z.array(
-      z.object({
-        keyid: z.string(),
-        sig: z.string(),
-      }),
-    ),
+    integrity: z.string().optional(),
+    signatures: z
+      .array(
+        z.object({
+          keyid: z.string(),
+          sig: z.string(),
+        }),
+      )
+      .optional(),
   }),
   directories: z.record(z.string()),
 });

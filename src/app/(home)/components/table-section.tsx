@@ -171,8 +171,8 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
         projectsStats.length === 0 && "hidden",
       )}
     >
-      <div className="relative flex justify-end">
-        <h3 className="absolute left-1/2 top-0 -translate-x-1/2 text-center text-lg">
+      <div className="relative flex w-full items-center justify-between sm:justify-end">
+        <h3 className="text-center text-sm sm:absolute sm:left-1/2 sm:top-0 sm:-translate-x-1/2 sm:text-lg">
           Downloads by project
         </h3>
         <div className="flex items-center gap-2">

@@ -140,7 +140,7 @@ export default function BreakDropIndicatorComponent({
           </SimpleTooltip>
         </div>
       )}
-      <div className="flex flex-col text-xs text-muted-foreground">
+      <div className="flex flex-col text-muted-foreground">
         {indicator.christmasDropPercentage !== null && (
           <span>
             Christmas: {formatPercentage(indicator.christmasDropPercentage, 1)}

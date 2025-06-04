@@ -194,7 +194,7 @@ const WidgetCard = memo(
     return (
       <Card className="relative">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col flex-wrap items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
             <div>
               <CardTitle className="text-lg">{widget.title}</CardTitle>
               <p className="text-sm text-muted-foreground">

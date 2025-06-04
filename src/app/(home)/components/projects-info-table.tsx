@@ -50,7 +50,9 @@ const ProjectsInfoTable = memo(() => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Project</TableHead>
+          <TableHead className="sticky left-0 z-20 w-[100px] min-w-[100px] md:w-[200px] md:min-w-[150px]">
+            Project name
+          </TableHead>
           <TableHead className="text-center">Last Release</TableHead>
           <TableHead className="text-center">Created</TableHead>
           <TableHead className="text-center">Stars</TableHead>
@@ -58,7 +60,7 @@ const ProjectsInfoTable = memo(() => {
           <TableHead className="text-center">Pull Requests</TableHead>
           <TableHead className="text-center">Contributors Github</TableHead>
           <TableHead className="text-center">Contributors</TableHead>
-          <TableHead className="text-center">Deps (Dev)</TableHead>
+          <TableHead className="min-w-[60px] text-center">Deps (Dev)</TableHead>
           <TableHead className="text-center">Latest Version</TableHead>
           <TableHead className="text-center">License</TableHead>
           <TableHead className="text-center">Library size</TableHead>

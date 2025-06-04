@@ -236,7 +236,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
               <TableCellWithStats change={projectStats.yearlyChange} />
               <TableCellWithStats change={projectStats.yoyWeekChange} />
               <TableCellWithStats change={projectStats.yoyMonthChange} />
-              <TableCell>
+              <TableCell className="min-w-[175px]">
                 <BreakDropIndicatorComponent
                   indicator={projectStats.breakDropIndicator}
                 />
@@ -261,14 +261,14 @@ export function ProjectNameCell({
   color,
 }: ProjectNameCellProps) {
   return (
-    <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background md:bg-transparent">
+    <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background">
       <Loader
         isLoading={isLoading}
         fallback={<Skeleton className="h-4 w-full" />}
       >
         <div className="flex items-center gap-2">
           <DotIndicator color={color} />
-          <span className="text-sm">{projectName}</span>
+          <span>{projectName}</span>
         </div>
       </Loader>
     </TableCell>
