@@ -1,5 +1,6 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { formatInteger } from "@/lib/utils/formatters";
 import { forwardRef, memo, useImperativeHandle, useRef } from "react";
@@ -17,6 +18,7 @@ const StatsCardsWidget = memo(
   forwardRef<StatsCardsWidgetRef, StatsCardsWidgetProps>(
     ({ projectsStats }, ref) => {
       const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+      const statsMatrix = useStatsMatrix(projectsStats);
 
       const peakAndLatestStats = getPeakAndLatestDownloads(
         projectsStats,
@@ -38,56 +40,63 @@ const StatsCardsWidget = memo(
 
       return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {peakAndLatestStats.map((stat, index) => (
-            <Card
-              key={stat.name}
-              ref={(el) => {
-                if (el) {
-                  cardRefs.current.set(stat.name, el);
-                } else {
-                  cardRefs.current.delete(stat.name);
-                }
-              }}
-              className={`relative overflow-hidden shadow-none ${
-                peakAndLatestStats.length % 2 === 1 &&
-                index === peakAndLatestStats.length - 1
-                  ? "sm:col-span-2 sm:w-full sm:max-w-[calc(50%-0.5rem)] sm:justify-self-center"
-                  : ""
-              }`}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-2">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {formatInteger(stat.latestDownloads)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Latest downloads
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-muted-foreground">
-                      {formatInteger(stat.peakDownloads)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Peak downloads
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-              <div
-                className="absolute right-0 top-0 h-full w-1"
-                style={{
-                  backgroundColor: `hsl(var(--chart-${(index % 10) + 1}))`,
+          {peakAndLatestStats.map((stat, index) => {
+            const originalIndex = statsMatrix.stats.findIndex(
+              (statRow) => statRow.projectName === stat.name,
+            );
+            const colorIndex = originalIndex !== -1 ? originalIndex : index;
+
+            return (
+              <Card
+                key={stat.name}
+                ref={(el) => {
+                  if (el) {
+                    cardRefs.current.set(stat.name, el);
+                  } else {
+                    cardRefs.current.delete(stat.name);
+                  }
                 }}
-              />
-            </Card>
-          ))}
+                className={`relative overflow-hidden shadow-none ${
+                  peakAndLatestStats.length % 2 === 1 &&
+                  index === peakAndLatestStats.length - 1
+                    ? "sm:col-span-2 sm:w-full sm:max-w-[calc(50%-0.5rem)] sm:justify-self-center"
+                    : ""
+                }`}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-2xl font-bold">
+                        {formatInteger(stat.latestDownloads)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Latest downloads
+                      </p>
+                    </div>
+                    <div>
+                      <div className="text-lg font-semibold text-muted-foreground">
+                        {formatInteger(stat.peakDownloads)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Peak downloads
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+                <div
+                  className="absolute right-0 top-0 h-full w-1"
+                  style={{
+                    backgroundColor: `hsl(var(--chart-${(colorIndex % 10) + 1}))`,
+                  }}
+                />
+              </Card>
+            );
+          })}
         </div>
       );
     },
