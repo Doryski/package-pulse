@@ -108,7 +108,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
       </style>
       <div className="h-[400px]" data-chart>
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
+          <PieChart margin={{ top: 20, right: 20, bottom: 25, left: 20 }}>
             <defs>
               {enhancedData.map((item) => {
                 const gradientId = `gradient-${item.normalizedName}`;
