@@ -2,6 +2,11 @@
 import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
+  useInitialChartScaleFromSearchParams,
+  useInitialTimePeriodFromSearchParams,
+  useUpdateSearchParams,
+} from "@/app/(home)/utils/search-params";
+import {
   ChartContainer,
   ChartDotIndicator,
   ChartLegend,
@@ -123,14 +128,25 @@ type MultipleLineChartProps = {
   data: ChartData[];
   config: ChartConfig;
   chartKey: string;
+  selectedProjects?: string[];
 };
 
-function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
-  const [chartScale, setChartScale] = useState<ChartScale>("linear");
+function MultipleLineChart({
+  data,
+  config,
+  chartKey,
+  selectedProjects = [],
+}: MultipleLineChartProps) {
+  const initialTimePeriod = useInitialTimePeriodFromSearchParams();
+  const initialChartScale = useInitialChartScaleFromSearchParams();
+
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialTimePeriod);
+  const [chartScale, setChartScale] = useState<ChartScale>(initialChartScale);
   const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
+
+  useUpdateSearchParams(selectedProjects, timePeriod, chartScale, ",");
 
   const handleTimePeriodChange = useCallback(
     (value: TimePeriod) => {

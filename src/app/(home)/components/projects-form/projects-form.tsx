@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm } from "react-hook-form";
 import {
   useInitialProjectsFromSearchParams,
-  useUpdateSearchParams,
+  useUpdateSearchParamsProjects,
 } from "../../utils/search-params";
 import ComboboxForm from "../combobox-form";
 import SimilarProjects from "../similar-projects";
@@ -33,7 +33,7 @@ const ProjectsForm = () => {
 
   const selectedProjects = projectsSearchForm.watch("projects");
   useLocalStorage(LocalStorageKey.SELECTED_PROJECTS, selectedProjects);
-  useUpdateSearchParams(selectedProjects, PROJECTS_URL_DELIMITER);
+  useUpdateSearchParamsProjects(selectedProjects, PROJECTS_URL_DELIMITER);
 
   const handleAddProject = (projectName: string) => {
     if (!selectedProjects.includes(projectName)) {

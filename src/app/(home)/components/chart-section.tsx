@@ -27,6 +27,14 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
     [projectStats],
   );
 
+  const selectedProjects = useMemo(
+    () =>
+      projectStats
+        .map((project) => project.data?.projectName)
+        .filter((project) => project !== undefined),
+    [projectStats],
+  );
+
   return (
     <div
       className={cn(
@@ -38,6 +46,7 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
         chartKey="main-chart"
         data={processedProjectsStats}
         config={chartConfig}
+        selectedProjects={selectedProjects}
       />
     </div>
   );

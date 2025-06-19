@@ -5,7 +5,9 @@ import {
   constructNewUrl,
   decodeProjectName,
   encodeProjectName,
+  getInitialChartScale,
   getInitialProjects,
+  getInitialTimePeriod,
   getOtherParamsString,
   getProjectsQueryString,
 } from "./search-params";
@@ -55,6 +57,31 @@ describe("decodeProjectName", () => {
     testCases.forEach(({ input, expected }) => {
       expect(decodeProjectName(input)).toBe(expected);
     });
+  });
+});
+
+describe("getInitialTimePeriod", () => {
+  it("should return valid time period when provided", () => {
+    expect(getInitialTimePeriod("months-1")).toBe("months-1");
+    expect(getInitialTimePeriod("years-2")).toBe("years-2");
+    expect(getInitialTimePeriod("all-time")).toBe("all-time");
+  });
+
+  it("should return default 'all-time' for invalid time period", () => {
+    expect(getInitialTimePeriod("invalid")).toBe("all-time");
+    expect(getInitialTimePeriod(null)).toBe("all-time");
+  });
+});
+
+describe("getInitialChartScale", () => {
+  it("should return valid chart scale when provided", () => {
+    expect(getInitialChartScale("linear")).toBe("linear");
+    expect(getInitialChartScale("logarithmic")).toBe("logarithmic");
+  });
+
+  it("should return default 'linear' for invalid chart scale", () => {
+    expect(getInitialChartScale("invalid")).toBe("linear");
+    expect(getInitialChartScale(null)).toBe("linear");
   });
 });
 
@@ -124,32 +151,46 @@ describe("getInitialProjects", () => {
 });
 
 describe("getOtherParamsString", () => {
-  it("should return a query string excluding the specified key", () => {
+  it("should return a query string excluding the specified keys", () => {
     const searchParams = new URLSearchParams({
       projects: "project1,project2",
+      period: "months-1",
+      scale: "linear",
       user: "testUser",
       page: "1",
     });
-    const result = getOtherParamsString(searchParams, "projects");
+    const result = getOtherParamsString(searchParams, [
+      "projects",
+      "period",
+      "scale",
+    ]);
     expect(result).toBe("user=testUser&page=1");
-    const result2 = getOtherParamsString(searchParams, "user");
-    expect(result2).toBe("projects=project1,project2&page=1");
   });
 
   it("should return an empty string if all keys are excluded", () => {
     const searchParams = new URLSearchParams({
       projects: "project1,project2",
+      period: "months-1",
+      scale: "linear",
     });
-    const result = getOtherParamsString(searchParams, "projects");
+    const result = getOtherParamsString(searchParams, [
+      "projects",
+      "period",
+      "scale",
+    ]);
     expect(result).toBe("");
   });
 
-  it("should return the original query string if the exclude key is not present", () => {
+  it("should return the original query string if the exclude keys are not present", () => {
     const searchParams = new URLSearchParams({
       user: "testUser",
       page: "1",
     });
-    const result = getOtherParamsString(searchParams, "projects");
+    const result = getOtherParamsString(searchParams, [
+      "projects",
+      "period",
+      "scale",
+    ]);
     expect(result).toBe("user=testUser&page=1");
   });
 });
@@ -180,54 +221,70 @@ describe("getProjectsQueryString", () => {
 describe("constructNewUrl", () => {
   const delimiter = ",";
 
-  it("should return URL with projects query string and other params", () => {
+  it("should return URL with all params when all are provided", () => {
     const pathname = "/projects";
     const selectedProjects = ["project1", "project2"];
+    const timePeriod = "months-1";
+    const chartScale = "logarithmic";
     const otherParams = "user=testUser&page=1";
     const result = constructNewUrl(
       pathname,
       selectedProjects,
+      timePeriod,
+      chartScale,
       otherParams,
       delimiter,
     );
     expect(result).toBe(
-      "/projects?projects=project1,project2&user=testUser&page=1",
+      "/projects?projects=project1,project2&period=months-1&scale=logarithmic&user=testUser&page=1",
     );
   });
 
-  it("should return URL with only projects query string if other params are empty", () => {
+  it("should return URL with only projects when time period and scale are defaults", () => {
     const pathname = "/projects";
     const selectedProjects = ["project1", "project2"];
+    const timePeriod = "all-time";
+    const chartScale = "linear";
     const otherParams = "";
     const result = constructNewUrl(
       pathname,
       selectedProjects,
+      timePeriod,
+      chartScale,
       otherParams,
       delimiter,
     );
     expect(result).toBe("/projects?projects=project1,project2");
   });
 
-  it("should return URL with only other params if selected projects are empty", () => {
+  it("should return URL with only period and scale when projects is empty", () => {
     const pathname = "/projects";
     const selectedProjects: string[] = [];
-    const otherParams = "user=testUser&page=1";
-    const result = constructNewUrl(
-      pathname,
-      selectedProjects,
-      otherParams,
-      delimiter,
-    );
-    expect(result).toBe("/projects?user=testUser&page=1");
-  });
-
-  it("should return pathname if both selected projects and other params are empty", () => {
-    const pathname = "/projects";
-    const selectedProjects: string[] = [];
+    const timePeriod = "months-1";
+    const chartScale = "logarithmic";
     const otherParams = "";
     const result = constructNewUrl(
       pathname,
       selectedProjects,
+      timePeriod,
+      chartScale,
+      otherParams,
+      delimiter,
+    );
+    expect(result).toBe("/projects?period=months-1&scale=logarithmic");
+  });
+
+  it("should return pathname only when all params are defaults or empty", () => {
+    const pathname = "/projects";
+    const selectedProjects: string[] = [];
+    const timePeriod = "all-time";
+    const chartScale = "linear";
+    const otherParams = "";
+    const result = constructNewUrl(
+      pathname,
+      selectedProjects,
+      timePeriod,
+      chartScale,
       otherParams,
       delimiter,
     );
