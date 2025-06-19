@@ -4,7 +4,7 @@ import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   useInitialChartScaleFromSearchParams,
   useInitialTimePeriodFromSearchParams,
-  useUpdateSearchParams,
+  useUpdateSearchParamsChart,
 } from "@/app/(home)/utils/search-params";
 import {
   ChartContainer,
@@ -128,15 +128,9 @@ type MultipleLineChartProps = {
   data: ChartData[];
   config: ChartConfig;
   chartKey: string;
-  selectedProjects?: string[];
 };
 
-function MultipleLineChart({
-  data,
-  config,
-  chartKey,
-  selectedProjects = [],
-}: MultipleLineChartProps) {
+function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
   const initialTimePeriod = useInitialTimePeriodFromSearchParams();
   const initialChartScale = useInitialChartScaleFromSearchParams();
 
@@ -146,7 +140,7 @@ function MultipleLineChart({
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
 
-  useUpdateSearchParams(selectedProjects, timePeriod, chartScale, ",");
+  useUpdateSearchParamsChart(timePeriod, chartScale);
 
   const handleTimePeriodChange = useCallback(
     (value: TimePeriod) => {

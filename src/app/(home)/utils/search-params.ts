@@ -141,6 +141,35 @@ export function constructNewUrl(
     : pathname;
 }
 
+export function useUpdateSearchParamsProjects(
+  selectedProjects: string[],
+  delimiter: string,
+) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const currentTimePeriod = getInitialTimePeriod(searchParams.get("period"));
+    const currentChartScale = getInitialChartScale(searchParams.get("scale"));
+
+    const otherParams = getOtherParamsString(searchParams, [
+      "projects",
+      "period",
+      "scale",
+    ]);
+    const newUrl = constructNewUrl(
+      pathname,
+      selectedProjects,
+      currentTimePeriod,
+      currentChartScale,
+      otherParams,
+      delimiter,
+    );
+    router.replace(newUrl, { scroll: false });
+  }, [selectedProjects, router, searchParams, delimiter, pathname]);
+}
+
 export function useUpdateSearchParams(
   selectedProjects: string[],
   timePeriod: TimePeriod,
@@ -177,17 +206,44 @@ export function useUpdateSearchParams(
   ]);
 }
 
-export function useUpdateSearchParamsProjects(
-  selectedProjects: string[],
-  delimiter: string,
+export function useUpdateSearchParamsChart(
+  timePeriod: TimePeriod,
+  chartScale: ChartScale,
 ) {
-  const initialTimePeriod = useInitialTimePeriodFromSearchParams();
-  const initialChartScale = useInitialChartScaleFromSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  useUpdateSearchParams(
-    selectedProjects,
-    initialTimePeriod,
-    initialChartScale,
-    delimiter,
-  );
+  useEffect(() => {
+    const otherParams = getOtherParamsString(searchParams, ["period", "scale"]);
+    const queryParts: string[] = [];
+
+    // Keep existing projects parameter as-is
+    const projectsParam = searchParams.get("projects");
+    if (projectsParam) {
+      queryParts.push(`projects=${projectsParam}`);
+    }
+
+    // Add period if not default
+    if (timePeriod !== "all-time") {
+      queryParts.push(`period=${timePeriod}`);
+    }
+
+    // Add scale if not default
+    if (chartScale !== "linear") {
+      queryParts.push(`scale=${chartScale}`);
+    }
+
+    // Add any other parameters
+    if (otherParams) {
+      queryParts.push(otherParams);
+    }
+
+    const newUrl =
+      queryParts.length > 0 ? `${pathname}?${queryParts.join("&")}` : pathname;
+
+    if (`${pathname}?${searchParams.toString()}` !== newUrl) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [timePeriod, chartScale, router, searchParams, pathname]);
 }
