@@ -1,4 +1,4 @@
-import { formatDate } from "@/app/(home)/utils/date-utils";
+import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
 import {
   addDays,
   addMonths,
@@ -9,7 +9,6 @@ import {
   differenceInCalendarWeeks,
   differenceInCalendarYears,
   startOfMonth,
-  startOfWeek,
   startOfYear,
 } from "date-fns";
 import { describe, expect, it } from "vitest";
@@ -463,13 +462,13 @@ describe("calculatePeriodStartDate", () => {
 
   it("should calculate correct start date for weekly periods", () => {
     const result = calculatePeriodStartDate(
-      "2023-05-15",
+      "2023-05-16",
       1,
       startOfWeek,
       differenceInCalendarWeeks,
       addWeeks,
     );
-    expect(formatDate(result)).toEqual("2023-05-14");
+    expect(formatDate(result)).toEqual("2023-05-15");
   });
 
   it("should calculate correct start date for monthly periods", () => {

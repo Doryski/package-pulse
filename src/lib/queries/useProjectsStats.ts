@@ -85,6 +85,10 @@ export function sortStatsMatrix(
       return sortDirection === "desc"
         ? (bValue ?? 0) - (aValue ?? 0)
         : (aValue ?? 0) - (bValue ?? 0);
+    } else if (sortColumn === "vibeCodingEra") {
+      const aValue = a.vibeCodingEraChange?.percentage ?? 0;
+      const bValue = b.vibeCodingEraChange?.percentage ?? 0;
+      return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
     } else {
       const aValue = a[`${sortColumn}Change`]?.percentage ?? 0;
       const bValue = b[`${sortColumn}Change`]?.percentage ?? 0;

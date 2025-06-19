@@ -12,6 +12,7 @@ const sortColumnOptions = [
   "yearly",
   "yoyWeek",
   "yoyMonth",
+  "vibeCodingEra",
   "breakDrop",
 ] as const;
 const sortDirectionOptions = ["asc", "desc"] as const;

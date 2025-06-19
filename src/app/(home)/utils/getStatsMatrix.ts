@@ -1,3 +1,4 @@
+import { VIBE_CODING_ERA_REFERENCE_DATE } from "@/lib/config/constants";
 import { ProjectStats } from "@/lib/queries/useProjectsStats";
 import {
   BreakDropIndicator,
@@ -28,6 +29,7 @@ export type StatsRow = {
   yearlyChange: StatChange | null;
   yoyWeekChange: StatChange | null;
   yoyMonthChange: StatChange | null;
+  vibeCodingEraChange: StatChange | null;
   breakDropIndicator: BreakDropIndicator;
 };
 
@@ -62,6 +64,7 @@ export type GetStatsMatrixResult = {
     previousFullYear: Omit<PeriodStat, "count"> | undefined;
     lastYearsReferenceWeek: Omit<PeriodStat, "count"> | undefined;
     lastYearsReferenceMonth: Omit<PeriodStat, "count"> | undefined;
+    vibeCodingEraReferenceWeek: Omit<PeriodStat, "count"> | undefined;
   };
 };
 
@@ -78,6 +81,7 @@ export default function getStatsMatrix(
     previousFullYear: undefined,
     lastYearsReferenceWeek: undefined,
     lastYearsReferenceMonth: undefined,
+    vibeCodingEraReferenceWeek: undefined,
   };
 
   const statsData = stats.reduce<StatsRow[]>((acc, query, index) => {
@@ -129,6 +133,14 @@ export default function getStatsMatrix(
           }),
       );
 
+    const vibeCodingEraReferenceDate = new Date(VIBE_CODING_ERA_REFERENCE_DATE);
+    const vibeCodingEraReferenceWeekStats = groupedStats.byWeeks.find((week) =>
+      isWithinInterval(vibeCodingEraReferenceDate, {
+        start: new Date(week.start),
+        end: new Date(week.end),
+      }),
+    );
+
     if (
       collectedDates.recentFullWeek === undefined &&
       recentFullWeek &&
@@ -147,6 +159,7 @@ export default function getStatsMatrix(
         previousFullYear: previousFullYear,
         lastYearsReferenceWeek: lastYearsReferenceWeekStats,
         lastYearsReferenceMonth: lastYearsReferenceMonthStats,
+        vibeCodingEraReferenceWeek: vibeCodingEraReferenceWeekStats,
       };
     }
 
@@ -210,6 +223,18 @@ export default function getStatsMatrix(
           }
         : null;
 
+    const vibeCodingEraChange =
+      vibeCodingEraReferenceWeekStats && recentFullWeek
+        ? {
+            nominal:
+              recentFullWeek.count - vibeCodingEraReferenceWeekStats.count,
+            percentage: getPercentChange(
+              recentFullWeek.count,
+              vibeCodingEraReferenceWeekStats.count,
+            ),
+          }
+        : null;
+
     const breakDropIndicator = calculateBreakDrop(query.data.rawSortedData);
 
     const result: StatsRow = {
@@ -219,6 +244,7 @@ export default function getStatsMatrix(
       yearlyChange,
       yoyWeekChange,
       yoyMonthChange,
+      vibeCodingEraChange,
       breakDropIndicator,
       color,
     };

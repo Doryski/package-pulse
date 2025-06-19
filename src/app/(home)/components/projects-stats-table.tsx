@@ -188,6 +188,32 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
             </TableHeadSortable>
 
             <TableHeadSortable
+              column="vibeCodingEra"
+              isSorted={sortColumn === "vibeCodingEra"}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+              tooltip={
+                <StatHeaderTooltip
+                  dates={dates}
+                  title="Vibe Coding Era Change"
+                  recentPeriodKey="recentFullWeek"
+                  previousPeriodKey="vibeCodingEraReferenceWeek"
+                  titleOfRecentPeriod="Recent Full Week"
+                  titleOfPreviousPeriod="Vibe Coding Era Start Week"
+                  description={
+                    <p className="text-xs">
+                      The &quot;Vibe Coding Era&quot; began when tools like
+                      Bolt, Lovable, and others were released and started
+                      trending.
+                    </p>
+                  }
+                />
+              }
+            >
+              Vibe Coding Era
+            </TableHeadSortable>
+
+            <TableHeadSortable
               column="breakDrop"
               isSorted={sortColumn === "breakDrop"}
               sortDirection={sortDirection}
@@ -236,6 +262,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
               <TableCellWithStats change={projectStats.yearlyChange} />
               <TableCellWithStats change={projectStats.yoyWeekChange} />
               <TableCellWithStats change={projectStats.yoyMonthChange} />
+              <TableCellWithStats change={projectStats.vibeCodingEraChange} />
               <TableCell className="min-w-[175px]">
                 <BreakDropIndicatorComponent
                   indicator={projectStats.breakDropIndicator}
@@ -282,6 +309,7 @@ type StatHeaderTooltipProps<T> = {
   titleOfRecentPeriod: string;
   titleOfPreviousPeriod: string;
   formatter?: (period: { start: string; end: string }) => string;
+  description?: React.ReactNode;
 };
 
 const StatHeaderTooltip = <
@@ -294,6 +322,7 @@ const StatHeaderTooltip = <
   titleOfRecentPeriod,
   titleOfPreviousPeriod,
   formatter = (period) => `${period.start} – ${period.end}`,
+  description,
 }: StatHeaderTooltipProps<T>) => {
   if (!dates[recentPeriodKey] || !dates[previousPeriodKey]) {
     return null;
@@ -310,6 +339,7 @@ const StatHeaderTooltip = <
 
       <p className="font-medium">{titleOfPreviousPeriod}</p>
       <p className="text-xs">{formatter(dates[previousPeriodKey])}</p>
+      {description}
     </div>
   );
 };

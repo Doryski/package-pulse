@@ -1,4 +1,4 @@
-import { formatDate } from "@/app/(home)/utils/date-utils";
+import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
 import {
   addDays,
   addMonths,
@@ -9,7 +9,6 @@ import {
   differenceInCalendarWeeks,
   differenceInCalendarYears,
   startOfMonth,
-  startOfWeek,
   startOfYear,
   subDays,
 } from "date-fns";
@@ -45,7 +44,7 @@ export function groupByDays<T extends DownloadStat>(
 
 export function groupByWeeks<T extends DownloadStat[]>(stats: T) {
   return groupByPeriod(stats, 1, addWeeks, differenceInCalendarWeeks, (date) =>
-    startOfWeek(date, { weekStartsOn: 1 }),
+    startOfWeek(date),
   );
 }
 
