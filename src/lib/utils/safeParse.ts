@@ -1,5 +1,5 @@
-import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { captureExceptionWithSearchParams } from "./sentry-context";
 
 export default function safeParse<Output, Input = Output>(
   data: unknown,
@@ -8,7 +8,7 @@ export default function safeParse<Output, Input = Output>(
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     console.error(parsed.error);
-    Sentry.captureException(parsed.error, {
+    captureExceptionWithSearchParams(parsed.error, {
       level: "warning",
       extra: {
         data,
