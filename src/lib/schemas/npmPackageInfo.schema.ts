@@ -76,7 +76,7 @@ export const VersionSchema = z.object({
       )
       .optional(),
   }),
-  directories: z.record(z.string()),
+  directories: z.record(z.string()).optional(),
 });
 
 export const NPMPackageInfoSchema = z.object({

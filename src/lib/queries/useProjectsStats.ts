@@ -74,6 +74,7 @@ export function sortStatsMatrix(
   sortColumn: SortColumn,
   sortDirection: SortDirection,
 ) {
+  if (!statsMatrix?.stats) return [];
   return statsMatrix.stats.toSorted((a, b) => {
     if (sortColumn === "projectName") {
       return sortDirection === "desc"
