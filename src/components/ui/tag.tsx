@@ -6,9 +6,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 type TagProps = {
   children: React.ReactNode;
   onRemove: () => void;
+  tooltipContent?: React.ReactNode;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-const Tag = ({ children, onRemove, ...props }: TagProps) => {
+const Tag = ({ children, onRemove, tooltipContent, ...props }: TagProps) => {
   return (
     <div
       {...props}
@@ -24,7 +25,7 @@ const Tag = ({ children, onRemove, ...props }: TagProps) => {
             <Cross1Icon />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Remove</TooltipContent>
+        <TooltipContent>{tooltipContent ?? "Remove"}</TooltipContent>
       </Tooltip>
       {children}
     </div>

@@ -3,6 +3,7 @@ import searchNPMRegistry from "@/api/searchNpmRegistry";
 import ClientOnly from "@/components/ui/client-only";
 import { Combobox } from "@/components/ui/combobox";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import Tag from "@/components/ui/tag";
 import {
   MULTI_SEARCH_DELIMITER,
   SELECTED_PROJECTS_LIMIT,
@@ -196,12 +197,32 @@ const ComboboxForm = ({ form }: ComboboxFormProps) => {
                     </ClientOnly>
                   );
                 })}
+                <ClientOnly>
+                  <ClearAllTag onClick={() => form.setValue("projects", [])} />
+                </ClientOnly>
               </div>
             </FormItem>
           )}
         />
       </form>
     </Form>
+  );
+};
+
+type ClearAllTagProps = {
+  onClick: () => void;
+};
+
+const ClearAllTag = ({ onClick }: ClearAllTagProps) => {
+  return (
+    <Tag
+      onRemove={onClick}
+      onClick={onClick}
+      className="cursor-pointer"
+      tooltipContent="Clear All"
+    >
+      Clear All
+    </Tag>
   );
 };
 
