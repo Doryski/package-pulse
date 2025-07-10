@@ -9,6 +9,7 @@ import {
   useUpdateSearchParamsProjects,
 } from "../../utils/search-params";
 import ComboboxForm from "../combobox-form";
+import QuickComparisons from "../quick-comparisons";
 import SimilarProjects from "../similar-projects";
 import StatsSection from "../stats-section";
 import { ProjectsSearchFormSchema, ProjectsSearchFormValues } from "./schema";
@@ -44,10 +45,26 @@ const ProjectsForm = () => {
     }
   };
 
+  const handleAddMultipleProjects = (projectNames: string[]) => {
+    const newProjects = projectNames.filter(
+      (project) => !selectedProjects.includes(project),
+    );
+    if (newProjects.length > 0) {
+      projectsSearchForm.setValue("projects", [
+        ...selectedProjects,
+        ...newProjects,
+      ]);
+    }
+  };
+
   return (
     <FormProvider {...projectsSearchForm}>
       <div className="flex h-full flex-col justify-center py-4">
         <ComboboxForm form={projectsSearchForm} />
+        <QuickComparisons
+          selectedProjects={selectedProjects}
+          onAddMultipleProjects={handleAddMultipleProjects}
+        />
         <SimilarProjects
           selectedProjects={selectedProjects}
           onAddProject={handleAddProject}
