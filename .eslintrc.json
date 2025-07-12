@@ -1,29 +1,42 @@
 {
-	"plugins": ["prettier"],
-	"extends": [
-		"next/core-web-vitals",
-		"plugin:tailwindcss/recommended",
-		"plugin:prettier/recommended"
-	],
-	"rules": {
-		"prettier/prettier": "error",
-		"no-console": [
-			"warn",
-			{
-				"allow": ["info", "warn", "error"]
-			}
-		],
-		"tailwindcss/no-custom-classname": [
-			"warn",
-			{
-				"callees": ["cn"],
-				"config": "tailwind.config.ts",
-				"cssFiles": ["**/*.css"],
-				"cssFilesRefreshRate": 1000,
-				"skipClassAttribute": false,
-				"tags": ["className"],
-				"whitelist": ["cn"]
-			}
-		]
-	}
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["prettier", "@typescript-eslint"],
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:tailwindcss/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "rules": {
+    "prettier/prettier": "error",
+    "no-console": [
+      "warn",
+      {
+        "allow": ["info", "warn", "error"]
+      }
+    ],
+    "no-underscore-dangle": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_|.*Types$",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "@typescript-eslint/no-non-null-asserted-optional-chain": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "tailwindcss/no-custom-classname": [
+      "warn",
+      {
+        "callees": ["cn"],
+        "config": "tailwind.config.ts",
+        "cssFiles": ["**/*.css"],
+        "cssFilesRefreshRate": 1000,
+        "skipClassAttribute": false,
+        "tags": ["className"],
+        "whitelist": ["cn"]
+      }
+    ]
+  }
 }
