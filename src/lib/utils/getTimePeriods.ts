@@ -8,7 +8,7 @@ export default function getTimePeriods(
   unitsCount: number,
   unit: DurationUnit,
 ): Period[] {
-  let periods: Period[] = [];
+  const periods: Period[] = [];
   let endTime = to;
 
   while (isAfter(endTime, from)) {

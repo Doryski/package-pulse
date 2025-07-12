@@ -1,6 +1,6 @@
 import Loader from "@/components/loader";
 import BreakDropIndicatorComponent from "@/components/ui/break-drop-indicator";
-import DotIndicator from "@/components/ui/dot-indicator";
+import DotIndicator, { DotIndicatorProps } from "@/components/ui/dot-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -279,13 +279,12 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
 type ProjectNameCellProps = {
   isLoading?: boolean;
   projectName: string;
-  color: string | undefined;
-};
+} & DotIndicatorProps;
 
 export function ProjectNameCell({
   isLoading = false,
   projectName,
-  color,
+  ...dotIndicatorProps
 }: ProjectNameCellProps) {
   return (
     <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background">
@@ -294,7 +293,7 @@ export function ProjectNameCell({
         fallback={<Skeleton className="h-4 w-full" />}
       >
         <div className="flex items-center gap-2">
-          <DotIndicator color={color} />
+          <DotIndicator {...dotIndicatorProps} />
           <span>{projectName}</span>
         </div>
       </Loader>

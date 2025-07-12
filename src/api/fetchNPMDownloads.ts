@@ -50,7 +50,7 @@ export default async function fetchNPMDownloads(
       try {
         const { downloads } = safeParse(data, NPMDownloadPeriodSchema);
         downloadsByDate.push(...downloads);
-      } catch (error) {
+      } catch (_error) {
         throw new AppError("Received invalid data from NPM API");
       }
     } else {

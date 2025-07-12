@@ -41,5 +41,6 @@ next-env.d.ts
 /specs
 
 .env.sentry-build-plugin
+.env*.local
 
 /ai_docs

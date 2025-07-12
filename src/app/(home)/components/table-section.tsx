@@ -127,7 +127,9 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
         dependenciesCount: projectInfo.dependenciesCount ?? null,
         devDependenciesCount: projectInfo.devDependenciesCount ?? null,
         homepage: projectInfo.homepage ?? null,
-        license: projectInfo.license ?? null,
+        license: Array.isArray(projectInfo.license)
+          ? projectInfo.license.join(", ")
+          : (projectInfo.license ?? null),
         repositoryUrl: projectInfo.repositoryUrl ?? null,
         description: projectInfo.description ?? null,
         createdAt: projectInfo.createdAt ?? null,

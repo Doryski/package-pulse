@@ -31,6 +31,7 @@ export const VersionSchema = z.object({
         type: z.string(),
         url: z.string(),
       }),
+      z.array(z.string()),
     ])
     .optional(),
   bugs: z
@@ -51,8 +52,8 @@ export const VersionSchema = z.object({
   _npmVersion: z.string().optional(),
   _npmUser: z
     .object({
-      name: z.string(),
-      email: z.string(),
+      name: z.string().optional(),
+      email: z.string().optional(),
     })
     .optional(),
   maintainers: z
@@ -105,11 +106,14 @@ export const NPMPackageInfoSchema = z.object({
   homepage: z.string().optional(),
   repository: RepositorySchema.optional(),
   author: z
-    .object({
-      name: z.string(),
-    })
+    .string()
+    .or(
+      z.object({
+        name: z.string(),
+      }),
+    )
     .optional(),
-  license: z.string().optional(),
+  license: z.union([z.string(), z.array(z.string())]).optional(),
   bugs: z
     .object({
       url: z.string(),

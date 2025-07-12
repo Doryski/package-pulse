@@ -16,11 +16,9 @@ import useGithubContributorsCount from "@/lib/queries/useGithubContributorsCount
 import useGithubPullRequestsCount from "@/lib/queries/useGithubPullRequestsCount";
 import useGithubRepoInfo from "@/lib/queries/useGithubRepoInfo";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
-import getChartColor from "@/lib/utils/getChartColor";
 import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
 import { UseQueryResult } from "@tanstack/react-query";
 import { differenceInDays, formatDistanceToNow } from "date-fns";
-import { useTheme } from "next-themes";
 import Image from "next/image";
 import { memo } from "react";
 import { useFormContext } from "react-hook-form";
@@ -93,8 +91,6 @@ type ProjectInfoRowProps = {
 };
 
 const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
-  const { resolvedTheme } = useTheme();
-
   const githubRepo = useGithubRepoInfo(
     npmPackage.data?.repoName!,
     npmPackage.data?.projectName!,
@@ -117,7 +113,7 @@ const ProjectInfoRow = memo(({ npmPackage, index }: ProjectInfoRowProps) => {
       <ProjectNameCell
         isLoading={npmPackage.isLoading}
         projectName={npmPackage.data?.projectName ?? ""}
-        color={getChartColor(resolvedTheme, index)}
+        index={index}
       />
       <TableCell className="flex items-center justify-between gap-1 text-center">
         <Loader

@@ -283,7 +283,9 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             type="single"
             value={chartScale}
             onValueChange={(value) => {
-              value && setChartScale(value as ChartScale);
+              if (value) {
+                setChartScale(value as ChartScale);
+              }
             }}
             variant="outline"
             size="sm"
