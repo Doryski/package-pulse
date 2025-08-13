@@ -14,7 +14,7 @@ export const VersionSchema = z.object({
   keywords: z.array(z.string()).optional(),
   description: z.string().optional(),
   main: z.string().optional(),
-  scripts: z.record(z.string()).optional(),
+  scripts: z.any().optional(),
   repository: RepositorySchema.optional(),
   author: z
     .union([
