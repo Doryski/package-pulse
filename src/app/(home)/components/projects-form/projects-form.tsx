@@ -1,25 +1,18 @@
 "use client";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
-import LocalStorageKey from "@/lib/enums/LocalStorageKey";
-import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { CreateGlobalComparisonRequest } from "@/lib/types/global-comparison";
-import safeParse from "@/lib/utils/safeParse";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import { isSingleItemArray } from "../../utils/array-utils";
-import {
-  useInitialProjectsFromSearchParams,
-  useUpdateSearchParamsProjects,
-} from "../../utils/search-params";
+import { useUpdateSearchParamsProjects } from "../../utils/search-params";
 import ComboboxForm from "../combobox-form";
 import LatestComparisons from "../latest-comparisons";
 import PopularComparisons from "../popular-comparisons";
 import QuickComparisons from "../quick-comparisons";
 import SimilarProjects from "../similar-projects";
 import StatsSection from "../stats-section";
-import { ProjectsSearchFormSchema, ProjectsSearchFormValues } from "./schema";
+import { ProjectsSearchFormValues } from "./schema";
 
 const PROJECTS_URL_DELIMITER = ",";
 
@@ -66,25 +59,10 @@ function parseSearchValue(searchValue: string): string[] {
 }
 
 const ProjectsForm = () => {
-  const initialProjects = useInitialProjectsFromSearchParams(
-    PROJECTS_URL_DELIMITER,
-  );
-
-  const projectsSearchForm = useForm<ProjectsSearchFormValues>({
-    resolver: zodResolver(ProjectsSearchFormSchema),
-    defaultValues: safeParse(
-      {
-        search: "",
-        projects: initialProjects,
-      },
-      ProjectsSearchFormSchema,
-    ),
-  });
-
+  const projectsSearchForm = useFormContext<ProjectsSearchFormValues>();
   const selectedProjects = projectsSearchForm.watch("projects");
   const previousProjectsRef = useRef<string[]>([]);
 
-  useLocalStorage(LocalStorageKey.SELECTED_PROJECTS, selectedProjects);
   useUpdateSearchParamsProjects(selectedProjects, PROJECTS_URL_DELIMITER);
 
   useEffect(() => {
@@ -206,31 +184,29 @@ const ProjectsForm = () => {
   };
 
   return (
-    <FormProvider {...projectsSearchForm}>
-      <div className="flex h-full flex-col justify-center py-4">
-        <ComboboxForm form={projectsSearchForm} onFormSubmit={handleSearch} />
-        <QuickComparisons
-          selectedProjects={selectedProjects}
-          onAddMultipleProjects={handleAddMultipleProjects}
-        />
-        <PopularComparisons
-          selectedProjects={selectedProjects}
-          onAddMultipleProjects={handleAddMultipleProjects}
-        />
-        <LatestComparisons
-          selectedProjects={selectedProjects}
-          onAddMultipleProjects={handleAddMultipleProjects}
-        />
-        <SimilarProjects
-          selectedProjects={selectedProjects}
-          onAddProject={handleAddProject}
-        />
-        <StatsSection
-          form={projectsSearchForm}
-          selectedProjects={selectedProjects}
-        />
-      </div>
-    </FormProvider>
+    <div className="flex h-full flex-col justify-center py-4">
+      <ComboboxForm form={projectsSearchForm} onFormSubmit={handleSearch} />
+      <QuickComparisons
+        selectedProjects={selectedProjects}
+        onAddMultipleProjects={handleAddMultipleProjects}
+      />
+      <PopularComparisons
+        selectedProjects={selectedProjects}
+        onAddMultipleProjects={handleAddMultipleProjects}
+      />
+      <LatestComparisons
+        selectedProjects={selectedProjects}
+        onAddMultipleProjects={handleAddMultipleProjects}
+      />
+      <SimilarProjects
+        selectedProjects={selectedProjects}
+        onAddProject={handleAddProject}
+      />
+      <StatsSection
+        form={projectsSearchForm}
+        selectedProjects={selectedProjects}
+      />
+    </div>
   );
 };
 
