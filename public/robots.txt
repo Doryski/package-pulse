@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Block crawling of API endpoints
+Disallow: /api/
+
+# Encourage indexing of main pages
+Allow: /
+
+Sitemap: https://www.package-pulse.com/sitemap.xml

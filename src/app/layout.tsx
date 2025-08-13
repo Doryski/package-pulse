@@ -1,3 +1,4 @@
+import StructuredData from "@/components/seo/structured-data";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
 import { Analytics } from "@vercel/analytics/react";
@@ -11,24 +12,32 @@ import Providers from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Package Pulse | Explore NPM Package Trends",
+  title: "Compare NPM Package Downloads & Trends - Package Pulse",
   description:
-    "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on NPM trends and analytics.",
+    "Compare npm package download trends and statistics. Interactive charts for React, Vue, Angular, and thousands of JavaScript packages. Analyze download patterns, growth rates, and popularity metrics.",
   keywords: [
-    "NPM trends",
-    "NPM package trends",
-    "NPM package",
-    "package stats",
-    "JavaScript libraries",
-    "dependency trends",
+    "compare npm packages",
+    "npm download statistics",
+    "npm package trends",
+    "npm charts",
+    "JavaScript package comparison",
+    "npm download trends",
+    "package analytics",
+    "npm stats",
+    "download charts",
+    "npm package downloads",
+    "react vue angular comparison",
+    "npm registry statistics",
+    "JavaScript library trends",
+    "package popularity",
+    "dependency comparison",
     "open source analytics",
-    "Github stars",
-    "Github trends",
+    "github trends",
   ],
   openGraph: {
-    title: "Package Pulse | Explore NPM Package Trends",
+    title: "Compare NPM Package Downloads & Trends - Package Pulse",
     description:
-      "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
+      "Compare npm package download trends and statistics. Interactive charts for React, Vue, Angular, and thousands of JavaScript packages. Analyze download patterns, growth rates, and popularity metrics.",
     url: "https://www.package-pulse.com",
     type: "website",
     images: [
@@ -36,15 +45,15 @@ export const metadata = {
         url: "https://www.package-pulse.com/images/share_image.png",
         width: 800,
         height: 600,
-        alt: "Package Pulse Share Image",
+        alt: "Package Pulse - Compare NPM Package Downloads & Trends",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Package Pulse | Explore NPM Package Trends",
+    title: "Compare NPM Package Downloads & Trends - Package Pulse",
     description:
-      "Explore comprehensive statistics for NPM packages. View charts, tables, and subscribe for email updates on package trends and analytics.",
+      "Compare npm package download trends and statistics. Interactive charts for React, Vue, Angular, and thousands of JavaScript packages.",
     images: ["https://www.package-pulse.com/images/share_image.png"],
   },
   icons: {
@@ -71,6 +80,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <StructuredData type="website" />
+      </head>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
