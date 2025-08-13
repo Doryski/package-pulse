@@ -56,7 +56,7 @@ const SimilarProjects = ({
     setRemovedProjects((prev) => new Set([...prev, projectName]));
   };
 
-  if (!selectedProjects.length) {
+  if (!selectedProjects.length || similarProjectsQuery.isError) {
     return null;
   }
 

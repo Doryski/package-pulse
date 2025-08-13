@@ -68,7 +68,7 @@ export async function fetchSimilarProjects(
 
     const response = await openaiClient.responses.create(
       {
-        model: "gpt-5-nano",
+        model: "gpt-4.1-nano",
         input: createPrompt(packagesInfo),
         text: {
           format: zodTextFormat(SimilarProjectsSchema, "similar_projects"),
@@ -100,7 +100,7 @@ export async function fetchSimilarProjects(
     return validatedProjects.filter((v) => v != null);
   } catch (error) {
     console.error("Error fetching similar projects:", error);
-    return [];
+    throw error;
   }
 }
 
