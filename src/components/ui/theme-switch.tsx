@@ -1,42 +1,41 @@
 "use client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
+import { Monitor, Moon, Smartphone, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import ClientOnly from "./client-only";
 
+const THEME_OPTIONS = [
+  { value: "system", label: "System", Icon: null },
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+] as const;
+
 const ThemeSwitch = () => {
   const { theme, setTheme } = useTheme();
+  const isMobile = useIsMobile();
+
+  const SystemIcon = isMobile === true ? Smartphone : Monitor;
 
   return (
-    <div className="flex items-center gap-2">
-      <label
-        htmlFor="theme-switch"
-        className="hidden text-nowrap text-sm font-medium sm:block"
-      >
-        Theme:
-      </label>
-      <Select value={theme} onValueChange={(value) => setTheme(value)}>
-        <SelectTrigger className="w-24" id="theme-switch" aria-label="Theme">
-          <SelectValue placeholder="Select theme" />
-        </SelectTrigger>
-        <SelectContent role="menu">
-          <SelectItem role="menuitem" value="system">
-            System
-          </SelectItem>
-          <SelectItem role="menuitem" value="dark">
-            Dark
-          </SelectItem>
-          <SelectItem role="menuitem" value="light">
-            Light
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+    <ToggleGroup
+      type="single"
+      value={theme}
+      onValueChange={(value) => value && setTheme(value)}
+      variant="outline"
+      aria-label="Theme"
+    >
+      {THEME_OPTIONS.map(({ value, label, Icon }) => (
+        <ToggleGroupItem key={value} value={value} aria-label={label}>
+          {value === "system" ? (
+            <SystemIcon className="size-4" />
+          ) : (
+            Icon && <Icon className="size-4" />
+          )}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 };
 

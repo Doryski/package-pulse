@@ -1,13 +1,10 @@
 import { expect, Page, test } from "@playwright/test";
 
-const getThemeSwitch = (page: Page) => page.getByLabel(/Theme/);
+const getThemeToggleGroup = (page: Page) => page.getByLabel(/Theme/);
 
 const selectTheme = async (page: Page, theme: string) => {
-  const themeSwitch = getThemeSwitch(page);
-  await themeSwitch.click();
-  const menuitems = page.locator('[role="menuitem"]');
-  await expect(menuitems).toHaveCount(3);
-  await menuitems.getByText(theme).click();
+  const themeToggle = getThemeToggleGroup(page);
+  await themeToggle.getByLabel(theme).click();
 };
 
 test.describe("Theme Switch", () => {
@@ -16,9 +13,8 @@ test.describe("Theme Switch", () => {
   });
 
   test("should have default theme set to system", async ({ page }) => {
-    const themeSwitch = getThemeSwitch(page);
-    const text = await themeSwitch.textContent();
-    expect(text).toBe("System");
+    const systemButton = getThemeToggleGroup(page).getByLabel("System");
+    await expect(systemButton).toHaveAttribute("data-state", "on");
   });
 
   test("should change theme to dark when selected", async ({ page }) => {
