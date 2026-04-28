@@ -3,6 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Web application providing analytics-driven statistics and visualizations for npm packages.",
+  "license": "MIT",
+  "author": {
+    "name": "Dominik Rycharski",
+    "url": "https://github.com/doryski"
+  },
+  "homepage": "https://github.com/doryski/package-pulse#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doryski/package-pulse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/doryski/package-pulse/issues"
+  },
+  "keywords": [
+    "npm",
+    "analytics",
+    "package-stats",
+    "downloads",
+    "nextjs",
+    "visualization"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
