@@ -3,11 +3,22 @@ import { expect, Page, test } from "@playwright/test";
 import { projectNames } from "./data";
 import { goToProjectsPage } from "./utils";
 
+const MAIN_CHART_WRAPPER_SELECTOR =
+  "[data-testid='main-chart'] .recharts-wrapper";
+
+const mainChart = (page: Page) => page.locator(MAIN_CHART_WRAPPER_SELECTOR);
+
+const waitForMainChart = async (page: Page) => {
+  await page.waitForSelector(MAIN_CHART_WRAPPER_SELECTOR);
+  await expect(mainChart(page)).toBeVisible();
+};
+
 const checkLegendContent = async (page: Page) => {
+  const legend = page
+    .getByTestId("main-chart")
+    .locator(".recharts-legend-wrapper");
   for (const project of projectNames) {
-    await expect(page.locator(".recharts-legend-wrapper")).toContainText(
-      project,
-    );
+    await expect(legend).toContainText(project);
   }
 };
 
@@ -17,21 +28,24 @@ test.describe("Chart Section", () => {
   });
 
   test("chart is visible", async ({ page }) => {
-    await page.waitForSelector(".recharts-wrapper");
-    await expect(page.locator(".recharts-wrapper")).toBeVisible();
+    await waitForMainChart(page);
   });
 
   test("chart legend contains all project names", async ({ page }) => {
-    await page.waitForSelector(".recharts-wrapper");
+    await waitForMainChart(page);
     await checkLegendContent(page);
   });
 
   test("changing time period updates chart", async ({ page }) => {
-    await page.waitForSelector(".recharts-wrapper");
-    await page.waitForSelector(".recharts-cartesian-axis-tick-value");
+    await waitForMainChart(page);
+    await page.waitForSelector(
+      "[data-testid='main-chart'] .recharts-cartesian-axis-tick-value",
+    );
 
     const initialXAxisLabels = await page
-      .locator(".recharts-xAxis .recharts-cartesian-axis-tick-value")
+      .locator(
+        "[data-testid='main-chart'] .recharts-xAxis .recharts-cartesian-axis-tick-value",
+      )
       .allTextContents();
 
     await expect(page.locator("#time-period-select")).toBeVisible();
@@ -46,7 +60,9 @@ test.describe("Chart Section", () => {
     await expect(loader).not.toBeVisible();
 
     const updatedXAxisLabels = await page
-      .locator(".recharts-xAxis .recharts-cartesian-axis-tick-value")
+      .locator(
+        "[data-testid='main-chart'] .recharts-xAxis .recharts-cartesian-axis-tick-value",
+      )
       .allTextContents();
 
     expect(updatedXAxisLabels).not.toEqual(initialXAxisLabels);
@@ -54,19 +70,27 @@ test.describe("Chart Section", () => {
   });
 
   test("tooltip appears on hover", async ({ page }) => {
-    await page.waitForSelector(".recharts-wrapper");
-    const chartArea = page.locator(".recharts-wrapper");
+    await waitForMainChart(page);
+    const chartArea = mainChart(page);
     await chartArea.hover({ position: { x: 100, y: 100 } });
 
-    await expect(page.locator(".recharts-tooltip-wrapper")).toBeVisible();
+    await expect(
+      page
+        .getByTestId("main-chart")
+        .locator(".recharts-tooltip-wrapper")
+        .first(),
+    ).toBeVisible();
   });
 
   test("tooltip contains project names", async ({ page }) => {
-    await page.waitForSelector(".recharts-wrapper");
-    const chartArea = page.locator(".recharts-wrapper");
+    await waitForMainChart(page);
+    const chartArea = mainChart(page);
     await chartArea.hover({ position: { x: 100, y: 100 } });
 
-    const tooltip = page.locator(".recharts-tooltip-wrapper");
+    const tooltip = page
+      .getByTestId("main-chart")
+      .locator(".recharts-tooltip-wrapper")
+      .first();
     await expect(tooltip).toBeVisible();
 
     for (const project of projectNames) {

@@ -1,7 +1,7 @@
 import { expect, Locator, Page } from "@playwright/test";
 
 export const getSearchInput = (page: Page) =>
-  page.getByPlaceholder("Search project...");
+  page.getByPlaceholder("Search projects...");
 
 export const fillSearchInput = async (
   searchInput: Locator,

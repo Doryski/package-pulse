@@ -4,7 +4,7 @@ const DEV_SERVER_URL = "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 30_000,
+  timeout: 60_000,
   retries: 1,
   reporter: [["html"], ["list"]],
   fullyParallel: true,

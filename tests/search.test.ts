@@ -27,7 +27,7 @@ test.describe("Search Projects Form", () => {
 
   test.afterEach(async ({ page }) => {
     await page.evaluate(() => {
-      localStorage.removeItem("selected-projects");
+      localStorage.removeItem("pp:selected-projects");
     });
   });
 
@@ -92,13 +92,13 @@ test.describe("Search Projects Form", () => {
     page,
   }) => {
     await page.evaluate((projects) => {
-      localStorage.setItem("selected-projects", JSON.stringify(projects));
+      localStorage.setItem("pp:selected-projects", JSON.stringify(projects));
     }, projectNames);
 
     await goToProjectsPage(page, []);
     await fillSearchInput(getSearchInput(page), "");
     const localStorageProjects = await page.evaluate(() =>
-      localStorage.getItem("selected-projects"),
+      localStorage.getItem("pp:selected-projects"),
     );
     expect(localStorageProjects).toEqual(JSON.stringify([]));
     const tagsEmpty = getTags(page);
