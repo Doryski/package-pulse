@@ -5,7 +5,6 @@ export const links = {
   githubProfile: "https://github.com/Doryski",
   githubRepository: "https://github.com/Doryski/package-pulse",
   personalWebsite: "https://dominikrycharski.com/",
-  buyMeACoffee: "https://buymeacoffee.com/doryski",
 };
 
 export const NPM_API_FIRST_DAY = "2015-01-10";
