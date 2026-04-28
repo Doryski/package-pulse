@@ -2,7 +2,12 @@ import { expect, Page, test } from "@playwright/test";
 import { projectNames } from "./data";
 import { goToProjectsPage } from "./utils";
 
+const waitForTableLoaded = async (page: Page) => {
+  await page.waitForSelector("table tbody tr");
+};
+
 const assertTableContainsProjects = async (page: Page, projects: string[]) => {
+  await waitForTableLoaded(page);
   for (const project of projects) {
     await expect(page.locator("table")).toContainText(project);
   }

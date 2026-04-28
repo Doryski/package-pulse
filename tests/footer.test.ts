@@ -11,7 +11,6 @@ test.describe("Footer Links", () => {
       page.waitForEvent("popup"),
       page.locator(`a[href="${links.githubProfile}"]`).click(),
     ]);
-    await newPage.waitForLoadState("networkidle");
     await expect(newPage).toHaveURL(links.githubProfile);
   });
 
@@ -20,7 +19,6 @@ test.describe("Footer Links", () => {
       page.waitForEvent("popup"),
       page.locator(`a[href="${links.personalWebsite}"]`).click(),
     ]);
-    await newPage.waitForLoadState("networkidle");
     await expect(newPage).toHaveURL(links.personalWebsite);
   });
 
@@ -29,7 +27,6 @@ test.describe("Footer Links", () => {
       page.waitForEvent("popup"),
       page.locator(`a[href="${links.githubRepository}"]`).click(),
     ]);
-    await newPage.waitForLoadState("networkidle");
     await expect(newPage).toHaveURL(links.githubRepository);
   });
 });

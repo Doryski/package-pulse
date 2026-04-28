@@ -234,6 +234,11 @@ test.describe("Search Projects Form", () => {
       ).not.toBeVisible();
     }
 
+    await page.waitForURL((url) => {
+      const projectsParam = url.searchParams.get("projects");
+      return (projectsParam?.split(",").length ?? 0) === SELECTED_PROJECTS_LIMIT;
+    });
+
     const url = page.url();
     const urlProjects =
       new URL(url).searchParams.get("projects")?.split(",") || [];
