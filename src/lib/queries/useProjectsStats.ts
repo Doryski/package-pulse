@@ -1,4 +1,4 @@
-import fetchNPMDownloads from "@/api/fetchNPMDownloads";
+import fetchDownloadsBatch from "@/api/fetchDownloadsBatch";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
 import { GetStatsMatrixResult } from "@/app/(home)/utils/getStatsMatrix";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
@@ -35,10 +35,17 @@ export default function useProjectsStats(
     queries: selectedProjects.map((projectName, index) => {
       return {
         queryKey: getProjectStatsQueryKey(projectName),
+        retry: false,
         queryFn: async () => {
           try {
+            const batch = await fetchDownloadsBatch(selectedProjects);
+            const downloads = batch[projectName];
+            if (!downloads) {
+              throw new AppError(`Package "${projectName}" not found`);
+            }
+
             const sortedDownloads = sortByDate(
-              await fetchNPMDownloads(projectName),
+              downloads,
               (download) => new Date(download.date),
             );
             const groupedDownloads = groupByWeeks(sortedDownloads).slice(0, -1);
@@ -60,6 +67,7 @@ export default function useProjectsStats(
                 message: "Something went wrong. Please try again.",
               });
             }
+            throw error;
           }
         },
       };
