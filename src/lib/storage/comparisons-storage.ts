@@ -1,10 +1,100 @@
-import { GlobalComparison } from "@/lib/types/global-comparison";
+import { env } from "@/lib/config/env";
+import {
+  GlobalComparison,
+  GlobalComparisonSchema,
+} from "@/lib/types/global-comparison";
+import safeParse from "@/lib/utils/safeParse";
 import { Redis } from "@upstash/redis";
+import { z } from "zod";
+
+const GlobalComparisonsSchema = z.array(GlobalComparisonSchema);
 
 const COMPARISONS_KEY = "global_comparisons";
 const COMPARISONS_BY_USER_KEY = "comparisons_by_user";
 const MAX_COMPARISONS = 500;
 const MAX_COMPARISONS_PER_USER = 20;
+const DEDUP_WINDOW_MS = 5 * 60 * 1000;
+const USER_KEY_TTL_SECONDS = 90 * 24 * 60 * 60;
+
+const ADD_COMPARISON_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+local comparisons = {}
+if raw then
+  local ok, decoded = pcall(cjson.decode, raw)
+  if ok and type(decoded) == 'table' then
+    comparisons = decoded
+  end
+end
+
+local newComparison = cjson.decode(ARGV[1])
+local clientIP = ARGV[2]
+local now = tonumber(ARGV[3])
+local dedupWindow = tonumber(ARGV[4])
+local maxPerUser = tonumber(ARGV[5])
+local maxTotal = tonumber(ARGV[6])
+local userTtl = tonumber(ARGV[7])
+
+local function projectsKey(projects)
+  local copy = {}
+  for i, p in ipairs(projects) do copy[i] = p end
+  table.sort(copy)
+  return table.concat(copy, '|')
+end
+
+local newKey = projectsKey(newComparison.projects)
+
+for _, c in ipairs(comparisons) do
+  if c.clientIP == clientIP and type(c.timestamp) == 'number' and (now - c.timestamp) < dedupWindow then
+    if projectsKey(c.projects) == newKey then
+      return 'DUPLICATE'
+    end
+  end
+end
+
+local updated = { newComparison }
+for _, c in ipairs(comparisons) do
+  updated[#updated + 1] = c
+end
+
+local byUser = {}
+local order = {}
+for _, c in ipairs(updated) do
+  local ip = c.clientIP or 'unknown'
+  if not byUser[ip] then
+    byUser[ip] = {}
+    order[#order + 1] = ip
+  end
+  table.insert(byUser[ip], c)
+end
+
+local limited = {}
+for _, ip in ipairs(order) do
+  local list = byUser[ip]
+  table.sort(list, function(a, b) return a.timestamp > b.timestamp end)
+  for i = 1, math.min(#list, maxPerUser) do
+    limited[#limited + 1] = list[i]
+  end
+end
+
+table.sort(limited, function(a, b) return a.timestamp > b.timestamp end)
+
+local final = {}
+for i = 1, math.min(#limited, maxTotal) do
+  final[#final + 1] = limited[i]
+end
+
+redis.call('SET', KEYS[1], cjson.encode(final))
+
+local userComparisons = {}
+for _, c in ipairs(final) do
+  if (c.clientIP or 'unknown') == clientIP then
+    userComparisons[#userComparisons + 1] = c
+  end
+end
+redis.call('SET', KEYS[2], cjson.encode(userComparisons), 'EX', userTtl)
+
+return 'OK'
+` as const;
 
 let memoryComparisons: GlobalComparison[] = [];
 const memoryComparisonsByUser: Record<string, GlobalComparison[]> = {};
@@ -26,7 +116,7 @@ function isDuplicateComparison(
   const recentComparisonsByIP = existingComparisons.filter(
     (comparison) =>
       comparison.clientIP === newComparison.clientIP &&
-      Date.now() - comparison.timestamp < 5 * 60 * 1000, // 5 minutes
+      Date.now() - comparison.timestamp < DEDUP_WINDOW_MS,
   );
 
   return recentComparisonsByIP.some(
@@ -72,8 +162,8 @@ function getRedisClient(): Redis {
   if (!redis) {
     try {
       redis = new Redis({
-        url: process.env.PP_KV_REST_API_URL!,
-        token: process.env.PP_KV_REST_API_TOKEN!,
+        url: env.PP_KV_REST_API_URL!,
+        token: env.PP_KV_REST_API_TOKEN!,
       });
     } catch (error) {
       console.error("Failed to initialize Redis client:", error);
@@ -87,8 +177,9 @@ const redisStorage: ComparisonStorage = {
   async getComparisons() {
     try {
       const client = getRedisClient();
-      const comparisons = await client.get<GlobalComparison[]>(COMPARISONS_KEY);
-      return comparisons || [];
+      const raw = await client.get<GlobalComparison[]>(COMPARISONS_KEY);
+      const comparisons = safeParse(raw, GlobalComparisonsSchema);
+      return Array.isArray(comparisons) ? comparisons : [];
     } catch (error) {
       console.error("Failed to get comparisons from Redis:", error);
 
@@ -98,46 +189,31 @@ const redisStorage: ComparisonStorage = {
 
   async addComparison(newComparison: GlobalComparison) {
     try {
-      const existingComparisons = await this.getComparisons();
+      const client = getRedisClient();
+      const clientIP = newComparison.clientIP || "unknown";
 
-      if (isDuplicateComparison(newComparison, existingComparisons)) {
+      const result = await client.eval<string[], string>(
+        ADD_COMPARISON_SCRIPT,
+        [COMPARISONS_KEY, `${COMPARISONS_BY_USER_KEY}:${clientIP}`],
+        [
+          JSON.stringify(newComparison),
+          clientIP,
+          String(Date.now()),
+          String(DEDUP_WINDOW_MS),
+          String(MAX_COMPARISONS_PER_USER),
+          String(MAX_COMPARISONS),
+          String(USER_KEY_TTL_SECONDS),
+        ],
+      );
+
+      if (result === "DUPLICATE") {
         throw new Error("DUPLICATE_COMPARISON");
       }
-
-      const updatedComparisons = [newComparison, ...existingComparisons];
-
-      const comparisonsByUser = new Map<string, GlobalComparison[]>();
-      for (const comparison of updatedComparisons) {
-        const ip = comparison.clientIP || "unknown";
-        if (!comparisonsByUser.has(ip)) {
-          comparisonsByUser.set(ip, []);
-        }
-        comparisonsByUser.get(ip)!.push(comparison);
-      }
-
-      const limitedComparisons: GlobalComparison[] = [];
-      for (const [, userComparisons] of comparisonsByUser.entries()) {
-        const sortedUserComparisons = userComparisons
-          .sort((a, b) => b.timestamp - a.timestamp)
-          .slice(0, MAX_COMPARISONS_PER_USER);
-        limitedComparisons.push(...sortedUserComparisons);
-      }
-
-      const finalComparisons = limitedComparisons
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, MAX_COMPARISONS);
-
-      const client = getRedisClient();
-      await client.set(COMPARISONS_KEY, finalComparisons);
-
-      const userComparisons = finalComparisons.filter(
-        (c) => c.clientIP === newComparison.clientIP,
-      );
-      await client.set(
-        `${COMPARISONS_BY_USER_KEY}:${newComparison.clientIP}`,
-        userComparisons,
-      );
     } catch (error) {
+      if (error instanceof Error && error.message === "DUPLICATE_COMPARISON") {
+        throw error;
+      }
+
       console.error("Failed to add comparison to Redis:", error);
 
       throw error;
@@ -147,10 +223,11 @@ const redisStorage: ComparisonStorage = {
   async getComparisonsByUser(clientIP: string) {
     try {
       const client = getRedisClient();
-      const comparisons = await client.get<GlobalComparison[]>(
+      const raw = await client.get<GlobalComparison[]>(
         `${COMPARISONS_BY_USER_KEY}:${clientIP}`,
       );
-      return comparisons || [];
+      const comparisons = safeParse(raw, GlobalComparisonsSchema);
+      return Array.isArray(comparisons) ? comparisons : [];
     } catch (error) {
       console.error("Failed to get user comparisons from Redis:", error);
       return [];

@@ -1,69 +1,163 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, test } from "vitest";
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { fetchSimilarProjects } from "./fetchSimilarProjects";
 
-describe.skip("fetchSimilarProjects", () => {
-  test("should find similar validation libraries", async () => {
-    const result = await fetchSimilarProjects([
-      {
-        projectName: "zod",
-        keywords: ["validation", "schema"],
-        description:
-          "Zod is a schema declaration and validation library for TypeScript.",
-      },
-    ]);
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_KEYWORDS = 100;
+const RATE_LIMIT_MAX_REQUESTS = 10;
 
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.some((project) => project === "yup")).toBe(true);
+const { openaiCreate, fetchPackageInfoMock, headersState } = vi.hoisted(() => ({
+  openaiCreate: vi.fn(),
+  fetchPackageInfoMock: vi.fn(),
+  headersState: { ip: "127.0.0.1" },
+}));
 
-    const yupProject = result.find((p) => p === "yup");
-    expect(yupProject).toBeDefined();
-  });
+vi.mock("openai", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    responses: { create: openaiCreate },
+  })),
+}));
 
-  test("should find similar UI libraries", async () => {
+vi.mock("openai/helpers/zod.mjs", () => ({
+  zodTextFormat: () => ({}),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: () => ({
+    get: (name: string) => (name === "x-real-ip" ? headersState.ip : null),
+  }),
+}));
+
+vi.mock("@/api/fetchPackageInfo", () => ({
+  fetchPackageInfo: fetchPackageInfoMock,
+}));
+
+const respondWith = (similarProjects: string[]) => ({
+  output_text: JSON.stringify({ similarProjects }),
+});
+
+const getUserPromptInput = (callIndex: number) => {
+  const request = openaiCreate.mock.calls[callIndex]![0];
+  const userMessage = request.input.find(
+    (message: { role: string }) => message.role === "user",
+  );
+  return JSON.parse(userMessage.content) as {
+    projectName: string;
+    keywords?: string[] | null;
+    description?: string | null;
+  }[];
+};
+
+let ipCounter = 0;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  headersState.ip = `10.0.0.${(ipCounter += 1)}`;
+  fetchPackageInfoMock.mockResolvedValue({ projectName: "exists" });
+  openaiCreate.mockResolvedValue(respondWith(["vue"]));
+});
+
+describe("fetchSimilarProjects", () => {
+  test("parses valid input and returns the model's validated suggestions", async () => {
+    openaiCreate.mockResolvedValue(respondWith(["Vue", "solid-js"]));
+
     const result = await fetchSimilarProjects([
       {
         projectName: "react",
         keywords: ["frontend", "framework"],
-        description:
-          "React is a JavaScript library for building user interfaces.",
+        description: "A JavaScript library for building user interfaces.",
       },
     ]);
 
-    expect(result.some((project) => project === "vue")).toBe(true);
-    const vueProject = result.find((p) => p === "vue");
-    expect(vueProject).toBeDefined();
+    expect(result).toEqual(["vue", "solid-js"]);
+    expect(openaiCreate).toHaveBeenCalledTimes(1);
   });
 
-  test("should find similar state management libraries", async () => {
-    const result = await fetchSimilarProjects([
-      {
-        projectName: "redux",
-        keywords: ["state", "management"],
-        description:
-          "Redux is a state management library for JavaScript applications.",
-      },
-    ]);
+  test("rejects input exceeding SELECTED_PROJECTS_LIMIT without calling OpenAI", async () => {
+    const oversizedInput = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT + 1 },
+      (_, index) => ({
+        projectName: `package-${index}`,
+        keywords: ["misc"],
+        description: "some package",
+      }),
+    );
 
-    expect(result.some((project) => project === "zustand")).toBe(true);
-    const zustandProject = result.find((p) => p === "zustand");
-    expect(zustandProject).toBeDefined();
+    const result = await fetchSimilarProjects(oversizedInput);
+
+    expect(result).toEqual([]);
+    expect(openaiCreate).not.toHaveBeenCalled();
   });
 
-  test("should find similar state management libraries for a non-popular project", async () => {
+  test("returns [] for empty input without calling OpenAI", async () => {
+    const result = await fetchSimilarProjects([]);
+
+    expect(result).toEqual([]);
+    expect(openaiCreate).not.toHaveBeenCalled();
+  });
+
+  test("truncates over-long description and keywords instead of rejecting", async () => {
+    const longDescription = "d".repeat(MAX_DESCRIPTION_LENGTH + 500);
+    const tooManyKeywords = Array.from(
+      { length: MAX_KEYWORDS + 25 },
+      (_, index) => `keyword-${index}`,
+    );
+
     const result = await fetchSimilarProjects([
       {
-        projectName: "eventrix",
-        keywords: ["store"],
-        description:
-          "A system for managing the state of the application based on the events broadcast in the application.",
+        projectName: "react",
+        keywords: tooManyKeywords,
+        description: longDescription,
       },
     ]);
 
-    expect(result.some((project) => project === "redux")).toBe(true);
-    const reduxProject = result.find((p) => p === "redux");
-    expect(reduxProject).toBeDefined();
+    expect(openaiCreate).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(["vue"]);
+
+    const sanitized = getUserPromptInput(0)[0]!;
+    expect(sanitized.description).toHaveLength(MAX_DESCRIPTION_LENGTH);
+    expect(sanitized.keywords).toHaveLength(MAX_KEYWORDS);
+  });
+
+  test("returns [] when rate limited without calling OpenAI again", async () => {
+    const input = [
+      {
+        projectName: "react",
+        keywords: ["frontend"],
+        description: "ui library",
+      },
+    ];
+
+    const results: string[][] = [];
+    for (let attempt = 0; attempt <= RATE_LIMIT_MAX_REQUESTS; attempt += 1) {
+      results.push(await fetchSimilarProjects(input));
+    }
+
+    expect(results[0]).toEqual(["vue"]);
+    expect(results[RATE_LIMIT_MAX_REQUESTS]).toEqual([]);
+    expect(openaiCreate).toHaveBeenCalledTimes(RATE_LIMIT_MAX_REQUESTS);
+  });
+
+  test("dedupes the input package and drops suggestions that fail existence check", async () => {
+    openaiCreate.mockResolvedValue(
+      respondWith(["Vue", "React", "nonexistent"]),
+    );
+    fetchPackageInfoMock.mockImplementation(async (name: string) => {
+      if (name === "nonexistent") throw new Error("not found");
+      return { projectName: name };
+    });
+
+    const result = await fetchSimilarProjects([
+      {
+        projectName: "react",
+        keywords: ["frontend"],
+        description: "ui library",
+      },
+    ]);
+
+    expect(result).toEqual(["vue"]);
   });
 });

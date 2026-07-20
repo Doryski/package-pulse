@@ -1,6 +1,7 @@
 import fetchNpmDownloadsAdaptive from "@/api/fetchNpmDownloadsAdaptive";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { isAppError } from "@/lib/utils/AppError";
+import getClientIp from "@/lib/utils/getClientIp";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -9,12 +10,6 @@ const RATE_LIMIT_WINDOW = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 20;
 
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIP = request.headers.get("x-real-ip");
-  return forwarded?.split(",")[0] || realIP || "unknown";
-}
 
 const RATE_LIMIT_SWEEP_THRESHOLD = 10_000;
 
@@ -53,13 +48,13 @@ function isValidPackageName(name: string): boolean {
   if (!name || typeof name !== "string") return false;
   if (name.length < 1 || name.length > 214) return false;
   if (name.startsWith(".") || name.startsWith("_")) return false;
-  if (!npmNameRegex.test(name.toLowerCase())) return false;
+  if (!npmNameRegex.test(name)) return false;
 
   return true;
 }
 
 export async function GET(request: NextRequest) {
-  const clientIP = getClientIP(request);
+  const clientIP = getClientIp(request.headers);
   if (isRateLimited(clientIP)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Too many requests." },
@@ -96,8 +91,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data, stats } = await fetchNpmDownloadsAdaptive(packages);
-    return NextResponse.json({ data, stats });
+    const { data, errors, stats } = await fetchNpmDownloadsAdaptive(packages);
+    return NextResponse.json({ data, errors, stats });
   } catch (error) {
     const message = isAppError(error)
       ? error.message

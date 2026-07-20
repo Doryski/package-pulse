@@ -1,14 +1,29 @@
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import {
   comparisonsStorage,
   getUniqueComparisons,
 } from "@/lib/storage/comparisons-storage";
 import {
-  CreateGlobalComparisonRequest,
+  CreateGlobalComparisonRequestSchema,
   GlobalComparison,
   GlobalComparisonError,
   GlobalComparisonResponse,
+  PublicComparison,
 } from "@/lib/types/global-comparison";
+import getClientIp from "@/lib/utils/getClientIp";
 import { NextRequest, NextResponse } from "next/server";
+
+type CreateComparisonResponse = PublicComparison & {
+  validation?: {
+    invalidPackages: string[];
+    message: string;
+  };
+};
+
+function toPublicComparison(comparison: GlobalComparison): PublicComparison {
+  const { clientIP: _clientIP, userAgent: _userAgent, ...rest } = comparison;
+  return rest;
+}
 
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
@@ -20,12 +35,6 @@ const packageValidationCache = new Map<
   { isValid: boolean; timestamp: number }
 >();
 const VALIDATION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIP = request.headers.get("x-real-ip");
-  return forwarded?.split(",")[0] || realIP || "unknown";
-}
 
 function isRateLimited(clientIP: string): boolean {
   const now = Date.now();
@@ -125,7 +134,7 @@ export async function GET(
     const uniqueComparisons = getUniqueComparisons(comparisons, limit);
 
     return NextResponse.json({
-      comparisons: uniqueComparisons,
+      comparisons: uniqueComparisons.map(toPublicComparison),
       total: comparisons.length,
     });
   } catch (_error) {
@@ -138,9 +147,9 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-): Promise<NextResponse<GlobalComparison | GlobalComparisonError>> {
+): Promise<NextResponse<CreateComparisonResponse | GlobalComparisonError>> {
   try {
-    const clientIP = getClientIP(request);
+    const clientIP = getClientIp(request.headers);
 
     if (isRateLimited(clientIP)) {
       return NextResponse.json(
@@ -149,17 +158,20 @@ export async function POST(
       );
     }
 
-    const body: CreateGlobalComparisonRequest = await request.json();
+    const rawBody = await request.json().catch(() => null);
+    const parsedBody = CreateGlobalComparisonRequestSchema.safeParse(rawBody);
 
-    if (!Array.isArray(body.projects) || body.projects.length === 0) {
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { error: "Invalid request body. Projects array required." },
+        {
+          error: `Invalid request body. Projects array required (1-${SELECTED_PROJECTS_LIMIT} package names).`,
+        },
         { status: 400 },
       );
     }
 
     const { validPackages, invalidPackages } = await validateAndFilterPackages(
-      body.projects,
+      parsedBody.data.projects,
     );
 
     if (validPackages.length === 0) {
@@ -191,13 +203,17 @@ export async function POST(
       throw error;
     }
 
-    const response: any = newComparison;
-    if (invalidPackages.length > 0) {
-      response.validation = {
-        invalidPackages,
-        message: `${validPackages.length} valid packages stored. ${invalidPackages.length} packages filtered out.`,
-      };
-    }
+    const publicComparison = toPublicComparison(newComparison);
+    const response: CreateComparisonResponse =
+      invalidPackages.length > 0
+        ? {
+            ...publicComparison,
+            validation: {
+              invalidPackages,
+              message: `${validPackages.length} valid packages stored. ${invalidPackages.length} packages filtered out.`,
+            },
+          }
+        : publicComparison;
 
     return NextResponse.json(response, { status: 201 });
   } catch (error) {

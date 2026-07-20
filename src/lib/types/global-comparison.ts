@@ -1,4 +1,7 @@
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { z } from "zod";
+
+const NPM_PACKAGE_NAME_MAX_LENGTH = 214;
 
 export const GlobalComparisonSchema = z.object({
   id: z.string(),
@@ -10,8 +13,18 @@ export const GlobalComparisonSchema = z.object({
 
 export type GlobalComparison = z.infer<typeof GlobalComparisonSchema>;
 
+export const PublicComparisonSchema = GlobalComparisonSchema.omit({
+  clientIP: true,
+  userAgent: true,
+});
+
+export type PublicComparison = z.infer<typeof PublicComparisonSchema>;
+
 export const CreateGlobalComparisonRequestSchema = z.object({
-  projects: z.array(z.string()),
+  projects: z
+    .array(z.string().min(1).max(NPM_PACKAGE_NAME_MAX_LENGTH))
+    .min(1)
+    .max(SELECTED_PROJECTS_LIMIT),
 });
 
 export type CreateGlobalComparisonRequest = z.infer<
@@ -19,7 +32,7 @@ export type CreateGlobalComparisonRequest = z.infer<
 >;
 
 export const GlobalComparisonResponseSchema = z.object({
-  comparisons: z.array(GlobalComparisonSchema),
+  comparisons: z.array(PublicComparisonSchema),
   total: z.number(),
 });
 
