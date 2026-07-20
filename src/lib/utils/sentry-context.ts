@@ -3,22 +3,30 @@ import * as Sentry from "@sentry/nextjs";
 type CaptureExceptionOptions = Parameters<typeof Sentry.captureException>[1];
 type CaptureMessageOptions = Parameters<typeof Sentry.captureMessage>[1];
 
+const ALLOWED_SEARCH_PARAM_KEYS = ["projects", "period", "scale"] as const;
+
+function pickAllowedSearchParams(
+  searchParams: URLSearchParams,
+): Record<string, string> {
+  const params: Record<string, string> = {};
+
+  for (const key of ALLOWED_SEARCH_PARAM_KEYS) {
+    const value = searchParams.get(key);
+    if (value !== null) params[key] = value;
+  }
+
+  return params;
+}
+
 export function getSearchParamsContext(): Record<string, unknown> {
   if (typeof window === "undefined") return {};
 
   try {
     const searchParams = new URLSearchParams(window.location.search);
-    const params: Record<string, string> = {};
-
-    searchParams.forEach((value, key) => {
-      params[key] = value;
-    });
 
     return {
-      searchParams: params,
-      url: window.location.href,
+      searchParams: pickAllowedSearchParams(searchParams),
       pathname: window.location.pathname,
-      search: window.location.search,
     };
   } catch (error) {
     console.warn("Failed to extract search params for Sentry context:", error);
@@ -26,22 +34,35 @@ export function getSearchParamsContext(): Record<string, unknown> {
   }
 }
 
+export function scrubRequestUrl<TEvent extends Sentry.ErrorEvent>(
+  event: TEvent,
+): TEvent {
+  const request = event.request;
+  if (!request) return event;
+
+  if (request.query_string) request.query_string = undefined;
+
+  if (typeof request.url !== "string") return event;
+
+  try {
+    const urlObj = new URL(request.url);
+    request.url = `${urlObj.origin}${urlObj.pathname}`;
+  } catch (error) {
+    console.warn("Failed to scrub request URL for Sentry event:", error);
+  }
+
+  return event;
+}
+
 export function getSearchParamsContextFromUrl(
   url: string,
 ): Record<string, unknown> {
   try {
     const urlObj = new URL(url);
-    const params: Record<string, string> = {};
-
-    urlObj.searchParams.forEach((value, key) => {
-      params[key] = value;
-    });
 
     return {
-      searchParams: params,
-      url: url,
+      searchParams: pickAllowedSearchParams(urlObj.searchParams),
       pathname: urlObj.pathname,
-      search: urlObj.search,
     };
   } catch (error) {
     console.warn(

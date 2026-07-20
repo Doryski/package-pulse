@@ -3,17 +3,15 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
-import { getSearchParamsContext } from "./lib/utils/sentry-context";
+import {
+  getSearchParamsContext,
+  scrubRequestUrl,
+} from "./lib/utils/sentry-context";
 
 Sentry.init({
   dsn: "https://1e370265741031c93d8e072603c36fe3@o4509277242458112.ingest.de.sentry.io/4509277245145168",
 
-  integrations: [
-    Sentry.replayIntegration({
-      maskAllText: false,
-      maskAllInputs: false,
-    }),
-  ],
+  integrations: [Sentry.replayIntegration()],
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: 1,
@@ -36,7 +34,7 @@ Sentry.init({
         searchParams: getSearchParamsContext(),
       };
     }
-    return event;
+    return scrubRequestUrl(event);
   },
 });
 

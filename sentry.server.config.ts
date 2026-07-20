@@ -3,7 +3,10 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
-import { getSearchParamsContextFromUrl } from "./src/lib/utils/sentry-context";
+import {
+  getSearchParamsContextFromUrl,
+  scrubRequestUrl,
+} from "./src/lib/utils/sentry-context";
 
 Sentry.init({
   dsn: "https://1e370265741031c93d8e072603c36fe3@o4509277242458112.ingest.de.sentry.io/4509277245145168",
@@ -24,6 +27,6 @@ Sentry.init({
         searchParams: getSearchParamsContextFromUrl(url),
       };
     }
-    return event;
+    return scrubRequestUrl(event);
   },
 });

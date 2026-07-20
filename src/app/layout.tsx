@@ -12,6 +12,10 @@ import Providers from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
+  metadataBase: new URL("https://www.package-pulse.com"),
+  alternates: {
+    canonical: "/",
+  },
   title: "Compare NPM Package Downloads & Trends - Package Pulse",
   description:
     "Compare npm package download trends and statistics. Interactive charts for React, Vue, Angular, and thousands of JavaScript packages. Analyze download patterns, growth rates, and popularity metrics.",
@@ -70,7 +74,10 @@ export const metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#020817" },
+  ],
 };
 
 export default function RootLayout({
