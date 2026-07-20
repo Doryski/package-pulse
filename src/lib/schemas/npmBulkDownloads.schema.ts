@@ -2,24 +2,15 @@ import AppError from "@/lib/utils/AppError";
 import { z } from "zod";
 import {
   NPMDownloadCount,
-  NPMDownloadCountSchema,
+  NPMDownloadPeriodSchema,
 } from "./npmDownloadsPeriod.schema";
-
-export const NpmRangePeriodSchema = z.object({
-  downloads: z.array(NPMDownloadCountSchema),
-  start: z.string().date(),
-  end: z.string().date(),
-  package: z.string(),
-});
 
 export const NpmBulkRangeResponseSchema = z.record(
   z.string(),
-  NpmRangePeriodSchema.nullable(),
+  NPMDownloadPeriodSchema.nullable(),
 );
 
 export const NpmRangeErrorSchema = z.object({ error: z.string() });
-
-export type NpmRangePeriod = z.infer<typeof NpmRangePeriodSchema>;
 
 type NormalizedRangeResponse = Record<
   string,
@@ -44,7 +35,7 @@ export function normalizeRangeResponse(json: unknown): NormalizedRangeResponse {
   }
 
   if (hasFlatShape(json)) {
-    const period = NpmRangePeriodSchema.parse(json);
+    const period = NPMDownloadPeriodSchema.parse(json);
     return { [period.package]: { downloads: period.downloads } };
   }
 

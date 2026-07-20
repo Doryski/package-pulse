@@ -32,6 +32,7 @@ const DEFAULT_RETRY: RetryConfig = {
 
 export type AdaptiveDownloadsResult = {
   data: Record<string, NPMDownloadCount[] | null>;
+  errors: Record<string, string>;
   stats: {
     requestCount: number;
     rateLimitEvents: number;
@@ -50,6 +51,23 @@ type FetchNpmDownloadsAdaptiveOptions = {
 };
 
 type DownloadTask = { url: string; packages: string[] };
+
+type NormalizedMap = ReturnType<typeof normalizeRangeResponse>;
+type TaskSuccess = { packages: string[]; map: NormalizedMap };
+type TaskFailure = { packages: string[]; error: string; notFound?: boolean };
+type TaskResult = TaskSuccess | TaskFailure;
+
+const isTaskFailure = (result: TaskResult): result is TaskFailure =>
+  "error" in result;
+
+const notFoundMessage = (name: string) => `Package "${name}" not found`;
+const failedMessage = (name: string) =>
+  `Failed to load downloads for "${name}"`;
+
+const isNotFoundErrorBody = (message: string) => {
+  const normalized = message.toLowerCase();
+  return normalized.includes("not found") || normalized.includes("no stats");
+};
 
 const buildRangeUrl = (start: Date, end: Date, packages: string) =>
   `${NPM_RANGE_BASE_URL}/${formatDate(start)}:${formatDate(end)}/${packages}`;
@@ -117,7 +135,7 @@ export default async function fetchNpmDownloadsAdaptive(
   const processor = async (
     task: DownloadTask,
     ctx: { signal: AbortSignal },
-  ) => {
+  ): Promise<TaskResult> => {
     const res = await fetchImpl(task.url, { signal: ctx.signal });
 
     if (res.status === 429) {
@@ -125,12 +143,32 @@ export default async function fetchNpmDownloadsAdaptive(
         retryAfter: Number(res.headers.get("retry-after")) || undefined,
       });
     }
+    if (res.status === 404) {
+      return { packages: task.packages, error: "not found", notFound: true };
+    }
+    if (res.status >= 400 && res.status < 500) {
+      return {
+        packages: task.packages,
+        error: `NPM API responded with status ${res.status}`,
+      };
+    }
     if (!res.ok) {
       throw new Error(`NPM API responded with status ${res.status}`);
     }
 
-    const map = normalizeRangeResponse(await res.json());
-    return { packages: task.packages, map };
+    try {
+      const map = normalizeRangeResponse(await res.json());
+      return { packages: task.packages, map };
+    } catch (error) {
+      if (error instanceof AppError && isNotFoundErrorBody(error.message)) {
+        return {
+          packages: task.packages,
+          error: error.message,
+          notFound: true,
+        };
+      }
+      throw error;
+    }
   };
 
   const result = await adaptiveMap(tasks, processor, {
@@ -140,37 +178,67 @@ export default async function fetchNpmDownloadsAdaptive(
     signal: opts?.signal,
   });
 
-  const firstError = result.errors[0];
-  if (firstError) {
-    throw firstError.error instanceof AppError
-      ? firstError.error
-      : new AppError("Failed to fetch NPM download data");
-  }
-
   const accumulator = new Map<
     string,
-    { downloads: NPMDownloadCount[]; sawNonNull: boolean }
+    { downloads: NPMDownloadCount[]; sawData: boolean; failed: boolean }
   >();
   for (const name of packages) {
-    accumulator.set(name, { downloads: [], sawNonNull: false });
+    accumulator.set(name, { downloads: [], sawData: false, failed: false });
   }
 
-  for (const { map } of result.results) {
-    for (const [name, period] of Object.entries(map)) {
+  const errors: Record<string, string> = {};
+  const recordError = (name: string, message: string) => {
+    if (!errors[name]) errors[name] = message;
+  };
+
+  let hasNonNotFoundFailure = false;
+
+  const markFailed = (names: string[], notFound: boolean) => {
+    if (!notFound) hasNonNotFoundFailure = true;
+    for (const name of names) {
+      const acc = accumulator.get(name);
+      if (acc) acc.failed = true;
+      recordError(name, notFound ? notFoundMessage(name) : failedMessage(name));
+    }
+  };
+
+  for (const outcome of result.results) {
+    if (isTaskFailure(outcome)) {
+      markFailed(outcome.packages, Boolean(outcome.notFound));
+      continue;
+    }
+    for (const [name, period] of Object.entries(outcome.map)) {
       const acc = accumulator.get(name);
       if (!acc || !period) continue;
       acc.downloads.push(...period.downloads);
-      acc.sawNonNull = true;
+      acc.sawData = true;
     }
+  }
+
+  for (const failed of result.errors) {
+    markFailed(failed.item.packages, false);
   }
 
   const data: Record<string, NPMDownloadCount[] | null> = {};
   for (const [name, acc] of accumulator) {
-    data[name] = acc.sawNonNull ? mergeDownloads(acc.downloads) : null;
+    if (acc.failed || !acc.sawData) {
+      data[name] = null;
+      continue;
+    }
+    data[name] = mergeDownloads(acc.downloads);
+  }
+
+  const hasAnyData = Object.values(data).some((value) => value !== null);
+  if (!hasAnyData && hasNonNotFoundFailure) {
+    const firstError = result.errors[0]?.error;
+    throw firstError instanceof AppError
+      ? firstError
+      : new AppError("Failed to fetch NPM download data");
   }
 
   return {
     data,
+    errors,
     stats: {
       requestCount: tasks.length,
       rateLimitEvents: result.stats.rateLimitEvents,

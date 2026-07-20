@@ -1,6 +1,9 @@
 import fetchDownloadsBatch from "@/api/fetchDownloadsBatch";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
-import { GetStatsMatrixResult } from "@/app/(home)/utils/getStatsMatrix";
+import {
+  GetStatsMatrixResult,
+  StatsRow,
+} from "@/app/(home)/utils/getStatsMatrix";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import AppError from "@/lib/utils/AppError";
@@ -15,8 +18,11 @@ import {
   useQueries,
   UseQueryResult,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
+
+const BATCH_ERROR_MESSAGE = "Failed to fetch NPM download data";
 
 export type ProjectStats = {
   projectName: string;
@@ -31,7 +37,7 @@ export default function useProjectsStats(
   selectedProjects: string[],
   form: UseFormReturn<ProjectsSearchFormValues>,
 ) {
-  return useQueries({
+  const queries = useQueries({
     queries: selectedProjects.map((projectName, index) => {
       return {
         queryKey: getProjectStatsQueryKey(projectName),
@@ -39,9 +45,12 @@ export default function useProjectsStats(
         queryFn: async () => {
           try {
             const batch = await fetchDownloadsBatch(selectedProjects);
-            const downloads = batch[projectName];
+            const downloads = batch.data[projectName];
             if (!downloads) {
-              throw new AppError(`Package "${projectName}" not found`);
+              throw new AppError(
+                batch.errors[projectName] ??
+                  `Package "${projectName}" not found`,
+              );
             }
 
             const sortedDownloads = sortByDate(
@@ -57,23 +66,38 @@ export default function useProjectsStats(
             };
           } catch (error) {
             if (error instanceof AppError) {
-              form.setError(`projects.${index}`, {
-                message: error.message,
-              });
-              toast.error(error.message);
+              form.setError(`projects.${index}`, { message: error.message });
+              toast.error(error.message, { id: error.message });
             } else {
-              toast.error(`Failed to fetch stats for project ${projectName}`);
               form.setError(`projects.${index}`, {
                 message: "Something went wrong. Please try again.",
               });
+              toast.error(BATCH_ERROR_MESSAGE, { id: BATCH_ERROR_MESSAGE });
             }
             throw error;
           }
         },
       };
     }),
-  }).filter(
-    (query): query is SuccessfulProjectQuery => query.data !== undefined,
+  });
+
+  const stabilityKey = queries
+    .map((query) => {
+      if (!query.data) return "";
+      const { projectName, rawSortedData } = query.data;
+      const last = rawSortedData.at(-1);
+      const total = rawSortedData.reduce((sum, entry) => sum + entry.count, 0);
+      return `${projectName}:${rawSortedData.length}:${last?.date ?? ""}:${last?.count ?? 0}:${total}`;
+    })
+    .join("|");
+
+  return useMemo(
+    () =>
+      queries.filter(
+        (query): query is SuccessfulProjectQuery => query.data !== undefined,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stabilityKey],
   );
 }
 
@@ -83,25 +107,25 @@ export function sortStatsMatrix(
   sortDirection: SortDirection,
 ) {
   if (!statsMatrix?.stats) return [];
+  const directionFactor = sortDirection === "asc" ? 1 : -1;
+  const valueSelectors = {
+    projectName: (row: StatsRow) => row.projectName,
+    breakDrop: (row: StatsRow) =>
+      row.breakDropIndicator.corporateUsageScore ?? 0,
+    vibeCodingEra: (row: StatsRow) => row.vibeCodingEraChange?.percentage ?? 0,
+    weekly: (row: StatsRow) => row.weeklyChange?.percentage ?? 0,
+    monthly: (row: StatsRow) => row.monthlyChange?.percentage ?? 0,
+    yearly: (row: StatsRow) => row.yearlyChange?.percentage ?? 0,
+    yoyWeek: (row: StatsRow) => row.yoyWeekChange?.percentage ?? 0,
+    yoyMonth: (row: StatsRow) => row.yoyMonthChange?.percentage ?? 0,
+  } satisfies Record<SortColumn, (row: StatsRow) => string | number>;
+  const selectValue = valueSelectors[sortColumn];
   return statsMatrix.stats.toSorted((a, b) => {
-    if (sortColumn === "projectName") {
-      return sortDirection === "desc"
-        ? b.projectName.localeCompare(a.projectName)
-        : a.projectName.localeCompare(b.projectName);
-    } else if (sortColumn === "breakDrop") {
-      const aValue = a.breakDropIndicator.corporateUsageScore;
-      const bValue = b.breakDropIndicator.corporateUsageScore;
-      return sortDirection === "desc"
-        ? (bValue ?? 0) - (aValue ?? 0)
-        : (aValue ?? 0) - (bValue ?? 0);
-    } else if (sortColumn === "vibeCodingEra") {
-      const aValue = a.vibeCodingEraChange?.percentage ?? 0;
-      const bValue = b.vibeCodingEraChange?.percentage ?? 0;
-      return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
-    } else {
-      const aValue = a[`${sortColumn}Change`]?.percentage ?? 0;
-      const bValue = b[`${sortColumn}Change`]?.percentage ?? 0;
-      return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
+    const aValue = selectValue(a);
+    const bValue = selectValue(b);
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return aValue.localeCompare(bValue) * directionFactor;
     }
+    return (Number(aValue) - Number(bValue)) * directionFactor;
   });
 }

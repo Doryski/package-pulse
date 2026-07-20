@@ -2,17 +2,24 @@ import { NPMDownloadCount } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import AppError from "@/lib/utils/AppError";
 import { z } from "zod";
 
-const BatchDataSchema = z.record(
-  z.string(),
-  z.array(z.object({ date: z.string(), count: z.number() })).nullable(),
-);
+const DownloadsResponseSchema = z.object({
+  data: z.record(
+    z.string(),
+    z.array(z.object({ date: z.string(), count: z.number() })).nullable(),
+  ),
+  errors: z.record(z.string(), z.string()).optional().default({}),
+});
 
-const inFlightRequests = new Map<
-  string,
-  Promise<Record<string, NPMDownloadCount[]>>
->();
+export type DownloadsBatchResult = {
+  data: Record<string, NPMDownloadCount[]>;
+  errors: Record<string, string>;
+};
 
-async function requestDownloadsBatch(packages: string[]) {
+const inFlightRequests = new Map<string, Promise<DownloadsBatchResult>>();
+
+async function requestDownloadsBatch(
+  packages: string[],
+): Promise<DownloadsBatchResult> {
   const res = await fetch(
     `/api/downloads?packages=${encodeURIComponent(packages.join(","))}`,
   );
@@ -22,21 +29,21 @@ async function requestDownloadsBatch(packages: string[]) {
     throw new AppError(body?.error || "Failed to fetch NPM download data");
   }
 
-  const { data } = await res.json();
-  const parsed = BatchDataSchema.parse(data);
+  const { data, errors } = DownloadsResponseSchema.parse(await res.json());
 
-  return Object.entries(parsed).reduce<Record<string, NPMDownloadCount[]>>(
-    (acc, [packageName, downloads]) => {
-      if (downloads) acc[packageName] = downloads;
-      return acc;
-    },
-    {},
-  );
+  const filtered = Object.entries(data).reduce<
+    Record<string, NPMDownloadCount[]>
+  >((acc, [packageName, downloads]) => {
+    if (downloads) acc[packageName] = downloads;
+    return acc;
+  }, {});
+
+  return { data: filtered, errors };
 }
 
 export default function fetchDownloadsBatch(
   packages: string[],
-): Promise<Record<string, NPMDownloadCount[]>> {
+): Promise<DownloadsBatchResult> {
   const cacheKey = [...packages].sort().join(",");
 
   const cached = inFlightRequests.get(cacheKey);
