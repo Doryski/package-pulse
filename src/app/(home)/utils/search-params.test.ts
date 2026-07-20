@@ -11,6 +11,8 @@ import {
   getInitialTimePeriod,
   getOtherParamsString,
   getProjectsQueryString,
+  projectsToSlug,
+  slugToProjects,
 } from "./search-params";
 
 vi.mock("../../../lib/utils/getLocalStorageValue");
@@ -83,6 +85,46 @@ describe("getInitialChartScale", () => {
   it("should return default 'linear' for invalid chart scale", () => {
     expect(getInitialChartScale("invalid")).toBe("linear");
     expect(getInitialChartScale(null)).toBe("linear");
+  });
+});
+
+describe("projectsToSlug / slugToProjects round-trip", () => {
+  const roundTripCases = [
+    ["react", "vue", "svelte"],
+    ["@angular/core", "react"],
+    ["react-dom", "vue"],
+    ["some-vs-name", "x"],
+  ];
+
+  roundTripCases.forEach((projects) => {
+    it(`round-trips ${JSON.stringify(projects)}`, () => {
+      expect(slugToProjects(projectsToSlug(projects))).toEqual(projects);
+    });
+  });
+
+  it("produces a human-readable slug for non-scoped packages", () => {
+    expect(projectsToSlug(["react", "vue"])).toBe("react-vs-vue");
+  });
+
+  it("returns an empty array for empty or invalid slugs", () => {
+    expect(slugToProjects("")).toEqual([]);
+    expect(slugToProjects(undefined as unknown as string)).toEqual([]);
+  });
+
+  it(`truncates to ${SELECTED_PROJECTS_LIMIT} projects`, () => {
+    const projects = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT + 5 },
+      (_, i) => `project${i + 1}`,
+    );
+    const result = slugToProjects(projectsToSlug(projects));
+    expect(result).toHaveLength(SELECTED_PROJECTS_LIMIT);
+    expect(result).toEqual(projects.slice(0, SELECTED_PROJECTS_LIMIT));
+  });
+
+  it("survives the compare route's array-join pipeline for scoped packages", () => {
+    const projects = ["react", "@angular/core"];
+    const slugSegments = projectsToSlug(projects).split("/");
+    expect(slugToProjects(slugSegments.join("/"))).toEqual(projects);
   });
 });
 

@@ -1,51 +1,11 @@
 "use client";
+import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import ComparisonCard from "./comparison-card";
 
 type QuickComparisonsProps = {
   selectedProjects: string[];
   onAddMultipleProjects: (projectNames: string[]) => void;
 };
-
-const QUICK_COMPARISONS = [
-  {
-    title: "Frameworks",
-    projects: ["react", "vue", "@angular/core", "svelte"],
-  },
-  {
-    title: "Validation",
-    projects: ["zod", "yup", "joi", "valibot", "arktype"],
-  },
-  {
-    title: "State Management",
-    projects: ["zustand", "jotai", "mobx", "redux"],
-  },
-  {
-    title: "Testing",
-    projects: [
-      "@playwright/test",
-      "cypress",
-      "vitest",
-      "@testing-library/react",
-      "jest",
-      "@storybook/react",
-    ],
-  },
-  {
-    title: "UI Components",
-    projects: [
-      "@mui/material",
-      "@radix-ui/themes",
-      "@mantine/core",
-      "@chakra-ui/react",
-      "@headlessui/react",
-      "tailwindcss",
-    ],
-  },
-  {
-    title: "Date & Time",
-    projects: ["date-fns", "dayjs", "luxon", "moment", "temporal-polyfill"],
-  },
-];
 
 const QuickComparisons = ({
   selectedProjects,
@@ -66,8 +26,8 @@ const QuickComparisons = ({
         {QUICK_COMPARISONS.map((category) => (
           <ComparisonCard
             key={category.title}
-            projects={category.projects}
-            onProjectsClick={() => handleCardClick(category.projects)}
+            projects={[...category.projects]}
+            onProjectsClick={() => handleCardClick([...category.projects])}
             title={category.title}
           />
         ))}

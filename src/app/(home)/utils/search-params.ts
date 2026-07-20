@@ -2,20 +2,22 @@ import {
   MULTI_SEARCH_DELIMITER,
   SELECTED_PROJECTS_LIMIT,
 } from "@/lib/config/constants";
+import { ChartMode } from "@/lib/enums/ChartMode";
 import { ChartScale } from "@/lib/enums/ChartScale";
 import { TimePeriod } from "@/lib/enums/TimePeriod";
+import { decodeProjectName, encodeProjectName } from "@/lib/utils/slug";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import LocalStorageKey from "../../../lib/enums/LocalStorageKey";
 import getLocalStorageValue from "../../../lib/utils/getLocalStorageValue";
 import { ProjectsSearchFormSchema } from "../components/projects-form/schema";
 
-export const encodeProjectName = (name: string) =>
-  encodeURIComponent(name)
-    .replace(/%2C/g, ",")
-    .replace(/%40/g, "@")
-    .replace(/%2F/g, "/");
-export const decodeProjectName = (name: string) => decodeURIComponent(name);
+export {
+  decodeProjectName,
+  encodeProjectName,
+  projectsToSlug,
+  slugToProjects,
+} from "@/lib/utils/slug";
 
 export function getInitialProjects(
   projectsParam: string | null,
@@ -78,6 +80,16 @@ export function getInitialChartScale(
   return "linear";
 }
 
+export function getInitialChartMode(chartModeParam: string | null): ChartMode {
+  const validChartModes: ChartMode[] = ["absolute", "normalized"];
+
+  if (chartModeParam && validChartModes.includes(chartModeParam as ChartMode)) {
+    return chartModeParam as ChartMode;
+  }
+
+  return "absolute";
+}
+
 export function useInitialProjectsFromSearchParams(delimiter: string) {
   const searchParams = useSearchParams();
   const projectsParam = searchParams.get("projects");
@@ -94,6 +106,12 @@ export function useInitialChartScaleFromSearchParams() {
   const searchParams = useSearchParams();
   const chartScaleParam = searchParams.get("scale");
   return getInitialChartScale(chartScaleParam);
+}
+
+export function useInitialChartModeFromSearchParams() {
+  const searchParams = useSearchParams();
+  const chartModeParam = searchParams.get("mode");
+  return getInitialChartMode(chartModeParam);
 }
 
 export function getOtherParamsString(
@@ -120,6 +138,7 @@ export function constructNewUrl(
   chartScale: ChartScale,
   otherParams: string,
   delimiter: string,
+  chartMode: ChartMode = "absolute",
 ): string {
   const queryParts: string[] = [];
 
@@ -133,6 +152,10 @@ export function constructNewUrl(
 
   if (chartScale !== "linear") {
     queryParts.push(`scale=${chartScale}`);
+  }
+
+  if (chartMode !== "absolute") {
+    queryParts.push(`mode=${chartMode}`);
   }
 
   if (otherParams) {
@@ -162,6 +185,7 @@ function getComparableCurrentUrl(
     "projects",
     "period",
     "scale",
+    "mode",
   ]);
   return constructNewUrl(
     pathname,
@@ -170,6 +194,7 @@ function getComparableCurrentUrl(
     getInitialChartScale(searchParams.get("scale")),
     otherParams,
     delimiter,
+    getInitialChartMode(searchParams.get("mode")),
   );
 }
 
@@ -184,11 +209,13 @@ export function useUpdateSearchParamsProjects(
   useEffect(() => {
     const currentTimePeriod = getInitialTimePeriod(searchParams.get("period"));
     const currentChartScale = getInitialChartScale(searchParams.get("scale"));
+    const currentChartMode = getInitialChartMode(searchParams.get("mode"));
 
     const otherParams = getOtherParamsString(searchParams, [
       "projects",
       "period",
       "scale",
+      "mode",
     ]);
     const newUrl = constructNewUrl(
       pathname,
@@ -197,6 +224,7 @@ export function useUpdateSearchParamsProjects(
       currentChartScale,
       otherParams,
       delimiter,
+      currentChartMode,
     );
 
     if (getComparableCurrentUrl(pathname, searchParams, delimiter) !== newUrl) {
@@ -210,6 +238,7 @@ export function useUpdateSearchParams(
   timePeriod: TimePeriod,
   chartScale: ChartScale,
   delimiter: string,
+  chartMode: ChartMode = "absolute",
 ) {
   const router = useRouter();
   const pathname = usePathname();
@@ -220,6 +249,7 @@ export function useUpdateSearchParams(
       "projects",
       "period",
       "scale",
+      "mode",
     ]);
     const newUrl = constructNewUrl(
       pathname,
@@ -228,6 +258,7 @@ export function useUpdateSearchParams(
       chartScale,
       otherParams,
       delimiter,
+      chartMode,
     );
     router.replace(newUrl, { scroll: false });
   }, [
@@ -238,12 +269,14 @@ export function useUpdateSearchParams(
     searchParams,
     delimiter,
     pathname,
+    chartMode,
   ]);
 }
 
 export function useUpdateSearchParamsChart(
   timePeriod: TimePeriod,
   chartScale: ChartScale,
+  chartMode: ChartMode = "absolute",
 ) {
   const router = useRouter();
   const pathname = usePathname();
@@ -254,6 +287,7 @@ export function useUpdateSearchParamsChart(
       "projects",
       "period",
       "scale",
+      "mode",
     ]);
     const newUrl = constructNewUrl(
       pathname,
@@ -262,6 +296,7 @@ export function useUpdateSearchParamsChart(
       chartScale,
       otherParams,
       MULTI_SEARCH_DELIMITER,
+      chartMode,
     );
 
     if (
@@ -273,5 +308,5 @@ export function useUpdateSearchParamsChart(
     ) {
       router.replace(newUrl, { scroll: false });
     }
-  }, [timePeriod, chartScale, router, searchParams, pathname]);
+  }, [timePeriod, chartScale, chartMode, router, searchParams, pathname]);
 }
