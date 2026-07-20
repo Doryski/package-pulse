@@ -13,7 +13,7 @@ export function formatLargeNumber(value: unknown): string {
     numericValue = value;
   }
 
-  if (numericValue > 1_000_000_000) {
+  if (numericValue >= 1_000_000_000) {
     return `${round(numericValue / 1_000_000_000, 1)}B`;
   }
 

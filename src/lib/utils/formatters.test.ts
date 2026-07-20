@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatCellValue, formatInteger } from "./formatters";
+import {
+  formatCellValue,
+  formatInteger,
+  formatLargeNumber,
+} from "./formatters";
 
 /**
  * Create a string with non-breaking spaces
@@ -41,6 +45,12 @@ describe("formatInteger", () => {
     expect(formatInteger(-1000.5)).toBe(nbsp("-1 001"));
     expect(formatInteger(1000.4)).toBe(nbsp("1 000"));
     expect(formatInteger(-1000.6)).toBe(nbsp("-1 001"));
+  });
+});
+
+describe("formatLargeNumber", () => {
+  it("formats exactly one billion as billions, not millions", () => {
+    expect(formatLargeNumber(1_000_000_000)).toBe("1B");
   });
 });
 
