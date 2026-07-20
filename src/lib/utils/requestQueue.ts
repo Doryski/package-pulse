@@ -47,3 +47,5 @@ export class RequestQueue {
 
 export const githubApiQueue = new RequestQueue(2, 200);
 export const npmApiQueue = new RequestQueue(5, 50);
+export const bundlephobiaApiQueue = new RequestQueue(1, 400);
+export const depsDevApiQueue = new RequestQueue(4, 100);

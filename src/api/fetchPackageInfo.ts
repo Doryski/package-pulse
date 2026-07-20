@@ -1,6 +1,16 @@
+import { BundlephobiaSchema } from "@/lib/schemas/bundlephobia.schema";
+import {
+  DepsDevProjectSchema,
+  DepsDevVersionSchema,
+} from "@/lib/schemas/depsDev.schema";
 import { GithubRepoInfoSchema } from "@/lib/schemas/githubRepoInfo.schema";
 import { NPMPackageInfoSchema } from "@/lib/schemas/npmPackageInfo.schema";
-import { githubApiQueue, npmApiQueue } from "@/lib/utils/requestQueue";
+import {
+  bundlephobiaApiQueue,
+  depsDevApiQueue,
+  githubApiQueue,
+  npmApiQueue,
+} from "@/lib/utils/requestQueue";
 import safeParse from "@/lib/utils/safeParse";
 import { z } from "zod";
 
@@ -122,3 +132,84 @@ export const fetchGithubPullRequestsCount = async (repoName: string) => {
     return safeParse(data, AnyArraySchema).length;
   });
 };
+
+export const fetchBundleSize = async (name: string, version?: string) => {
+  try {
+    return await bundlephobiaApiQueue.add(async () => {
+      const pkg = version ? `${name}@${version}` : name;
+      const response = await fetch(
+        `https://bundlephobia.com/api/size?package=${encodeURIComponent(pkg)}`,
+      );
+      const data = await response.json();
+      const parsed = safeParse(data, BundlephobiaSchema);
+      const treeShakeable =
+        parsed.hasJSModule === true && parsed.hasSideEffects === false;
+      return { ...parsed, treeShakeable };
+    });
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+export type BundleSizeResult = Awaited<ReturnType<typeof fetchBundleSize>>;
+
+const getDepsDevGithubProjectId = (
+  version: z.infer<typeof DepsDevVersionSchema>,
+) => {
+  const related = version.relatedProjects?.find((project) =>
+    project.projectKey?.id?.startsWith("github.com/"),
+  );
+  return related?.projectKey?.id;
+};
+
+export const fetchDepsDev = async (name: string, version: string) => {
+  try {
+    const versionData = await depsDevApiQueue.add(async () => {
+      const response = await fetch(
+        `https://api.deps.dev/v3/systems/npm/packages/${encodeURIComponent(
+          name,
+        )}/versions/${encodeURIComponent(version)}`,
+      );
+      const data = await response.json();
+      return safeParse(data, DepsDevVersionSchema);
+    });
+
+    const vulnerabilityCount = versionData.advisoryKeys?.length;
+    const licenses = versionData.licenses;
+    const projectId = getDepsDevGithubProjectId(versionData);
+
+    if (!projectId) {
+      return {
+        vulnerabilityCount,
+        licenses,
+        healthScore: undefined,
+        starsCount: undefined,
+        forksCount: undefined,
+        openIssuesCount: undefined,
+      };
+    }
+
+    const projectData = await depsDevApiQueue.add(async () => {
+      const response = await fetch(
+        `https://api.deps.dev/v3/projects/${encodeURIComponent(projectId)}`,
+      );
+      const data = await response.json();
+      return safeParse(data, DepsDevProjectSchema);
+    });
+
+    return {
+      vulnerabilityCount,
+      licenses,
+      healthScore: projectData.scorecard?.overallScore,
+      starsCount: projectData.starsCount,
+      forksCount: projectData.forksCount,
+      openIssuesCount: projectData.openIssuesCount,
+    };
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+export type DepsDevResult = Awaited<ReturnType<typeof fetchDepsDev>>;
