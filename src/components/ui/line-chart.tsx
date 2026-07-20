@@ -2,10 +2,13 @@
 import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
+  useInitialChartModeFromSearchParams,
   useInitialChartScaleFromSearchParams,
   useInitialTimePeriodFromSearchParams,
   useUpdateSearchParamsChart,
 } from "@/app/(home)/utils/search-params";
+import { SimpleTooltip } from "@/components/simple-tooltip";
+import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
   ChartDotIndicator,
@@ -14,20 +17,38 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import chartModes, { ChartMode } from "@/lib/enums/ChartMode";
 import chartScales, { ChartScale } from "@/lib/enums/ChartScale";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
+import { exportCsv, downloadFile } from "@/lib/utils/exportUtils";
 import { formatLargeNumber } from "@/lib/utils/formatters";
+import { convertHtmlToImage } from "@/lib/utils/imageExport";
 import sortByVersion from "@/lib/utils/sortByVersion";
+import {
+  ChevronDownIcon,
+  CopyIcon,
+  DownloadIcon,
+  Link2Icon,
+  TableIcon,
+  TwitterLogoIcon,
+} from "@radix-ui/react-icons";
 import { isAfter, subMonths, subYears } from "date-fns";
 import {
   Fragment,
   memo,
   useCallback,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -39,6 +60,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { toast } from "sonner";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import Dash from "./dash";
@@ -55,6 +77,12 @@ import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 export type ChartData = {
   time: string | Date;
 } & Record<string, number | null>;
+
+export type NormalizedChartData = {
+  weekIndex: number;
+} & Record<string, number | null>;
+
+type ChartRow = Record<string, number | string | Date | null>;
 
 export type VersionData = {
   version: string;
@@ -126,20 +154,32 @@ const formatVersion = (version: VersionData) => {
 
 type MultipleLineChartProps = {
   data: ChartData[];
+  normalizedData: NormalizedChartData[];
   config: ChartConfig;
   chartKey: string;
 };
 
-function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
+function MultipleLineChart({
+  data,
+  normalizedData,
+  config,
+  chartKey,
+}: MultipleLineChartProps) {
   const initialTimePeriod = useInitialTimePeriodFromSearchParams();
   const initialChartScale = useInitialChartScaleFromSearchParams();
+  const initialChartMode = useInitialChartModeFromSearchParams();
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialTimePeriod);
   const [chartScale, setChartScale] = useState<ChartScale>(initialChartScale);
+  const [chartMode, setChartMode] = useState<ChartMode>(initialChartMode);
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
+  const chartRef = useRef<HTMLDivElement>(null);
 
-  useUpdateSearchParamsChart(timePeriod, chartScale);
+  useUpdateSearchParamsChart(timePeriod, chartScale, chartMode);
+
+  const isNormalized = chartMode === "normalized";
+  const xKey = isNormalized ? "weekIndex" : "time";
 
   const handleTimePeriodChange = useCallback((value: TimePeriod) => {
     startTransition(() => {
@@ -147,7 +187,17 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     });
   }, []);
 
-  const chartData = useMemo(() => {
+  const handleChartModeChange = useCallback((value: ChartMode) => {
+    startTransition(() => {
+      setChartMode(value);
+    });
+  }, []);
+
+  const chartData = useMemo<ChartRow[]>(() => {
+    if (isNormalized) {
+      return normalizedData;
+    }
+
     const today = new Date();
     return data.filter((item) => {
       const date = new Date(item.time);
@@ -170,7 +220,13 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
           return assertUnreachable(timePeriod, "Invalid time period");
       }
     });
-  }, [data, timePeriod]);
+  }, [data, normalizedData, timePeriod, isNormalized]);
+
+  const seriesKeys = useMemo(() => {
+    const first = chartData[0];
+    if (!first) return [];
+    return Object.keys(first).filter((key) => key !== xKey);
+  }, [chartData, xKey]);
 
   const formatYAxisTick = useCallback(
     (value: number) => {
@@ -186,7 +242,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     if (chartScale === "logarithmic") {
       const allValues = chartData.flatMap((item) =>
         Object.keys(item)
-          .filter((key) => key !== "time")
+          .filter((key) => key !== xKey)
           .map((key) => item[key])
           .filter(
             (value): value is number => typeof value === "number" && value > 0,
@@ -207,14 +263,14 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     }
 
     return ["auto", "auto"];
-  }, [chartData, chartScale]);
+  }, [chartData, chartScale, xKey]);
 
   const transformedData = useMemo(() => {
     if (chartScale === "logarithmic") {
       return chartData.map((item) => {
-        const newItem = { ...item } as ChartData;
+        const newItem = { ...item };
         Object.keys(newItem).forEach((key) => {
-          if (key !== "time" && newItem[key] === 0) {
+          if (key !== xKey && newItem[key] === 0) {
             newItem[key] = null;
           }
         });
@@ -223,12 +279,69 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     }
 
     return chartData;
-  }, [chartData, chartScale]);
+  }, [chartData, chartScale, xKey]);
 
   useLocalStorage(LocalStorageKey.TIME_PERIOD, timePeriod);
   useLocalStorage(LocalStorageKey.CHART_SCALE, chartScale);
+  useLocalStorage(LocalStorageKey.CHART_MODE, chartMode);
 
   const yAxisScale = chartScale === "logarithmic" ? "log" : "linear";
+
+  const handleDownloadImage = useCallback(async () => {
+    if (!chartRef.current) return;
+    try {
+      const canvas = await convertHtmlToImage(chartRef.current);
+      downloadFile(`package-pulse-chart-${Date.now()}.png`, canvas.toDataURL());
+      toast.success("Chart downloaded as image");
+    } catch (error) {
+      console.error("Error downloading chart:", error);
+      toast.error("Failed to download chart");
+    }
+  }, []);
+
+  const handleCopyImage = useCallback(async () => {
+    if (!chartRef.current) return;
+    try {
+      const canvas = await convertHtmlToImage(chartRef.current);
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob }),
+          ]);
+          toast.success("Chart copied to clipboard");
+        } catch (error) {
+          console.error("Error copying chart:", error);
+          toast.error("Failed to copy chart");
+        }
+      });
+    } catch (error) {
+      console.error("Error copying chart:", error);
+      toast.error("Failed to copy chart");
+    }
+  }, []);
+
+  const handleExportCsv = useCallback(() => {
+    exportCsv(`package-pulse-chart-${Date.now()}`, chartData);
+  }, [chartData]);
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied to clipboard");
+    } catch (error) {
+      console.error("Error copying link:", error);
+      toast.error("Failed to copy link");
+    }
+  }, []);
+
+  const handleShareToX = useCallback(() => {
+    const text = "Compare npm package download trends on Package Pulse";
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+      text,
+    )}&url=${encodeURIComponent(window.location.href)}`;
+    window.open(intentUrl, "_blank", "noopener,noreferrer");
+  }, []);
 
   return (
     <div
@@ -250,13 +363,19 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             onValueChange={(value) =>
               handleTimePeriodChange(value as TimePeriod)
             }
+            disabled={isNormalized}
           >
-            <SelectTrigger
-              id="time-period-select"
-              className="w-full md:w-[180px]"
+            <SimpleTooltip
+              content="Time period is unavailable in “Since first release” mode"
+              open={isNormalized ? undefined : false}
             >
-              <SelectValue />
-            </SelectTrigger>
+              <SelectTrigger
+                id="time-period-select"
+                className="w-full md:w-[180px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+            </SimpleTooltip>
             <SelectContent>
               {timePeriods.map((timePeriod) => (
                 <SelectItem key={timePeriod.value} value={timePeriod.value}>
@@ -267,34 +386,108 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
           </Select>
         </div>
 
-        <div className="flex items-center justify-between gap-2 sm:justify-start">
-          <label className="text-nowrap text-sm font-medium">Scale</label>
-          <ToggleGroup
-            type="single"
-            value={chartScale}
-            onValueChange={(value) => {
-              if (value) {
-                setChartScale(value as ChartScale);
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="w-full sm:w-auto"
-          >
-            {chartScales.map((scale) => (
-              <ToggleGroupItem
-                key={scale.value}
-                value={scale.value}
-                className="w-full sm:w-auto"
-              >
-                {scale.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex items-center justify-between gap-2 sm:justify-start">
+            <label className="text-nowrap text-sm font-medium">Scale</label>
+            <ToggleGroup
+              type="single"
+              value={chartScale}
+              onValueChange={(value) => {
+                if (value) {
+                  setChartScale(value as ChartScale);
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              {chartScales.map((scale) => (
+                <ToggleGroupItem
+                  key={scale.value}
+                  value={scale.value}
+                  className="w-full sm:w-auto"
+                >
+                  {scale.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 sm:justify-start">
+            <label className="text-nowrap text-sm font-medium">Timeline</label>
+            <ToggleGroup
+              type="single"
+              value={chartMode}
+              onValueChange={(value) => {
+                if (value) {
+                  handleChartModeChange(value as ChartMode);
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              {chartModes.map((mode) => (
+                <ToggleGroupItem
+                  key={mode.value}
+                  value={mode.value}
+                  className="w-full sm:w-auto"
+                >
+                  {mode.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+
+          <div className="flex items-center justify-end gap-1">
+            <SimpleTooltip content="Download as PNG">
+              <Button variant="ghost" size="sm" onClick={handleDownloadImage}>
+                <DownloadIcon className="size-4" />
+              </Button>
+            </SimpleTooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="px-2">
+                  <span className="text-sm">Share</span>
+                  <ChevronDownIcon className="ml-1 size-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handleCopyImage}
+                  className="flex items-center gap-2"
+                >
+                  <CopyIcon className="size-4" />
+                  <span>Copy image</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-2"
+                >
+                  <TableIcon className="size-4" />
+                  <span>Export CSV</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleCopyLink}
+                  className="flex items-center gap-2"
+                >
+                  <Link2Icon className="size-4" />
+                  <span>Copy link</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleShareToX}
+                  className="flex items-center gap-2"
+                >
+                  <TwitterLogoIcon className="size-4" />
+                  <span>Share to X</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
-      <div className={cn("relative mx-auto w-full h-full")}>
+      <div ref={chartRef} className={cn("relative mx-auto w-full h-full")}>
         <ChartContainer config={config} className="max-h-[450px] w-full">
           <LineChart
             accessibilityLayer
@@ -308,10 +501,12 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             <ChartLegend
               content={
                 <ChartLegendContent chartKey={chartKey}>
-                  <div className="flex items-center gap-1.5 text-xs text-foreground md:text-sm">
-                    <Dash />
-                    <span>Last release date</span>
-                  </div>
+                  {!isNormalized && (
+                    <div className="flex items-center gap-1.5 text-xs text-foreground md:text-sm">
+                      <Dash />
+                      <span>Last release date</span>
+                    </div>
+                  )}
                 </ChartLegendContent>
               }
               layout="horizontal"
@@ -320,11 +515,13 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             />
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="time"
+              dataKey={xKey}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => formatDate(value)}
+              tickFormatter={(value) =>
+                isNormalized ? `wk ${value}` : formatDate(value)
+              }
             />
             <YAxis
               tickLine={false}
@@ -338,7 +535,15 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
             <ChartTooltip
               cursor={false}
               content={
-                <ChartTooltipContent chartKey={chartKey}>
+                <ChartTooltipContent
+                  chartKey={chartKey}
+                  labelFormatter={(value, payload) => {
+                    if (!isNormalized) return value;
+                    const [first] = payload ?? [];
+                    const weekIndex = first?.payload?.weekIndex;
+                    return `wk ${weekIndex}`;
+                  }}
+                >
                   <Separator />
                   <div className="flex items-center gap-1.5 text-sm text-foreground">
                     <span>Last releases</span>
@@ -376,46 +581,40 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
                 </ChartTooltipContent>
               }
             />
-            {data &&
-              data?.length > 0 &&
-              data[0] &&
-              Object.keys(data[0])
-                .filter((key) => key !== "time")
-                .map((key) => {
-                  const normalizedKey = normalizeProjectName(key);
-                  const projectConfig = config[normalizedKey];
+            {seriesKeys.map((key) => {
+              const normalizedKey = normalizeProjectName(key);
+              const projectConfig = config[normalizedKey];
 
-                  return (
-                    <Fragment key={normalizedKey}>
-                      <Line
-                        dataKey={key}
-                        type="monotone"
-                        stroke={`var(--color-${normalizedKey})`}
-                        strokeWidth={2}
-                        dot={false}
-                        hide={isHiddenElement(normalizedKey)}
-                      />
-                      {!isHiddenElement(normalizedKey) &&
-                        projectConfig?.versions &&
-                        sortByVersion(projectConfig.versions)
-                          .slice(-1)
-                          .map((version) => {
-                            const weekStart = formatDate(
-                              startOfWeek(version.date),
-                            );
+              return (
+                <Fragment key={normalizedKey}>
+                  <Line
+                    dataKey={key}
+                    type="monotone"
+                    stroke={`var(--color-${normalizedKey})`}
+                    strokeWidth={2}
+                    dot={false}
+                    hide={isHiddenElement(normalizedKey)}
+                  />
+                  {!isNormalized &&
+                    !isHiddenElement(normalizedKey) &&
+                    projectConfig?.versions &&
+                    sortByVersion(projectConfig.versions)
+                      .slice(-1)
+                      .map((version) => {
+                        const weekStart = formatDate(startOfWeek(version.date));
 
-                            return (
-                              <ReferenceLine
-                                key={`${normalizedKey}-${version.version}`}
-                                x={weekStart}
-                                stroke={`var(--color-${normalizedKey})`}
-                                strokeDasharray="3 3"
-                              />
-                            );
-                          })}
-                    </Fragment>
-                  );
-                })}
+                        return (
+                          <ReferenceLine
+                            key={`${normalizedKey}-${version.version}`}
+                            x={weekStart}
+                            stroke={`var(--color-${normalizedKey})`}
+                            strokeDasharray="3 3"
+                          />
+                        );
+                      })}
+                </Fragment>
+              );
+            })}
           </LineChart>
         </ChartContainer>
         {isPending && (

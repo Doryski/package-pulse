@@ -5,7 +5,9 @@ import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import { memo, useMemo } from "react";
-import prepareChartData from "../utils/prepareChartData";
+import prepareChartData, {
+  prepareNormalizedChartData,
+} from "../utils/prepareChartData";
 
 type ChartSectionProps = {
   projectStats: ProjectStatsQuery[];
@@ -27,6 +29,11 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
     [projectStats],
   );
 
+  const normalizedProjectsStats = useMemo(
+    () => prepareNormalizedChartData(projectStats),
+    [projectStats],
+  );
+
   return (
     <div
       data-testid="main-chart"
@@ -38,6 +45,7 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
       <MultipleLineChart
         chartKey="main-chart"
         data={processedProjectsStats}
+        normalizedData={normalizedProjectsStats}
         config={chartConfig}
       />
     </div>
