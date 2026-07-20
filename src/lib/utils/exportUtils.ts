@@ -1,5 +1,4 @@
 import * as Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 export const downloadFile = (filename: string, blobOrUrl: Blob | string) => {
   const url =
@@ -33,22 +32,4 @@ export const exportCsv = (filename: string, data: unknown[]) => {
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   downloadFile(`${filename}.csv`, blob);
-};
-
-export const exportExcel = (filename: string, data: unknown[]) => {
-  if (!data || data.length === 0) {
-    console.warn("No data provided for Excel export");
-    return;
-  }
-
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-
-  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([excelBuffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-
-  downloadFile(`${filename}.xlsx`, blob);
 };
