@@ -43,13 +43,36 @@ const TableHeadSortable = memo(
     sortDirection,
     contentClassName,
     tooltip,
+    className,
     ...props
   }: TableHeadSortableProps) => {
+    const ariaSort = isSorted
+      ? sortDirection === "desc"
+        ? "descending"
+        : "ascending"
+      : "none";
+
+    const handleKeyDown = (
+      event: React.KeyboardEvent<HTMLTableCellElement>,
+    ) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+      handleSort(column);
+    };
+
     return (
       <TableHead
-        className={cn("cursor-pointer", props.className)}
+        className={cn(
+          "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          className,
+        )}
         data-column-name={column}
+        tabIndex={0}
+        aria-sort={ariaSort}
         onClick={() => handleSort(column)}
+        onKeyDown={handleKeyDown}
         {...props}
       >
         <div
@@ -64,7 +87,7 @@ const TableHeadSortable = memo(
               <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
             </SimpleTooltip>
           )}
-          <span className="text-[10px] md:text-xs">
+          <span className="text-[10px] md:text-xs" aria-hidden>
             {isSorted && (sortDirection === "desc" ? "▼" : "▲")}
           </span>
         </div>

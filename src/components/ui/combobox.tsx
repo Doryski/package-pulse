@@ -43,8 +43,12 @@ export function Combobox<T>({
   const [isPopoverOpen, openPopover, closePopover] = useBooleanState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const popoverContentRef = useRef<HTMLDivElement>(null);
-  const optionsElements = popoverContentRef.current?.querySelectorAll("li");
   const searchValue = form.watch("search");
+
+  const getOptionsElements = useCallback(
+    () => popoverContentRef.current?.querySelectorAll("li"),
+    [],
+  );
 
   useEffect(() => {
     if (isPopoverOpen && searchValue.includes(MULTI_SEARCH_DELIMITER)) {
@@ -54,13 +58,13 @@ export function Combobox<T>({
 
   const focusNextOption = useCallback(
     (index: number) => {
-      const nextOption = optionsElements?.[index];
+      const nextOption = getOptionsElements()?.[index];
       if (nextOption) {
         nextOption.focus();
       }
       setActiveIndex(index);
     },
-    [optionsElements, setActiveIndex],
+    [getOptionsElements, setActiveIndex],
   );
 
   const handleInputKeyDown = useCallback(
@@ -72,7 +76,7 @@ export function Combobox<T>({
       ) {
         e.preventDefault();
         const nextIndex =
-          activeIndex < (optionsElements?.length ?? 0) - 1
+          activeIndex < (getOptionsElements()?.length ?? 0) - 1
             ? activeIndex + 1
             : 0;
         focusNextOption(nextIndex);
@@ -83,7 +87,7 @@ export function Combobox<T>({
     [
       isPopoverOpen,
       activeIndex,
-      optionsElements,
+      getOptionsElements,
       focusNextOption,
       closePopover,
     ],
@@ -94,7 +98,7 @@ export function Combobox<T>({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         const nextIndex =
-          activeIndex < (optionsElements?.length ?? 0) - 1
+          activeIndex < (getOptionsElements()?.length ?? 0) - 1
             ? activeIndex + 1
             : activeIndex;
         focusNextOption(nextIndex);
@@ -115,7 +119,7 @@ export function Combobox<T>({
     },
     [
       activeIndex,
-      optionsElements,
+      getOptionsElements,
       focusNextOption,
       form,
       onSelectItem,

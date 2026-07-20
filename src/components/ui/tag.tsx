@@ -21,8 +21,15 @@ const Tag = ({ children, onRemove, tooltipContent, ...props }: TagProps) => {
     >
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="link" size="icon" onClick={onRemove}>
-            <Cross1Icon />
+          <Button
+            variant="link"
+            size="icon"
+            onClick={onRemove}
+            aria-label={
+              typeof tooltipContent === "string" ? tooltipContent : "Remove"
+            }
+          >
+            <Cross1Icon aria-hidden />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{tooltipContent ?? "Remove"}</TooltipContent>

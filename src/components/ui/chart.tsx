@@ -108,7 +108,7 @@ const ChartTooltipContent = React.forwardRef<
     },
     ref,
   ) => {
-    const { config, isHiddenElement, toggleElement } = useLineChart(chartKey)();
+    const { config, isHiddenElement } = useLineChart(chartKey)();
 
     const tooltipLabel = React.useMemo(() => {
       if (hideLabel || !payload?.length) {
@@ -172,11 +172,10 @@ const ChartTooltipContent = React.forwardRef<
               <div
                 key={item.dataKey}
                 className={cn(
-                  "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
+                  "flex w-full flex-wrap items-stretch gap-2 text-left [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground rounded",
                   indicator === "dot" && "items-center",
                   isHidden && "opacity-50",
                 )}
-                onClick={() => toggleElement(normalizeProjectName(key))}
               >
                 {formatter && item?.value !== undefined && item.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
@@ -268,12 +267,18 @@ const ChartLegendContent = React.forwardRef<
           const key = `${nameKey || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
           const isHidden = isHiddenElement(normalizeProjectName(key));
+          const label = itemConfig?.label || item.value;
+          const ariaLabel =
+            typeof label === "string" ? `Toggle ${label} series` : undefined;
 
           return (
-            <div
+            <button
               key={item.value}
+              type="button"
+              aria-pressed={!isHidden}
+              aria-label={ariaLabel}
               className={cn(
-                "flex cursor-pointer items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
+                "flex cursor-pointer items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded",
                 isHidden && "opacity-50",
               )}
               onClick={() => toggleElement(normalizeProjectName(key))}
@@ -281,8 +286,8 @@ const ChartLegendContent = React.forwardRef<
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
               ) : (
-                <div
-                  className="size-2 shrink-0 rounded-full md:size-3"
+                <span
+                  className="inline-block size-2 shrink-0 rounded-full md:size-3"
                   style={{
                     backgroundColor: item.color,
                   }}
@@ -296,7 +301,7 @@ const ChartLegendContent = React.forwardRef<
               >
                 {itemConfig?.label || item.value}
               </span>
-            </div>
+            </button>
           );
         })}
         {children}
