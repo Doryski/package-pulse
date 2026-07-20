@@ -1,6 +1,11 @@
 "use client";
 import searchNPMRegistry from "@/api/searchNpmRegistry";
+import { Button } from "@/components/ui/button";
+import ClientOnly from "@/components/ui/client-only";
+import useFavorites from "@/lib/hooks/useFavorites";
 import { CreateGlobalComparisonRequest } from "@/lib/types/global-comparison";
+import { cn } from "@/lib/utils/cn";
+import { Star } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { toast } from "sonner";
@@ -10,6 +15,7 @@ import ComboboxForm from "../combobox-form";
 import LatestComparisons from "../latest-comparisons";
 import PopularComparisons from "../popular-comparisons";
 import QuickComparisons from "../quick-comparisons";
+import SavedComparisons from "../saved-comparisons";
 import SimilarProjects from "../similar-projects";
 import StatsSection from "../stats-section";
 import { ProjectsSearchFormValues } from "./schema";
@@ -68,6 +74,8 @@ const ProjectsForm = () => {
   const projectsSearchForm = useFormContext<ProjectsSearchFormValues>();
   const selectedProjects = projectsSearchForm.watch("projects");
   const previousProjectsRef = useRef<string[]>([]);
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const isSaved = isFavorite(selectedProjects);
 
   useUpdateSearchParamsProjects(selectedProjects, PROJECTS_URL_DELIMITER);
 
@@ -191,6 +199,25 @@ const ProjectsForm = () => {
   return (
     <div className="flex h-full flex-col justify-center py-4">
       <ComboboxForm form={projectsSearchForm} onFormSubmit={handleSearch} />
+      {selectedProjects.length > 0 && (
+        <ClientOnly>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={isSaved}
+              onClick={() => toggleFavorite(selectedProjects)}
+            >
+              <Star className={cn("mr-2 size-4", isSaved && "fill-current")} />
+              {isSaved ? "Saved" : "Save comparison"}
+            </Button>
+          </div>
+        </ClientOnly>
+      )}
+      <SavedComparisons
+        selectedProjects={selectedProjects}
+        onAddMultipleProjects={handleAddMultipleProjects}
+      />
       <QuickComparisons
         selectedProjects={selectedProjects}
         onAddMultipleProjects={handleAddMultipleProjects}
