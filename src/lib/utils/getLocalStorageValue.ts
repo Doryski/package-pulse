@@ -8,6 +8,12 @@ export default function getLocalStorageValue<T>(
     return schema.safeParse(null).data;
   }
   const value = localStorage.getItem(key);
-  const jsonParsed = value ? JSON.parse(value) : null;
-  return schema.safeParse(jsonParsed).data;
+  if (!value) {
+    return schema.safeParse(null).data;
+  }
+  try {
+    return schema.safeParse(JSON.parse(value)).data;
+  } catch {
+    return schema.safeParse(null).data;
+  }
 }

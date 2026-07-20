@@ -48,6 +48,21 @@ describe("getLocalStorageValue", () => {
     expect(mockLocalStorage.getItem).toHaveBeenCalledWith("testKey");
   });
 
+  it("should return undefined when localStorage value is not valid JSON", () => {
+    const schema = z.string();
+    mockLocalStorage.getItem.mockReturnValue("{not valid json");
+    const result = getLocalStorageValue("testKey", schema);
+    expect(result).toBeUndefined();
+    expect(mockLocalStorage.getItem).toHaveBeenCalledWith("testKey");
+  });
+
+  it("should fall back to the schema default when stored JSON is corrupted", () => {
+    const schema = z.string().catch("fallback");
+    mockLocalStorage.getItem.mockReturnValue("<<corrupted>>");
+    const result = getLocalStorageValue("testKey", schema);
+    expect(result).toBe("fallback");
+  });
+
   it("should handle complex object schemas", () => {
     const schema = z.object({
       name: z.string(),

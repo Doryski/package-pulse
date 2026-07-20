@@ -4,7 +4,7 @@ import { githubApiQueue, npmApiQueue } from "@/lib/utils/requestQueue";
 import safeParse from "@/lib/utils/safeParse";
 import { z } from "zod";
 
-const AnyObjectSchema = z.record(z.string(), z.any());
+const AnyObjectSchema = z.record(z.string(), z.unknown());
 const AnyArraySchema = z.array(AnyObjectSchema);
 
 export const fetchGithubRepoInfo = async (repoName: string) => {
