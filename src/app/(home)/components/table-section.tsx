@@ -7,17 +7,20 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
+import useBundleSize from "@/lib/queries/useBundleSize";
+import useDepsDev from "@/lib/queries/useDepsDev";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import {
   ProjectStatsQuery,
   sortStatsMatrix,
 } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
-import { exportCsv } from "@/lib/utils/exportUtils";
+import { exportCsv, exportJson } from "@/lib/utils/exportUtils";
 import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import {
   BarChartIcon,
   DownloadIcon,
+  FileTextIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
 import { memo, useMemo } from "react";
@@ -52,6 +55,15 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
     [sortColumn, sortDirection, statsMatrix],
   );
   const projectsInfo = usePackagesInfo(selectedProjects);
+  const bundleSizes = useBundleSize(selectedProjects);
+  const depsDev = useDepsDev(selectedProjects);
+
+  const bundleSizeByName = new Map(
+    selectedProjects.map((name, index) => [name, bundleSizes[index]?.data]),
+  );
+  const depsDevByName = new Map(
+    selectedProjects.map((name, index) => [name, depsDev[index]?.data]),
+  );
 
   type StatsRow = {
     projectName: string;
@@ -80,6 +92,13 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
     repositoryUrl: string | null;
     description: string | null;
     createdAt: string | null;
+    bundleSizeMin: number | null;
+    bundleSizeGzip: number | null;
+    treeShakeable: boolean | null;
+    dependencyCount: number | null;
+    vulnerabilityCount: number | null;
+    healthScore: number | null;
+    depsDevLicenses: string | null;
   };
   const buildExportData = (): StatsRow[] =>
     sortedStatsMatrix.map((project) => {
@@ -89,6 +108,9 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
       const projectInfo = foundProjectInfo?.isSuccess
         ? foundProjectInfo.data
         : null;
+
+      const bundleSize = bundleSizeByName.get(project.projectName) ?? null;
+      const depsDevInfo = depsDevByName.get(project.projectName) ?? null;
 
       return {
         projectName: project.projectName,
@@ -122,21 +144,37 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
         repositoryUrl: projectInfo?.repositoryUrl ?? null,
         description: projectInfo?.description ?? null,
         createdAt: projectInfo?.createdAt ?? null,
+        bundleSizeMin: bundleSize?.size ?? null,
+        bundleSizeGzip: bundleSize?.gzip ?? null,
+        treeShakeable: bundleSize?.treeShakeable ?? null,
+        dependencyCount: bundleSize?.dependencyCount ?? null,
+        vulnerabilityCount: depsDevInfo?.vulnerabilityCount ?? null,
+        healthScore: depsDevInfo?.healthScore ?? null,
+        depsDevLicenses: Array.isArray(depsDevInfo?.licenses)
+          ? depsDevInfo.licenses.join(", ")
+          : null,
       };
     });
 
-  const exportToFile = () => {
+  const exportToCsv = () => {
     const timestamp = new Date().getTime();
     const filename = `package-pulse-${timestamp}`;
 
     return exportCsv(filename, buildExportData());
   };
 
-  return exportToFile;
+  const exportToJson = () => {
+    const timestamp = new Date().getTime();
+    const filename = `package-pulse-${timestamp}`;
+
+    return exportJson(filename, buildExportData());
+  };
+
+  return { exportToCsv, exportToJson };
 }
 
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
-  const exportToFile = useExportData(projectsStats);
+  const { exportToCsv, exportToJson } = useExportData(projectsStats);
   const isLoading = projectsStats.some((project) => project.isLoading);
   const [isInfoTableVisible, showInfoTable, hideInfoTable] =
     useBooleanState(false);
@@ -168,10 +206,18 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
           <Button
             variant="outline"
             className="flex items-center gap-2"
-            onClick={exportToFile}
+            onClick={exportToCsv}
           >
             CSV
             <DownloadIcon className="size-4" />
+          </Button>
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={exportToJson}
+          >
+            JSON
+            <FileTextIcon className="size-4" />
           </Button>
           <ToggleGroup
             type="single"
