@@ -27,7 +27,7 @@ import {
   Fragment,
   memo,
   useCallback,
-  useEffect,
+  useMemo,
   useState,
   useTransition,
 } from "react";
@@ -136,43 +136,41 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialTimePeriod);
   const [chartScale, setChartScale] = useState<ChartScale>(initialChartScale);
-  const [chartData, setChartData] = useState<ChartData[]>(data);
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
 
   useUpdateSearchParamsChart(timePeriod, chartScale);
 
-  const handleTimePeriodChange = useCallback(
-    (value: TimePeriod) => {
+  const handleTimePeriodChange = useCallback((value: TimePeriod) => {
+    startTransition(() => {
       setTimePeriod(value);
-      startTransition(() => {
-        const newData = data.filter((item) => {
-          const date = new Date(item.time);
-          const today = new Date();
-          switch (value) {
-            case "months-1":
-              return isAfter(date, subMonths(today, 1));
-            case "months-3":
-              return isAfter(date, subMonths(today, 3));
-            case "months-6":
-              return isAfter(date, subMonths(today, 6));
-            case "years-1":
-              return isAfter(date, subYears(today, 1));
-            case "years-2":
-              return isAfter(date, subYears(today, 2));
-            case "years-5":
-              return isAfter(date, subYears(today, 5));
-            case "all-time":
-              return true;
-            default:
-              assertUnreachable(value, "Invalid time period");
-          }
-        });
-        setChartData(newData);
-      });
-    },
-    [data],
-  );
+    });
+  }, []);
+
+  const chartData = useMemo(() => {
+    const today = new Date();
+    return data.filter((item) => {
+      const date = new Date(item.time);
+      switch (timePeriod) {
+        case "months-1":
+          return isAfter(date, subMonths(today, 1));
+        case "months-3":
+          return isAfter(date, subMonths(today, 3));
+        case "months-6":
+          return isAfter(date, subMonths(today, 6));
+        case "years-1":
+          return isAfter(date, subYears(today, 1));
+        case "years-2":
+          return isAfter(date, subYears(today, 2));
+        case "years-5":
+          return isAfter(date, subYears(today, 5));
+        case "all-time":
+          return true;
+        default:
+          return assertUnreachable(timePeriod, "Invalid time period");
+      }
+    });
+  }, [data, timePeriod]);
 
   const formatYAxisTick = useCallback(
     (value: number) => {
@@ -184,7 +182,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
     [chartScale],
   );
 
-  const getYAxisDomain = useCallback(() => {
+  const yAxisDomain = useMemo(() => {
     if (chartScale === "logarithmic") {
       const allValues = chartData.flatMap((item) =>
         Object.keys(item)
@@ -202,20 +200,18 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
       const minValue = Math.min(...allValues);
       const maxValue = Math.max(...allValues);
 
-      const domain = [
+      return [
         Math.max(1, Math.floor(minValue * 0.9)),
         Math.ceil(maxValue * 1.1),
       ];
-
-      return domain;
     }
 
     return ["auto", "auto"];
   }, [chartData, chartScale]);
 
-  const getTransformedData = useCallback(() => {
+  const transformedData = useMemo(() => {
     if (chartScale === "logarithmic") {
-      const transformedData = chartData.map((item) => {
+      return chartData.map((item) => {
         const newItem = { ...item } as ChartData;
         Object.keys(newItem).forEach((key) => {
           if (key !== "time" && newItem[key] === 0) {
@@ -224,8 +220,6 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
         });
         return newItem;
       });
-
-      return transformedData;
     }
 
     return chartData;
@@ -234,13 +228,7 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
   useLocalStorage(LocalStorageKey.TIME_PERIOD, timePeriod);
   useLocalStorage(LocalStorageKey.CHART_SCALE, chartScale);
 
-  useEffect(() => {
-    handleTimePeriodChange(timePeriod);
-  }, [handleTimePeriodChange, timePeriod]);
-
   const yAxisScale = chartScale === "logarithmic" ? "log" : "linear";
-  const yAxisDomain = getYAxisDomain();
-  const transformedData = getTransformedData();
 
   return (
     <div
@@ -259,7 +247,9 @@ function MultipleLineChart({ data, config, chartKey }: MultipleLineChartProps) {
           </label>
           <Select
             value={timePeriod}
-            onValueChange={(value) => setTimePeriod(value as TimePeriod)}
+            onValueChange={(value) =>
+              handleTimePeriodChange(value as TimePeriod)
+            }
           >
             <SelectTrigger
               id="time-period-select"

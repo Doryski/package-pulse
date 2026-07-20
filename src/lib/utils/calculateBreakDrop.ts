@@ -92,20 +92,22 @@ export function calculateBreakDrop(
     last365DaysDataExcludingChristmas,
   );
 
+  const isChristmasInsufficient = isNaN(last5YearsAverageChristmasDrop);
+
   const data: { value: number; wage: number }[] = [
     { value: last5YearsAverageChristmasDrop, wage: 1 },
     { value: weekendDropPercentage, wage: 1.5 },
   ];
 
-  const corporateUsageScore = isNaN(last5YearsAverageChristmasDrop)
-    ? null
+  const corporateUsageScore = isChristmasInsufficient
+    ? weekendDropPercentage
     : sum(data, (item) => item.value * item.wage) /
       sum(data, (item) => item.wage);
 
   const corporateUsageLevel = determineCorporateUsageLevel(corporateUsageScore);
 
   return {
-    christmasDropPercentage: isNaN(last5YearsAverageChristmasDrop)
+    christmasDropPercentage: isChristmasInsufficient
       ? null
       : last5YearsAverageChristmasDrop,
     weekendDropPercentage,
@@ -123,7 +125,8 @@ function calculateChristmasDropForYear(
   const christmasStart = new Date(year, 11, 21);
   const christmasEnd = new Date(year, 11, 29);
 
-  // Baseline period: 30 days before Christmas - 30 days after Christmas
+  const baselineBeforeChristmasEnd = new Date(year, 11, 20);
+  const baselineAfterChristmasStart = new Date(year, 11, 30);
   const baselineBeforeChristmasStart = subBusinessDays(christmasStart, 30);
   const baselineAfterChristmasEnd = addBusinessDays(christmasEnd, 30);
 
@@ -143,10 +146,10 @@ function calculateChristmasDropForYear(
     const date = parseISO(item.date);
     const isInBaselineBeforeChristmas = isWithinInterval(date, {
       start: baselineBeforeChristmasStart,
-      end: christmasStart,
+      end: baselineBeforeChristmasEnd,
     });
     const isInBaselineAfterChristmas = isWithinInterval(date, {
-      start: christmasEnd,
+      start: baselineAfterChristmasStart,
       end: baselineAfterChristmasEnd,
     });
     // Exclude weekends from baseline (Saturday = 6, Sunday = 0)

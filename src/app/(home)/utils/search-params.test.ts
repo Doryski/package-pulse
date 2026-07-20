@@ -5,6 +5,7 @@ import {
   constructNewUrl,
   decodeProjectName,
   encodeProjectName,
+  getCurrentProjects,
   getInitialChartScale,
   getInitialProjects,
   getInitialTimePeriod,
@@ -215,6 +216,44 @@ describe("getProjectsQueryString", () => {
     const delimiter = ",";
     const result = getProjectsQueryString(projects, delimiter);
     expect(result).toBe("projects=@angular/core,@dnd/core");
+  });
+});
+
+describe("getCurrentProjects", () => {
+  const delimiter = ",";
+
+  it("should return an empty array when the projects param is absent", () => {
+    const searchParams = new URLSearchParams();
+    expect(getCurrentProjects(searchParams, delimiter)).toEqual([]);
+  });
+
+  it("should return an empty array when the projects param is empty", () => {
+    const searchParams = new URLSearchParams({ projects: "" });
+    expect(getCurrentProjects(searchParams, delimiter)).toEqual([]);
+  });
+
+  it("should decode multiple projects split by the delimiter", () => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("projects", "react,vue");
+    expect(getCurrentProjects(searchParams, delimiter)).toEqual([
+      "react",
+      "vue",
+    ]);
+  });
+
+  it("should round-trip scoped and multi-project selections through the encoding path", () => {
+    const projects = ["@angular/core", "@dnd/core"];
+    const searchParams = new URLSearchParams();
+    searchParams.set(
+      "projects",
+      projects.map(encodeProjectName).join(delimiter),
+    );
+
+    const currentProjects = getCurrentProjects(searchParams, delimiter);
+    expect(currentProjects).toEqual(projects);
+    expect(getProjectsQueryString(currentProjects, delimiter)).toBe(
+      getProjectsQueryString(projects, delimiter),
+    );
   });
 });
 

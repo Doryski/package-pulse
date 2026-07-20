@@ -51,6 +51,12 @@ async function trackComparison(projects: string[]) {
   }
 }
 
+const haveProjectsChanged = (current: string[], previous: string[]) => {
+  if (current.length !== previous.length) return true;
+  const previousSet = new Set(previous);
+  return current.some((project) => !previousSet.has(project));
+};
+
 function parseSearchValue(searchValue: string): string[] {
   return searchValue
     .split(",")
@@ -70,8 +76,7 @@ const ProjectsForm = () => {
 
     if (
       selectedProjects.length > 0 &&
-      JSON.stringify(selectedProjects.sort()) !==
-        JSON.stringify(previousProjects.sort())
+      haveProjectsChanged(selectedProjects, previousProjects)
     ) {
       trackComparison(selectedProjects);
     }
@@ -89,9 +94,9 @@ const ProjectsForm = () => {
   };
 
   const handleAddMultipleProjects = (projectNames: string[]) => {
-    const newProjects = projectNames.filter(
-      (project) => !selectedProjects.includes(project),
-    );
+    const newProjects = projectNames
+      .filter((project, index, all) => all.indexOf(project) === index)
+      .filter((project) => !selectedProjects.includes(project));
 
     if (newProjects.length > 0) {
       const updatedProjects = [...selectedProjects, ...newProjects];

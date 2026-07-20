@@ -14,13 +14,45 @@ import {
   PeriodStat,
 } from "../../../lib/utils/groupByPeriod";
 
+const GROUP_STATS_CACHE_MAX = 50 as const;
+const STATS_CACHE_MAX = 100 as const;
+
 const statsCache = new Map<string, StatsRow>();
 const groupStatsCache = new Map<string, ReturnType<typeof groupStats>>();
+
+function setWithLimit<K, V>(map: Map<K, V>, key: K, value: V, max: number) {
+  map.set(key, value);
+  if (map.size <= max) {
+    return;
+  }
+  const firstKey = map.keys().next().value;
+  if (firstKey !== undefined) {
+    map.delete(firstKey);
+  }
+}
+
+function fingerprintData(rawData: DownloadStat[]) {
+  const sum = rawData.reduce((total, { count }) => total + count, 0);
+  return `${rawData[rawData.length - 1]?.count ?? ""}-${sum}`;
+}
 
 export type StatChange = {
   nominal: number;
   percentage: number;
 };
+
+function computeChange(
+  recent?: { count: number },
+  previous?: { count: number },
+): StatChange | null {
+  if (!recent || !previous) {
+    return null;
+  }
+  return {
+    nominal: recent.count - previous.count,
+    percentage: getPercentChange(recent.count, previous.count),
+  };
+}
 export type StatsRow = {
   projectName: string;
   color: string | undefined;
@@ -34,21 +66,14 @@ export type StatsRow = {
 };
 
 function getCachedGroupStats(projectName: string, rawData: DownloadStat[]) {
-  const cacheKey = `${projectName}-${rawData.length}-${rawData[0]?.date || ""}-${rawData[rawData.length - 1]?.date || ""}`;
+  const cacheKey = `${projectName}-${rawData.length}-${rawData[0]?.date || ""}-${rawData[rawData.length - 1]?.date || ""}-${fingerprintData(rawData)}`;
 
   if (groupStatsCache.has(cacheKey)) {
     return groupStatsCache.get(cacheKey)!;
   }
 
   const result = groupStats(rawData);
-  groupStatsCache.set(cacheKey, result);
-
-  if (groupStatsCache.size > 50) {
-    const firstKey = groupStatsCache.keys().next().value;
-    if (firstKey) {
-      groupStatsCache.delete(firstKey);
-    }
-  }
+  setWithLimit(groupStatsCache, cacheKey, result, GROUP_STATS_CACHE_MAX);
 
   return result;
 }
@@ -90,7 +115,7 @@ export default function getStatsMatrix(
       return acc;
     }
 
-    const dataSignature = `${projectName}-${query.data.rawSortedData.length}-${theme}-${index}`;
+    const dataSignature = `${projectName}-${query.data.rawSortedData.length}-${theme}-${index}-${fingerprintData(query.data.rawSortedData)}`;
 
     const color = getChartColor(theme, index);
     const groupedStats = getCachedGroupStats(
@@ -168,72 +193,21 @@ export default function getStatsMatrix(
       return acc;
     }
 
-    const weeklyChange =
-      recentFullWeek && previousFullWeek
-        ? {
-            nominal: recentFullWeek.count - previousFullWeek.count,
-            percentage: getPercentChange(
-              recentFullWeek.count,
-              previousFullWeek.count,
-            ),
-          }
-        : null;
-
-    const monthlyChange =
-      recentFullMonth && previousFullMonth
-        ? {
-            nominal: recentFullMonth.count - previousFullMonth.count,
-            percentage: getPercentChange(
-              recentFullMonth.count,
-              previousFullMonth.count,
-            ),
-          }
-        : null;
-
-    const yearlyChange =
-      recentFullYear && previousFullYear
-        ? {
-            nominal: recentFullYear.count - previousFullYear.count,
-            percentage: getPercentChange(
-              recentFullYear.count,
-              previousFullYear.count,
-            ),
-          }
-        : null;
-
-    const yoyWeekChange =
-      lastYearsReferenceWeekStats && recentFullWeek
-        ? {
-            nominal: recentFullWeek.count - lastYearsReferenceWeekStats.count,
-            percentage: getPercentChange(
-              recentFullWeek.count,
-              lastYearsReferenceWeekStats.count,
-            ),
-          }
-        : null;
-
-    const yoyMonthChange =
-      lastYearsReferenceMonthStats && recentFullMonth
-        ? {
-            nominal: recentFullMonth.count - lastYearsReferenceMonthStats.count,
-            percentage: getPercentChange(
-              recentFullMonth.count,
-              lastYearsReferenceMonthStats.count,
-            ),
-          }
-        : null;
-
-    const vibeCodingEraChange =
-      vibeCodingEraReferenceWeekStats && recentFullWeek
-        ? {
-            nominal:
-              recentFullWeek.count - vibeCodingEraReferenceWeekStats.count,
-            percentage: getPercentChange(
-              recentFullWeek.count,
-              vibeCodingEraReferenceWeekStats.count,
-            ),
-          }
-        : null;
+    const weeklyChange = computeChange(recentFullWeek, previousFullWeek);
+    const monthlyChange = computeChange(recentFullMonth, previousFullMonth);
+    const yearlyChange = computeChange(recentFullYear, previousFullYear);
+    const yoyWeekChange = computeChange(
+      recentFullWeek,
+      lastYearsReferenceWeekStats,
+    );
+    const yoyMonthChange = computeChange(
+      recentFullMonth,
+      lastYearsReferenceMonthStats,
+    );
+    const vibeCodingEraChange = computeChange(
+      recentFullWeek,
+      vibeCodingEraReferenceWeekStats,
+    );
 
     const breakDropIndicator = calculateBreakDrop(query.data.rawSortedData);
 
@@ -249,14 +223,7 @@ export default function getStatsMatrix(
       color,
     };
 
-    statsCache.set(dataSignature, result);
-
-    if (statsCache.size > 100) {
-      const firstKey = statsCache.keys().next().value;
-      if (firstKey) {
-        statsCache.delete(firstKey);
-      }
-    }
+    setWithLimit(statsCache, dataSignature, result, STATS_CACHE_MAX);
 
     acc.push(result);
     return acc;

@@ -2,7 +2,7 @@
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { formatInteger, formatPercentage } from "@/lib/utils/formatters";
-import { memo } from "react";
+import { memo, useId, useMemo } from "react";
 import {
   Cell,
   Legend,
@@ -18,24 +18,42 @@ type PieChartWidgetProps = {
 };
 
 const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
-  const data = projectsStats
-    .filter((project) => project.data)
-    .map((project, index) => {
-      const projectData = project.data!;
-      const latestDownloads =
-        projectData.rawSortedData.slice(-2)[0]?.count || 0;
+  const uniqueId = useId();
+  const chartId = `pie-chart-${uniqueId.replace(/:/g, "")}`;
 
-      const normalizedName = normalizeProjectName(projectData.projectName);
+  const data = useMemo(
+    () =>
+      projectsStats
+        .filter((project) => project.data)
+        .map((project, index) => {
+          const projectData = project.data!;
+          const latestDownloads =
+            projectData.rawSortedData.slice(-2)[0]?.count || 0;
 
-      return {
-        name: projectData.projectName,
-        normalizedName: normalizedName,
-        value: latestDownloads,
-        fill: `var(--color-${normalizedName})`,
-        index: index,
-      };
-    })
-    .sort((a, b) => b.value - a.value);
+          const normalizedName = normalizeProjectName(projectData.projectName);
+
+          return {
+            name: projectData.projectName,
+            normalizedName: normalizedName,
+            value: latestDownloads,
+            fill: `var(--color-${normalizedName})`,
+            index: index,
+          };
+        })
+        .sort((a, b) => b.value - a.value),
+    [projectsStats],
+  );
+
+  const styleContent = useMemo(
+    () =>
+      data
+        .map(
+          (item) =>
+            `[data-chart="${chartId}"] { --color-${item.normalizedName}: hsl(var(--chart-${(item.index % 10) + 1})); }`,
+        )
+        .join("\n"),
+    [data, chartId],
+  );
 
   if (data.length === 0) {
     return (
@@ -95,18 +113,8 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
 
   return (
     <div className="w-full">
-      <style>
-        {enhancedData
-          .map(
-            (item) => `
-          [data-chart] {
-            --color-${item.normalizedName}: hsl(var(--chart-${(item.index % 10) + 1}));
-          }
-        `,
-          )
-          .join("")}
-      </style>
-      <div className="h-[400px]" data-chart>
+      <style dangerouslySetInnerHTML={{ __html: styleContent }} />
+      <div className="h-[400px]" data-chart={chartId}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart margin={{ top: 20, right: 20, bottom: 25, left: 20 }}>
             <defs>

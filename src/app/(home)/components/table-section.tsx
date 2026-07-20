@@ -81,68 +81,55 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
     description: string | null;
     createdAt: string | null;
   };
-  const data = sortedStatsMatrix.reduce<StatsRow[]>((acc, project) => {
-    let itemData: StatsRow = {
-      projectName: project.projectName,
-      weeklyChange_nominal: project.weeklyChange?.nominal ?? null,
-      weeklyChange_percentage: project.weeklyChange?.percentage ?? null,
-      monthlyChange_nominal: project.monthlyChange?.nominal ?? null,
-      monthlyChange_percentage: project.monthlyChange?.percentage ?? null,
-      yearlyChange_nominal: project.yearlyChange?.nominal ?? null,
-      yearlyChange_percentage: project.yearlyChange?.percentage ?? null,
-      yoyWeekChange_nominal: project.yoyWeekChange?.nominal ?? null,
-      yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
-      yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
-      yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
-      breakDropPercentage:
-        project.breakDropIndicator.christmasDropPercentage ?? null,
-      weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
-      corporateUsageScore:
-        project.breakDropIndicator.corporateUsageScore ?? null,
-      corporateUsageLevel:
-        project.breakDropIndicator.corporateUsageLevel ?? null,
-      repoName: null,
-      latestVersion: null,
-      lastReleaseDate: null,
-      contributorsCount: null,
-      dependenciesCount: null,
-      devDependenciesCount: null,
-      homepage: null,
-      license: null,
-      repositoryUrl: null,
-      description: null,
-      createdAt: null,
-    };
-    const foundProjectInfo = projectsInfo.find(
-      (p) => p.data?.projectName === project.projectName,
-    );
-    if (foundProjectInfo?.isSuccess) {
-      const projectInfo = foundProjectInfo.data;
-      itemData = {
-        ...itemData,
-        repoName: projectInfo.repoName,
-        latestVersion: projectInfo.latestVersion?.version ?? null,
-        lastReleaseDate: projectInfo.lastReleaseDate ?? null,
-        contributorsCount: projectInfo.contributorsCount ?? null,
-        dependenciesCount: projectInfo.dependenciesCount ?? null,
-        devDependenciesCount: projectInfo.devDependenciesCount ?? null,
-        homepage: projectInfo.homepage ?? null,
-        license: Array.isArray(projectInfo.license)
+  const buildExportData = (): StatsRow[] =>
+    sortedStatsMatrix.map((project) => {
+      const foundProjectInfo = projectsInfo.find(
+        (p) => p.data?.projectName === project.projectName,
+      );
+      const projectInfo = foundProjectInfo?.isSuccess
+        ? foundProjectInfo.data
+        : null;
+
+      return {
+        projectName: project.projectName,
+        weeklyChange_nominal: project.weeklyChange?.nominal ?? null,
+        weeklyChange_percentage: project.weeklyChange?.percentage ?? null,
+        monthlyChange_nominal: project.monthlyChange?.nominal ?? null,
+        monthlyChange_percentage: project.monthlyChange?.percentage ?? null,
+        yearlyChange_nominal: project.yearlyChange?.nominal ?? null,
+        yearlyChange_percentage: project.yearlyChange?.percentage ?? null,
+        yoyWeekChange_nominal: project.yoyWeekChange?.nominal ?? null,
+        yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
+        yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
+        yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
+        breakDropPercentage:
+          project.breakDropIndicator.christmasDropPercentage ?? null,
+        weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
+        corporateUsageScore:
+          project.breakDropIndicator.corporateUsageScore ?? null,
+        corporateUsageLevel:
+          project.breakDropIndicator.corporateUsageLevel ?? null,
+        repoName: projectInfo?.repoName ?? null,
+        latestVersion: projectInfo?.latestVersion?.version ?? null,
+        lastReleaseDate: projectInfo?.lastReleaseDate ?? null,
+        contributorsCount: projectInfo?.contributorsCount ?? null,
+        dependenciesCount: projectInfo?.dependenciesCount ?? null,
+        devDependenciesCount: projectInfo?.devDependenciesCount ?? null,
+        homepage: projectInfo?.homepage ?? null,
+        license: Array.isArray(projectInfo?.license)
           ? projectInfo.license.join(", ")
-          : (projectInfo.license ?? null),
-        repositoryUrl: projectInfo.repositoryUrl ?? null,
-        description: projectInfo.description ?? null,
-        createdAt: projectInfo.createdAt ?? null,
+          : (projectInfo?.license ?? null),
+        repositoryUrl: projectInfo?.repositoryUrl ?? null,
+        description: projectInfo?.description ?? null,
+        createdAt: projectInfo?.createdAt ?? null,
       };
-    }
-    return [...acc, itemData];
-  }, []);
+    });
 
   const exportToFile = () => {
     const timestamp = new Date().getTime();
     const filename = `package-pulse-${timestamp}`;
 
-    return exportCsv(filename, data);
+    return exportCsv(filename, buildExportData());
   };
 
   return exportToFile;

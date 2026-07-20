@@ -1,4 +1,7 @@
-import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
+import {
+  MULTI_SEARCH_DELIMITER,
+  SELECTED_PROJECTS_LIMIT,
+} from "@/lib/config/constants";
 import { ChartScale } from "@/lib/enums/ChartScale";
 import { TimePeriod } from "@/lib/enums/TimePeriod";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -141,6 +144,35 @@ export function constructNewUrl(
     : pathname;
 }
 
+export function getCurrentProjects(
+  searchParams: URLSearchParams,
+  delimiter: string,
+): string[] {
+  const projectsParam = searchParams.get("projects");
+  if (!projectsParam) return [];
+  return projectsParam.split(delimiter).map(decodeProjectName);
+}
+
+function getComparableCurrentUrl(
+  pathname: string,
+  searchParams: URLSearchParams,
+  delimiter: string,
+): string {
+  const otherParams = getOtherParamsString(searchParams, [
+    "projects",
+    "period",
+    "scale",
+  ]);
+  return constructNewUrl(
+    pathname,
+    getCurrentProjects(searchParams, delimiter),
+    getInitialTimePeriod(searchParams.get("period")),
+    getInitialChartScale(searchParams.get("scale")),
+    otherParams,
+    delimiter,
+  );
+}
+
 export function useUpdateSearchParamsProjects(
   selectedProjects: string[],
   delimiter: string,
@@ -166,7 +198,10 @@ export function useUpdateSearchParamsProjects(
       otherParams,
       delimiter,
     );
-    router.replace(newUrl, { scroll: false });
+
+    if (getComparableCurrentUrl(pathname, searchParams, delimiter) !== newUrl) {
+      router.replace(newUrl, { scroll: false });
+    }
   }, [selectedProjects, router, searchParams, delimiter, pathname]);
 }
 
@@ -215,34 +250,27 @@ export function useUpdateSearchParamsChart(
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const otherParams = getOtherParamsString(searchParams, ["period", "scale"]);
-    const queryParts: string[] = [];
+    const otherParams = getOtherParamsString(searchParams, [
+      "projects",
+      "period",
+      "scale",
+    ]);
+    const newUrl = constructNewUrl(
+      pathname,
+      getCurrentProjects(searchParams, MULTI_SEARCH_DELIMITER),
+      timePeriod,
+      chartScale,
+      otherParams,
+      MULTI_SEARCH_DELIMITER,
+    );
 
-    // Keep existing projects parameter as-is
-    const projectsParam = searchParams.get("projects");
-    if (projectsParam) {
-      queryParts.push(`projects=${projectsParam}`);
-    }
-
-    // Add period if not default
-    if (timePeriod !== "all-time") {
-      queryParts.push(`period=${timePeriod}`);
-    }
-
-    // Add scale if not default
-    if (chartScale !== "linear") {
-      queryParts.push(`scale=${chartScale}`);
-    }
-
-    // Add any other parameters
-    if (otherParams) {
-      queryParts.push(otherParams);
-    }
-
-    const newUrl =
-      queryParts.length > 0 ? `${pathname}?${queryParts.join("&")}` : pathname;
-
-    if (`${pathname}?${searchParams.toString()}` !== newUrl) {
+    if (
+      getComparableCurrentUrl(
+        pathname,
+        searchParams,
+        MULTI_SEARCH_DELIMITER,
+      ) !== newUrl
+    ) {
       router.replace(newUrl, { scroll: false });
     }
   }, [timePeriod, chartScale, router, searchParams, pathname]);
