@@ -1,38 +1,42 @@
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
-export default function safeParse<Output, Input = Output>(
+function reportValidationError(
+  error: z.ZodError,
   data: unknown,
-  schema: z.ZodType<Output, z.ZodTypeDef, Input>,
-): Output {
-  // Validate asynchronously so the caller isn't blocked by zod work on the
-  // hot path. We only use the schema to surface bad payloads to logs and
-  // Sentry — the data itself is returned as-is.
+  schema: z.ZodTypeAny,
+): void {
+  // Reporting is the only part worth deferring off the hot path — the parse
+  // result itself is needed synchronously (see below), so only the Sentry/
+  // console I/O is fire-and-forget.
   setTimeout(() => {
-    const parsed = schema.safeParse(data);
-    if (!parsed.success) {
-      const schemaName = schema.description || "Unknown schema";
-      const errorPath = parsed.error.errors.map((err) => ({
-        path: err.path.join("."),
-        message: err.message,
-        code: err.code,
-      }));
-
-      console.error(parsed.error);
-      Sentry.captureException(parsed.error, {
-        level: "warning",
-        extra: {
-          data,
-          schemaName,
-          errorPath,
-        },
-        tags: {
-          errorType: "schema_validation_error",
-          schemaType: schemaName,
-        },
-      });
-    }
+    console.error(error);
+    Sentry.captureException(error, {
+      level: "warning",
+      extra: {
+        data,
+        schemaName: schema.description || "Unknown schema",
+        errorPath: error.flatten(),
+      },
+      tags: {
+        errorType: "schema_validation_error",
+        schemaType: schema.description || "Unknown schema",
+      },
+    });
   }, 0);
+}
 
-  return data as Output;
+export default function safeParse<T extends z.ZodTypeAny>(
+  data: unknown,
+  schema: T,
+): z.output<T> {
+  // Validate synchronously so schema transforms/coercions actually run and the
+  // returned value matches z.output<T>. Validation here is NOT a gate: this
+  // parses trusted server responses, which can't be rejected into an error —
+  // on a schema mismatch we report the drift and render the raw data as-is.
+  const parsed = schema.safeParse(data);
+  if (parsed.success) return parsed.data;
+
+  reportValidationError(parsed.error, data, schema);
+  return data as z.output<T>;
 }
