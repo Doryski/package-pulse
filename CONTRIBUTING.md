@@ -59,7 +59,7 @@ pnpm dev
 - For targeted runs use:
 
   ```bash
-  pnpm exec vitest run --maxWorkers=1 --bail=5 path/to/file.test.ts
+  pnpm exec vitest run --bail=5 path/to/file.test.ts
   ```
 
 ## Commit messages
