@@ -7,12 +7,8 @@ const Footer = () => {
     <footer className="mt-4 flex flex-col items-start gap-2 border-t border-gray-200 py-4 text-sm md:mt-8 md:text-base dark:border-gray-800">
       <p className="inline">
         Developed by Dominik Rycharski (
-        <TextLink
-          href={links.githubProfile}
-          className="inline-flex items-center px-0.5"
-          outside
-        >
-          <GithubIcon className="mr-1 size-4 text-black dark:text-white" />
+        <TextLink href={links.githubProfile} className="px-0.5" outside>
+          <GithubIcon className="mr-1 inline-block size-4 align-[-0.125em] text-black dark:text-white" />
           <span>Doryski</span>
         </TextLink>
         )
@@ -24,12 +20,8 @@ const Footer = () => {
           dominikrycharski.com
         </TextLink>{" "}
         or submit an issue on{" "}
-        <TextLink
-          href={links.githubRepository}
-          outside
-          className="inline-flex items-center"
-        >
-          <GithubIcon className="mr-1 size-4 text-black dark:text-white" />{" "}
+        <TextLink href={links.githubRepository} outside>
+          <GithubIcon className="mr-1 inline-block size-4 align-[-0.125em] text-black dark:text-white" />
           GitHub repository
         </TextLink>
       </p>
