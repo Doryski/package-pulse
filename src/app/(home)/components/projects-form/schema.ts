@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const ProjectsSearchFormSchema = z.object({
   search: z.string({
-    required_error: "Please enter a project name.",
+    error: (issue) =>
+      issue.input === undefined ? "Please enter a project name." : undefined,
   }),
   projects: z.array(z.string()),
 });

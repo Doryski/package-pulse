@@ -188,7 +188,8 @@ export async function fetchSimilarProjects(
 
     const response = await openaiClient.responses.create(
       {
-        model: "gpt-4.1-nano",
+        model: "gpt-6-luna",
+        reasoning: { effort: "none" },
         input: createPrompt(packagesMetadata),
         max_output_tokens: MAX_OUTPUT_TOKENS,
         text: {

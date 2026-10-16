@@ -43,8 +43,8 @@ export const VersionSchema = z.object({
     ])
     .optional(),
   homepage: z.string().optional(),
-  devDependencies: z.record(z.string()).optional(),
-  dependencies: z.record(z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+  dependencies: z.record(z.string(), z.string()).optional(),
   gitHead: z.string().optional(),
   _id: z.string(),
   _shasum: z.string().optional(),
@@ -77,7 +77,7 @@ export const VersionSchema = z.object({
       )
       .optional(),
   }),
-  directories: z.record(z.string()).optional(),
+  directories: z.record(z.string(), z.string()).optional(),
 });
 
 export const NPMPackageInfoSchema = z.object({
@@ -92,7 +92,7 @@ export const NPMPackageInfoSchema = z.object({
       next: z.string().optional(),
     })
     .optional(),
-  versions: z.record(VersionSchema).optional(),
+  versions: z.record(z.string(), VersionSchema).optional(),
   readme: z.string().optional(),
   maintainers: z
     .array(
@@ -102,7 +102,7 @@ export const NPMPackageInfoSchema = z.object({
       }),
     )
     .optional(),
-  time: z.record(z.string()).optional(),
+  time: z.record(z.string(), z.string()).optional(),
   homepage: z.string().optional(),
   repository: RepositorySchema.optional(),
   author: z
@@ -120,5 +120,5 @@ export const NPMPackageInfoSchema = z.object({
     })
     .optional(),
   readmeFilename: z.string().optional(),
-  users: z.record(z.boolean()).optional(),
+  users: z.record(z.string(), z.boolean()).optional(),
 });

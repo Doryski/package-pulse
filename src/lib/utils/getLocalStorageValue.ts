@@ -1,8 +1,8 @@
-import { ZodSchema } from "zod";
+import { z } from "zod";
 
 export default function getLocalStorageValue<T>(
   key: string,
-  schema: ZodSchema<T>,
+  schema: z.ZodType<T>,
 ) {
   if (typeof window === "undefined") {
     return schema.safeParse(null).data;

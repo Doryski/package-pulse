@@ -1,14 +1,14 @@
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
-function reportValidationError(error: z.ZodError, schema: z.ZodTypeAny): void {
+function reportValidationError(error: z.ZodError, schema: z.ZodType): void {
   setTimeout(() => {
     console.error(error);
     Sentry.captureException(error, {
       level: "warning",
       extra: {
         schemaName: schema.description || "Unknown schema",
-        errorPath: error.flatten(),
+        errorPath: z.flattenError(error),
       },
       tags: {
         errorType: "schema_validation_error",
@@ -18,7 +18,7 @@ function reportValidationError(error: z.ZodError, schema: z.ZodTypeAny): void {
   }, 0);
 }
 
-export default function safeParse<T extends z.ZodTypeAny>(
+export default function safeParse<T extends z.ZodType>(
   data: unknown,
   schema: T,
 ): z.output<T> {
