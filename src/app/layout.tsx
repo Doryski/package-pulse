@@ -1,7 +1,7 @@
 import StructuredData from "@/components/seo/structured-data";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils/cn";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 import { Viewport } from "next";
 import { Inter } from "next/font/google";
 import Footer from "./(footer)/footer";
@@ -97,7 +97,7 @@ export default function RootLayout({
         )}
       >
         <Providers>
-          <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-2 md:px-4 lg:px-8">
+          <div className="mx-auto flex min-h-screen max-w-360 flex-col px-2 md:px-4 lg:px-8">
             <Header />
             <main className="relative flex grow flex-col">{children}</main>
             <Footer />
