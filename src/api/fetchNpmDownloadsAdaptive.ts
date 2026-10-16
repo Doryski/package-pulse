@@ -30,7 +30,7 @@ const DEFAULT_RETRY: RetryConfig = {
   jitter: true,
   minDelay: 200,
   maxRateLimitRetries: 4,
-  maxRetryAfter: 60_000,
+  maxRetryAfter: 5_000,
 };
 
 export type AdaptiveDownloadsResult = {
