@@ -38,7 +38,7 @@ const ChartSection = memo(({ projectStats }: ChartSectionProps) => {
     <div
       data-testid="main-chart"
       className={cn(
-        "mt-4 md:mt-8 lg:mt-16 size-full",
+        "mt-4 size-full md:mt-8 lg:mt-16",
         processedProjectsStats.length === 0 && "hidden",
       )}
     >

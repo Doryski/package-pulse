@@ -14,8 +14,8 @@ const Tag = ({ children, onRemove, tooltipContent, ...props }: TagProps) => {
     <div
       {...props}
       className={cn(
-        `flex gap-2 items-center px-2 py-1 bg-accent
-      text-sm text-accent-foreground rounded-md`,
+        `flex items-center gap-2 rounded-md bg-accent px-2
+      py-1 text-sm text-accent-foreground`,
         props.className,
       )}
     >

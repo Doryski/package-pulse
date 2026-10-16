@@ -143,13 +143,13 @@ export function Combobox<T>({
               <FormControl>
                 <div
                   className={cn(
-                    "relative w-full max-w-full sm:w-[var(--combobox-width)]",
+                    "relative w-full max-w-full sm:w-(--combobox-width)",
                     fullwidth && "sm:w-full",
                   )}
                 >
                   <FormLabel
                     className={cn(
-                      "absolute -top-3 left-2 z-10 text-xs bg-background py-1 px-2 text-muted-foreground transition-all",
+                      "absolute -top-3 left-2 z-10 bg-background px-2 py-1 text-xs text-muted-foreground transition-all",
                       field.value ? "opacity-100" : "opacity-0",
                     )}
                     htmlFor={field.name}
@@ -163,7 +163,7 @@ export function Combobox<T>({
                     placeholder="Search projects..."
                     autoComplete="off"
                     className={cn(
-                      "w-full sm:w-[var(--combobox-width)] justify-between max-w-full",
+                      "w-full max-w-full justify-between sm:w-(--combobox-width)",
                       !field.value && "text-muted-foreground",
                       fullwidth && "sm:w-full",
                     )}
@@ -180,7 +180,7 @@ export function Combobox<T>({
               </FormControl>
             </PopoverTrigger>
             <PopoverContent
-              className={cn("p-0 max-w-full", !field.value && "hidden")}
+              className={cn("max-w-full p-0", !field.value && "hidden")}
               onOpenAutoFocus={(e) => e.preventDefault()}
               ref={popoverContentRef}
             >
@@ -210,7 +210,7 @@ export function Combobox<T>({
                         {optionValue}
                         <CheckIcon
                           className={cn(
-                            "ml-auto h-4 w-4",
+                            "ml-auto size-4",
                             form.watch("projects").includes(optionValue)
                               ? "opacity-100"
                               : "opacity-0",

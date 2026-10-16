@@ -76,7 +76,7 @@ const ProjectsInfoTable = memo(() => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky left-0 z-20 w-[100px] min-w-[100px] md:w-[200px] md:min-w-[150px]">
+          <TableHead className="sticky left-0 z-20 w-25 min-w-25 md:w-50 md:min-w-[150px]">
             Project name
           </TableHead>
           <TableHead className="text-center">Last Release</TableHead>
@@ -86,10 +86,10 @@ const ProjectsInfoTable = memo(() => {
           <TableHead className="text-center">Pull Requests</TableHead>
           <TableHead className="text-center">Contributors Github</TableHead>
           <TableHead className="text-center">Contributors</TableHead>
-          <TableHead className="min-w-[60px] text-center">Deps (Dev)</TableHead>
+          <TableHead className="min-w-15 text-center">Deps (Dev)</TableHead>
           <TableHead className="text-center">Latest Version</TableHead>
           <TableHead className="text-center">License</TableHead>
-          <TableHead className="min-w-[120px] text-center">
+          <TableHead className="min-w-30 text-center">
             <SimpleTooltip
               content={
                 <span className="block max-w-xs">

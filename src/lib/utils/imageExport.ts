@@ -2,7 +2,7 @@ import { downloadFile } from "@/lib/utils/exportUtils";
 import { toast } from "sonner";
 
 export async function convertHtmlToImage(element: HTMLElement) {
-  const html2canvas = (await import("html2canvas")).default;
+  const html2canvas = (await import("html2canvas-pro")).default;
 
   return html2canvas(element, {
     backgroundColor: "transparent",

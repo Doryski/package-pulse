@@ -84,7 +84,7 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
         <TableHeader>
           <TableRow>
             <TableHeadSortable
-              className="sticky left-0 z-20 w-[100px] min-w-[100px] cursor-pointer bg-slate-100 dark:bg-slate-900 md:w-[200px] md:min-w-[150px]"
+              className="sticky left-0 z-20 w-25 min-w-25 cursor-pointer bg-slate-100 md:w-50 md:min-w-[150px] dark:bg-slate-900"
               contentClassName="justify-start"
               column="projectName"
               isSorted={sortColumn === "projectName"}

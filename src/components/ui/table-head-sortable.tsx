@@ -65,7 +65,7 @@ const TableHeadSortable = memo(
     return (
       <TableHead
         className={cn(
-          "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          "cursor-pointer focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden",
           className,
         )}
         data-column-name={column}

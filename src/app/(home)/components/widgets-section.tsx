@@ -313,7 +313,7 @@ const WidgetsSection = memo(({ projectsStats }: WidgetsSectionProps) => {
   }
 
   return (
-    <div className={cn("mt-8 lg:mt-16 w-full")}>
+    <div className={cn("mt-8 w-full lg:mt-16")}>
       <div className="mb-6">
         <h2 className="mb-2 text-center text-2xl font-bold">Widgets</h2>
         <p className="text-center text-muted-foreground">

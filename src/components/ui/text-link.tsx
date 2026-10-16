@@ -11,7 +11,7 @@ const TextLink = forwardRef<HTMLAnchorElement, TextLinkProps>(
       <a
         ref={ref}
         className={cn(
-          "hover:underline hover:opacity-80 transition-opacity",
+          "transition-opacity hover:underline hover:opacity-80",
           className,
         )}
         {...props}

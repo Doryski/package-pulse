@@ -89,7 +89,7 @@ const StatsCardsWidget = memo(
                   </div>
                 </CardContent>
                 <div
-                  className="absolute right-0 top-0 h-full w-1"
+                  className="absolute top-0 right-0 h-full w-1"
                   style={{
                     backgroundColor: `hsl(var(--chart-${(colorIndex % 10) + 1}))`,
                   }}

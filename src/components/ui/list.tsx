@@ -11,7 +11,7 @@ type ListProps = React.DetailedHTMLProps<
 >;
 const List = ({ className, ...props }: ListProps) => (
   <ul
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn("max-h-75 overflow-x-hidden overflow-y-auto", className)}
     {...props}
   />
 );
@@ -31,7 +31,7 @@ type ListGroupProps = React.DetailedHTMLProps<
 const ListGroup = ({ className, ...props }: ListGroupProps) => (
   <div
     className={cn(
-      "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
+      "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
       className,
     )}
     {...props}
@@ -52,11 +52,11 @@ type ListItemProps = React.DetailedHTMLProps<
 const ListItem = ({ className, ...props }: ListItemProps) => (
   <li
     className={cn(
-      `relative flex cursor-default select-none items-center rounded-sm
-      px-2 py-1.5 text-sm outline-none
+      `relative flex cursor-default items-center rounded-sm px-2
+      py-1.5 text-sm outline-hidden select-none
+      hover:bg-accent hover:text-accent-foreground
       aria-selected:bg-accent aria-selected:text-accent-foreground
-      data-[disabled]:pointer-events-none data-[disabled]:opacity-50
-      hover:bg-accent hover:text-accent-foreground`,
+      data-disabled:pointer-events-none data-disabled:opacity-50`,
       className,
     )}
     {...props}
@@ -78,7 +78,7 @@ const ListLoading = ({
 }: ListLoadingProps) => (
   <div className={cn("space-y-1", className)} {...props}>
     {Array.from({ length }, (_, i) => (
-      <Skeleton key={i} className={cn("h-[1.625rem] w-full", itemClassName)} />
+      <Skeleton key={i} className={cn("h-6.5 w-full", itemClassName)} />
     ))}
   </div>
 );

@@ -4,7 +4,7 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 const Footer = () => {
   return (
-    <footer className="mt-4 flex flex-col items-start gap-2 border-t border-gray-200 py-4 text-sm dark:border-gray-800 md:mt-8 md:text-base">
+    <footer className="mt-4 flex flex-col items-start gap-2 border-t border-gray-200 py-4 text-sm md:mt-8 md:text-base dark:border-gray-800">
       <p className="inline">
         Developed by Dominik Rycharski (
         <TextLink
