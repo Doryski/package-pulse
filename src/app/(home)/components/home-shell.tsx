@@ -9,7 +9,7 @@ import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import safeParse from "@/lib/utils/safeParse";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 type HomeShellProps = {
   initialProjects: string[];
@@ -31,7 +31,10 @@ export default function HomeShell({
     ),
   });
 
-  const selectedProjects = projectsSearchForm.watch("projects");
+  const selectedProjects = useWatch({
+    control: projectsSearchForm.control,
+    name: "projects",
+  });
   const isSearchActive = selectedProjects.length > 0;
 
   useEffect(() => {

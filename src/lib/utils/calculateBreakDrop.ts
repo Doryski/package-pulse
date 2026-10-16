@@ -17,12 +17,7 @@ export type BreakDropIndicator = {
   weekendDropPercentage: number;
   corporateUsageScore: number | null;
   corporateUsageLevel:
-    | "very_high"
-    | "high"
-    | "moderate"
-    | "low"
-    | "very_low"
-    | null;
+    "very_high" | "high" | "moderate" | "low" | "very_low" | null;
   hasEnoughData: boolean;
 };
 

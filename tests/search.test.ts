@@ -236,7 +236,9 @@ test.describe("Search Projects Form", () => {
 
     await page.waitForURL((url) => {
       const projectsParam = url.searchParams.get("projects");
-      return (projectsParam?.split(",").length ?? 0) === SELECTED_PROJECTS_LIMIT;
+      return (
+        (projectsParam?.split(",").length ?? 0) === SELECTED_PROJECTS_LIMIT
+      );
     });
 
     const url = page.url();

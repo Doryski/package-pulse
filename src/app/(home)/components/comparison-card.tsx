@@ -29,7 +29,7 @@ const ComparisonCard = ({
         "cursor-pointer transition-all duration-200",
         "hover:bg-accent/50 hover:shadow-md",
         "border hover:border-primary/20",
-        "min-h-[160px] flex flex-col",
+        "flex min-h-40 flex-col",
         className,
       )}
       onClick={() => onProjectsClick(projects)}
@@ -69,14 +69,14 @@ type ComparisonCardSkeletonProps = {
   projectCount?: number;
 };
 
+const getSkeletonBadgeWidth = (index: number) => 60 + ((index * 17) % 40);
+
 export const ComparisonCardSkeleton = ({
   className,
   projectCount = 2,
 }: ComparisonCardSkeletonProps) => {
   return (
-    <Card
-      className={cn("animate-pulse min-h-[160px] flex flex-col", className)}
-    >
+    <Card className={cn("flex min-h-40 animate-pulse flex-col", className)}>
       <CardHeader className="pb-3">
         <div className="h-4 w-24 rounded bg-muted" />
       </CardHeader>
@@ -86,7 +86,7 @@ export const ComparisonCardSkeleton = ({
             <div
               key={index}
               className="h-6 w-16 rounded bg-muted"
-              style={{ width: `${Math.random() * 40 + 60}px` }}
+              style={{ width: `${getSkeletonBadgeWidth(index)}px` }}
             />
           ))}
         </div>

@@ -1,11 +1,15 @@
-import { PropsWithChildren, useEffect, useState } from "react";
+import { PropsWithChildren, useSyncExternalStore } from "react";
+
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 const ClientOnly = ({ children }: PropsWithChildren) => {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
 
   return isMounted ? children : null;
 };

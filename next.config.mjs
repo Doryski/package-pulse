@@ -1,4 +1,4 @@
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -55,7 +55,7 @@ const nextConfig = {
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/build/
 
   org: "package-pulse",
   project: "package-pulse",
@@ -76,11 +76,7 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-  // See the following for more information:
-  // https://docs.sentry.io/product/crons/
-  // https://vercel.com/docs/cron-jobs
-  automaticVercelMonitors: true,
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
 });

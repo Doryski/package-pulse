@@ -1,19 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 const DEFAULT_MOBILE_BREAKPOINT = 768;
 
+const getMediaQuery = (breakpoint: number) =>
+  window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+
+const getServerSnapshot = () => undefined;
+
 export const useIsMobile = (breakpoint = DEFAULT_MOBILE_BREAKPOINT) => {
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const mediaQuery = getMediaQuery(breakpoint);
+      mediaQuery.addEventListener("change", onChange);
+      return () => mediaQuery.removeEventListener("change", onChange);
+    },
+    [breakpoint],
+  );
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    setIsMobile(mediaQuery.matches);
+  const getSnapshot = useCallback(
+    () => getMediaQuery(breakpoint).matches,
+    [breakpoint],
+  );
 
-    const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [breakpoint]);
-
-  return isMobile;
+  return useSyncExternalStore<boolean | undefined>(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 };

@@ -1,7 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 
 type CaptureExceptionOptions = Parameters<typeof Sentry.captureException>[1];
-type CaptureMessageOptions = Parameters<typeof Sentry.captureMessage>[1];
+type SentryOptions = Parameters<typeof Sentry.init>[0];
+type DataCollection = NonNullable<SentryOptions["dataCollection"]>;
+type StreamedSpan = Parameters<NonNullable<SentryOptions["beforeSendSpan"]>>[0];
 
 const ALLOWED_SEARCH_PARAM_KEYS = [
   "projects",
@@ -44,13 +46,15 @@ export const SENTRY_TRACES_SAMPLE_RATE =
 
 const BREADCRUMB_URL_KEYS = ["url", "to", "from"] as const;
 
+const stripTextQuery = (text: string) => text.split(/[?#]/)[0] ?? text;
+
 const stripQuery = (raw: string) => {
   try {
     const url = new URL(raw, "http://localhost");
     const isRelative = !/^[a-z][a-z\d+.-]*:/i.test(raw);
     return isRelative ? url.pathname : `${url.origin}${url.pathname}`;
   } catch {
-    return raw.split(/[?#]/)[0] ?? raw;
+    return stripTextQuery(raw);
   }
 };
 
@@ -89,6 +93,77 @@ export function scrubRequestUrl<TEvent extends Sentry.Event>(
   return event;
 }
 
+export const SENTRY_DSN =
+  "https://1e370265741031c93d8e072603c36fe3@o4509277242458112.ingest.de.sentry.io/4509277245145168";
+
+export const SENTRY_DATA_COLLECTION = {
+  userInfo: false,
+  cookies: false,
+  httpHeaders: false,
+  httpBodies: [],
+  urlQueryParams: false,
+  graphQL: { document: false, variables: false },
+  genAI: { inputs: false, outputs: false },
+  databaseQueryData: false,
+  queues: false,
+  stackFrameVariables: false,
+} as const satisfies DataCollection;
+
+const SPAN_URL_ATTRIBUTE_KEYS = [
+  "url.full",
+  "http.url",
+  "http.target",
+  "url",
+] as const;
+
+const SPAN_QUERY_ATTRIBUTE_KEYS = [
+  "url.query",
+  "http.query",
+  "url.fragment",
+  "http.fragment",
+] as const;
+
+type SpanAttributes = StreamedSpan["attributes"];
+
+const isAttributeObject = (
+  value: unknown,
+): value is { value: unknown; unit?: unknown } =>
+  typeof value === "object" && value !== null && "value" in value;
+
+const scrubAttributeValue = (value: unknown): unknown => {
+  if (typeof value === "string") return stripQuery(value);
+  if (isAttributeObject(value) && typeof value.value === "string") {
+    return { ...value, value: stripQuery(value.value) };
+  }
+  return value;
+};
+
+const scrubSpanAttributes = (attributes: SpanAttributes): SpanAttributes => {
+  const withoutQuery = Object.fromEntries(
+    Object.entries(attributes).filter(
+      ([key]) =>
+        !SPAN_QUERY_ATTRIBUTE_KEYS.some((queryKey) => queryKey === key),
+    ),
+  );
+
+  const scrubbedUrls = Object.fromEntries(
+    SPAN_URL_ATTRIBUTE_KEYS.filter((key) => key in withoutQuery).map((key) => [
+      key,
+      scrubAttributeValue(withoutQuery[key]),
+    ]),
+  );
+
+  return { ...withoutQuery, ...scrubbedUrls };
+};
+
+export function scrubSpan(span: StreamedSpan): StreamedSpan {
+  return {
+    ...span,
+    name: stripTextQuery(span.name),
+    attributes: scrubSpanAttributes(span.attributes),
+  };
+}
+
 export function getSearchParamsContextFromUrl(
   url: string,
 ): Record<string, unknown> {
@@ -108,15 +183,40 @@ export function getSearchParamsContextFromUrl(
   }
 }
 
-export function setSentrySearchParamsContext(
-  context?: Record<string, unknown>,
-) {
-  const searchParamsContext = context || getSearchParamsContext();
+const getEventUrl = (event: Sentry.ErrorEvent) => {
+  const url =
+    event.request?.url || event.contexts?.trace?.data?.url || event.tags?.url;
+  return typeof url === "string" ? url : undefined;
+};
 
-  Sentry.withScope((scope) => {
-    scope.setContext("searchParams", searchParamsContext);
-  });
+export function withServerSearchParamsContext(
+  event: Sentry.ErrorEvent,
+): Sentry.ErrorEvent {
+  const url = getEventUrl(event);
+  if (!url) return event;
+
+  return {
+    ...event,
+    contexts: {
+      ...event.contexts,
+      searchParams: getSearchParamsContextFromUrl(url),
+    },
+  };
 }
+
+export const SENTRY_SHARED_OPTIONS = {
+  dsn: SENTRY_DSN,
+  tracesSampleRate: SENTRY_TRACES_SAMPLE_RATE,
+  debug: false,
+  dataCollection: SENTRY_DATA_COLLECTION,
+  beforeBreadcrumb: scrubBreadcrumb,
+  beforeSendSpan: scrubSpan,
+} satisfies SentryOptions;
+
+export const SENTRY_SERVER_OPTIONS = {
+  ...SENTRY_SHARED_OPTIONS,
+  beforeSend: (event) => scrubRequestUrl(withServerSearchParamsContext(event)),
+} satisfies SentryOptions;
 
 export function captureExceptionWithSearchParams(
   exception: unknown,
@@ -125,15 +225,5 @@ export function captureExceptionWithSearchParams(
   return Sentry.withScope((scope) => {
     scope.setContext("searchParams", getSearchParamsContext());
     return Sentry.captureException(exception, options);
-  });
-}
-
-export function captureMessageWithSearchParams(
-  message: string,
-  options?: CaptureMessageOptions,
-) {
-  return Sentry.withScope((scope) => {
-    scope.setContext("searchParams", getSearchParamsContext());
-    return Sentry.captureMessage(message, options);
   });
 }

@@ -36,11 +36,17 @@ const PACKAGE_SETS = [
     label: "react,vue,svelte,preact,solid-js",
     packages: ["react", "vue", "svelte", "preact", "solid-js"],
   },
-  { label: "react,@angular/core (scoped)", packages: ["react", "@angular/core"] },
+  {
+    label: "react,@angular/core (scoped)",
+    packages: ["react", "@angular/core"],
+  },
 ] as const satisfies readonly PackageSet[];
 
 const REAL_SET: PackageSet = { label: "react,vue", packages: ["react", "vue"] };
-const MOCK_429_SET: PackageSet = { label: "react,vue", packages: ["react", "vue"] };
+const MOCK_429_SET: PackageSet = {
+  label: "react,vue",
+  packages: ["react", "vue"],
+};
 
 const toMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -359,7 +365,9 @@ async function main() {
   }
 
   console.log("\n[2] REAL-NPM LATENCY + DATA PARITY (one gentle run)");
-  console.log("    NOTE: this section hits the REAL api.npmjs.org endpoint once.\n");
+  console.log(
+    "    NOTE: this section hits the REAL api.npmjs.org endpoint once.\n",
+  );
   const realResult = await runRealLatency(REAL_SET);
   if (realResult.status === "skipped") {
     console.log(
@@ -377,7 +385,9 @@ async function main() {
         ],
       ],
     );
-    console.log(`\n  Parity detail: [${realResult.parity}] ${realResult.parityDetail}`);
+    console.log(
+      `\n  Parity detail: [${realResult.parity}] ${realResult.parityDetail}`,
+    );
   }
 
   console.log("\n[3] INJECTED-429 RESILIENCE (mock fetch, no real npm)");
@@ -416,8 +426,12 @@ async function main() {
     printOfflineTable(offlineResults);
   }
   console.log(`\n  Real latency: ${realLatencyLine(realResult)}`);
-  const oldOutcome = resilienceRows.find((row) => row.approach.startsWith("OLD"));
-  const newOutcome = resilienceRows.find((row) => row.approach.startsWith("NEW"));
+  const oldOutcome = resilienceRows.find((row) =>
+    row.approach.startsWith("OLD"),
+  );
+  const newOutcome = resilienceRows.find((row) =>
+    row.approach.startsWith("NEW"),
+  );
   console.log(
     `  429 outcome: OLD -> ${oldOutcome?.recovered ?? "n/a"} recovered | NEW -> ${newOutcome?.recovered ?? "n/a"} recovered`,
   );

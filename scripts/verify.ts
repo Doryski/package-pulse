@@ -21,7 +21,6 @@ export async function runCommand(
     });
 
     let stdout = "";
-    let stderr = "";
 
     child.stdout?.on("data", (data: Buffer) => {
       const output = data.toString();
@@ -32,7 +31,6 @@ export async function runCommand(
     child.stderr?.on("data", (data: Buffer) => {
       const output = data.toString();
       process.stderr.write(output);
-      stderr += output;
     });
 
     child.on("close", (code: number | null) => {

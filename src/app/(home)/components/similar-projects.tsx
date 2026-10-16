@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import useSimilarProjects from "@/lib/queries/useSimilarProjects";
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type SimilarProjectsProps = {
@@ -20,11 +20,13 @@ const SimilarProjects = ({
     new Set(),
   );
 
-  useEffect(() => {
-    if (selectedProjects.length === 0) {
-      setRemovedProjects(new Set());
-    }
-  }, [selectedProjects.length]);
+  const hasSelection = selectedProjects.length > 0;
+  const [hadSelection, setHadSelection] = useState(hasSelection);
+
+  if (hadSelection !== hasSelection) {
+    setHadSelection(hasSelection);
+    if (!hasSelection) setRemovedProjects(new Set());
+  }
 
   const similarProjectsQuery = useSimilarProjects(selectedProjects);
 
