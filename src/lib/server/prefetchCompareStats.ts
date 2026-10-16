@@ -2,6 +2,7 @@ import "server-only";
 import fetchNpmDownloadsAdaptive, {
   AdaptiveDownloadsResult,
 } from "@/api/fetchNpmDownloadsAdaptive";
+import getFirstPublished from "@/lib/server/firstPublished";
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import { buildProjectStats } from "@/lib/stats/buildProjectStats";
 import { toCompactSeries } from "@/lib/utils/compactSeries";
@@ -16,10 +17,13 @@ type PrefetchEnv = Record<string, string | undefined>;
 export const shouldSkipPrefetch = (env: PrefetchEnv = process.env) =>
   env.NEXT_PHASE === PRODUCTION_BUILD_PHASE || env.PP_E2E_TEST_PROXY === "1";
 
-const fetchDownloads = (projects: string[]) =>
-  fetchNpmDownloadsAdaptive(projects, {
-    signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
+const fetchDownloads = async (projects: string[]) => {
+  const signal = AbortSignal.timeout(PREFETCH_TIMEOUT_MS);
+  return fetchNpmDownloadsAdaptive(projects, {
+    signal,
+    firstPublished: await getFirstPublished(projects, signal),
   }).catch(() => null);
+};
 
 const toProjectStats =
   ({ data, errors }: AdaptiveDownloadsResult) =>

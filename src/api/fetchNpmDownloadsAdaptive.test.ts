@@ -5,6 +5,7 @@ import { formatDate, parseDate } from "@/app/(home)/utils/date-utils";
 import fetchNpmDownloadsAdaptive, {
   CLOSED_WINDOW_REVALIDATE_SECONDS,
   hasTransientErrors,
+  notFoundMessage,
   parsePackageList,
 } from "@/api/fetchNpmDownloadsAdaptive";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/lib/config/constants";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import { RetryConfig } from "adaptive-promise-pool";
-import { startOfDay, sub } from "date-fns";
+import { eachDayOfInterval, startOfDay, sub } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -921,5 +922,296 @@ describe("fetchNpmDownloadsAdaptive - trailing zero days", () => {
       "2024-03-11",
       "2024-03-12",
     ]);
+  });
+});
+
+const TODAY = startOfDay(toZonedTime(SYSTEM_TIME, "UTC"));
+const REAL_COUNT = 5;
+
+const bulkWindows = (from: Date, to: Date = TODAY) =>
+  getTimePeriods(from, to, NPM_BULK_RANGE_API_PERIOD_DAYS, "days", FIRST_DAY);
+
+const scopedWindows = (from: Date) =>
+  getTimePeriods(from, TODAY, NPM_RANGE_API_PERIOD_MONTHS, "months", FIRST_DAY);
+
+const FULL_BULK_WINDOWS = bulkWindows(FIRST_DAY);
+const LATEST_BULK_WINDOW = FULL_BULK_WINDOWS.at(-1)!;
+
+const dailyDownloads = (start: string, end: string, realStart: Date) =>
+  eachDayOfInterval({ start: parseDate(start), end: parseDate(end) }).map(
+    (day) => ({
+      day: formatDate(day),
+      downloads: day >= realStart ? REAL_COUNT : 0,
+    }),
+  );
+
+const createRangeFetch = (
+  realStarts: Record<string, Date>,
+  overrides: (url: string) => Response | undefined = () => undefined,
+) =>
+  vi.fn((url: string) => {
+    const override = overrides(url);
+    if (override) return Promise.resolve(override);
+    const [start, end] = rangeOf(url).split(":") as [string, string];
+    const names = url.split("/range/")[1]!.split("/").slice(1).join("/");
+    const entries = Object.fromEntries(
+      names
+        .split(",")
+        .map((name) => [
+          name,
+          dailyDownloads(start, end, realStarts[name] ?? FIRST_DAY),
+        ]),
+    );
+    const [only, ...rest] = Object.keys(entries);
+    const body =
+      rest.length === 0 && only
+        ? flatBody(only, entries[only]!)
+        : bulkBody(entries);
+    return Promise.resolve(makeResponse(200, body));
+  });
+
+const urlsOf = (fetchImpl: { mock: { calls: [string, ...unknown[]][] } }) =>
+  fetchImpl.mock.calls.map((call) => call[0]);
+
+const expectContiguous = (series: { date: string }[] | null | undefined) => {
+  const dates = series!.map((entry) => entry.date);
+  const expected = eachDayOfInterval({
+    start: parseDate(dates[0]!),
+    end: parseDate(dates.at(-1)!),
+  }).map(formatDate);
+  expect(dates).toEqual(expected);
+};
+
+describe("fetchNpmDownloadsAdaptive - first-published start dates", () => {
+  test("requests only the windows from first publish and zero-fills the series like a full-history fetch", async () => {
+    const realStarts = {
+      jirallm: daysAgo(60),
+      quickurrence: daysAgo(100),
+      "@doryski/release": daysAgo(30),
+    };
+    const packages = ["jirallm", "quickurrence", "@doryski/release"];
+
+    const fullFetch = createRangeFetch(realStarts);
+    const full = await fetchNpmDownloadsAdaptive(packages, {
+      fetchImpl: asFetch(fullFetch),
+      retry: FAST_RETRY,
+    });
+
+    const trimmedFetch = createRangeFetch(realStarts);
+    const trimmed = await fetchNpmDownloadsAdaptive(packages, {
+      firstPublished: realStarts,
+      fetchImpl: asFetch(trimmedFetch),
+      retry: FAST_RETRY,
+    });
+
+    const expectedBulk = bulkWindows(daysAgo(100)).map((w) =>
+      buildUrl(w.start, w.end, "jirallm,quickurrence"),
+    );
+    const expectedScoped = scopedWindows(daysAgo(30)).map((w) =>
+      buildUrl(w.start, w.end, "@doryski/release"),
+    );
+
+    expect(fullFetch).toHaveBeenCalledTimes(
+      FULL_BULK_WINDOWS.length + scopedWindows(FIRST_DAY).length,
+    );
+    expect(expectedBulk).toHaveLength(1);
+    expect(expectedScoped).toHaveLength(1);
+    expect(urlsOf(trimmedFetch).sort()).toEqual(
+      [...expectedBulk, ...expectedScoped].sort(),
+    );
+    expect(trimmed.stats.requestCount).toBe(2);
+
+    expect(trimmed.errors).toEqual({});
+    expect(trimmed.data).toEqual(full.data);
+    packages.forEach((name) => {
+      const series = trimmed.data[name]!;
+      expect(series[0]).toEqual({ date: NPM_API_FIRST_DAY, count: 0 });
+      expect(series.find((entry) => entry.count > 0)).toBeDefined();
+      expect(series.at(-1)!.count).toBe(REAL_COUNT);
+      expectContiguous(series);
+    });
+  });
+
+  const olderStart = FULL_BULK_WINDOWS[3]!.start;
+  const bulkFrom = (from: Date) => ({
+    urls: bulkWindows(from).map((w) => buildUrl(w.start, w.end, "newpkg")),
+  });
+
+  test.each([
+    {
+      name: "missing entry falls back to full history",
+      firstPublished: {},
+      from: FIRST_DAY,
+      seriesStart: NPM_API_FIRST_DAY,
+    },
+    {
+      name: "invalid Date falls back to full history",
+      firstPublished: { newpkg: new Date("not a date") },
+      from: FIRST_DAY,
+      seriesStart: NPM_API_FIRST_DAY,
+    },
+    {
+      name: "date before NPM_API_FIRST_DAY falls back to full history",
+      firstPublished: { newpkg: new Date("2010-06-01T00:00:00.000Z") },
+      from: FIRST_DAY,
+      seriesStart: NPM_API_FIRST_DAY,
+    },
+    {
+      name: "date exactly on a window boundary starts at that window",
+      firstPublished: { newpkg: olderStart },
+      from: olderStart,
+      seriesStart: NPM_API_FIRST_DAY,
+    },
+    {
+      name: "date on the first day of the latest window requests only that window",
+      firstPublished: { newpkg: LATEST_BULK_WINDOW.start },
+      from: LATEST_BULK_WINDOW.start,
+      seriesStart: NPM_API_FIRST_DAY,
+    },
+    {
+      name: "startDate later than firstPublished wins with no zero-fill before its window",
+      firstPublished: { newpkg: FULL_BULK_WINDOWS[2]!.start },
+      startDate: sub(TODAY, { days: 100 }),
+      from: sub(TODAY, { days: 100 }),
+      seriesStart: formatDate(LATEST_BULK_WINDOW.start),
+    },
+  ])("$name", async ({ firstPublished, startDate, from, seriesStart }) => {
+    const fetchImpl = createRangeFetch({});
+
+    const result = await fetchNpmDownloadsAdaptive(["newpkg"], {
+      startDate,
+      firstPublished,
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    const { urls } = bulkFrom(from);
+    expect(urlsOf(fetchImpl).sort()).toEqual([...urls].sort());
+    expect(result.stats.requestCount).toBe(urls.length);
+    expect(result.errors).toEqual({});
+    expect(result.data.newpkg![0]!.date).toBe(seriesStart);
+    expectContiguous(result.data.newpkg);
+  });
+
+  test("full history is still requested when no firstPublished is given", async () => {
+    const fetchImpl = createRangeFetch({});
+
+    await fetchNpmDownloadsAdaptive(["newpkg"], {
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(FULL_BULK_WINDOWS.length);
+    expect(FULL_BULK_WINDOWS.length).toBeGreaterThan(5);
+  });
+
+  test("mixed unscoped group fetches bulk windows from the older package", async () => {
+    const oldStart = FULL_BULK_WINDOWS[2]!.start;
+    const newStart = daysAgo(30);
+    const fetchImpl = createRangeFetch({ oldpkg: oldStart, newpkg: newStart });
+
+    const result = await fetchNpmDownloadsAdaptive(["oldpkg", "newpkg"], {
+      firstPublished: { oldpkg: oldStart, newpkg: newStart },
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    const expected = bulkWindows(oldStart).map((w) =>
+      buildUrl(w.start, w.end, "oldpkg,newpkg"),
+    );
+    expect(expected.length).toBe(FULL_BULK_WINDOWS.length - 2);
+    expect(urlsOf(fetchImpl).sort()).toEqual([...expected].sort());
+
+    ["oldpkg", "newpkg"].forEach((name) => {
+      const series = result.data[name]!;
+      expect(series[0]).toEqual({ date: NPM_API_FIRST_DAY, count: 0 });
+      expectContiguous(series);
+    });
+    expect(
+      result.data.oldpkg!.filter((entry) => entry.date < formatDate(oldStart))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(result.data.newpkg!.find((entry) => entry.count > 0)!.date).toBe(
+      formatDate(newStart),
+    );
+  });
+
+  test("not-found package with firstPublished is not zero-filled and keeps not-found semantics", async () => {
+    const fetchImpl = createRangeFetch({}, () => makeResponse(404));
+
+    const result = await fetchNpmDownloadsAdaptive(["ghost"], {
+      firstPublished: { ghost: daysAgo(30) },
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.data.ghost).toBeNull();
+    expect(result.errors).toEqual({ ghost: notFoundMessage("ghost") });
+  });
+
+  test("failed package with firstPublished is not zero-filled while siblings succeed", async () => {
+    vi.useRealTimers();
+    const fetchImpl = createRangeFetch({}, (url) =>
+      url.includes("@scope/broken") ? makeResponse(500) : undefined,
+    );
+
+    const result = await fetchNpmDownloadsAdaptive(
+      ["newpkg", "@scope/broken"],
+      {
+        firstPublished: { newpkg: daysAgo(30), "@scope/broken": daysAgo(30) },
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+      },
+    );
+
+    expect(result.data["@scope/broken"]).toBeNull();
+    expect(result.errors).toEqual({
+      "@scope/broken": 'Failed to load downloads for "@scope/broken"',
+    });
+    expect(result.data.newpkg![0]).toEqual({
+      date: NPM_API_FIRST_DAY,
+      count: 0,
+    });
+  });
+
+  test("partial failure with firstPublished keeps the zero-filled prefix and reports a partial warning", async () => {
+    vi.useRealTimers();
+    const windows = bulkWindows(FIRST_DAY, getToday());
+    const olderWindow = windows.at(-2)!;
+    const latestWindow = windows.at(-1)!;
+    const firstPublished = olderWindow.start;
+    const fetchImpl = createRangeFetch({}, (url) =>
+      startOf(url) === formatDate(olderWindow.start)
+        ? makeResponse(500)
+        : undefined,
+    );
+
+    const result = await fetchNpmDownloadsAdaptive(["newpkg"], {
+      firstPublished: { newpkg: firstPublished },
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    const series = result.data.newpkg!;
+    const olderStartDate = formatDate(olderWindow.start);
+    const latestStartDate = formatDate(latestWindow.start);
+    const prefix = series.filter((entry) => entry.date < olderStartDate);
+
+    expect(fetchImpl.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(series[0]).toEqual({ date: NPM_API_FIRST_DAY, count: 0 });
+    expect(prefix.length).toBeGreaterThan(0);
+    expect(prefix.every((entry) => entry.count === 0)).toBe(true);
+    expect(
+      series.some(
+        (entry) => entry.date > olderStartDate && entry.date < latestStartDate,
+      ),
+    ).toBe(false);
+    expect(series.find((entry) => entry.date === latestStartDate)?.count).toBe(
+      REAL_COUNT,
+    );
+    expect(result.errors).toEqual({
+      newpkg: 'Some download data for "newpkg" could not be loaded',
+    });
   });
 });

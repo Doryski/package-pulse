@@ -1,5 +1,3 @@
-import { getProjectStatsQueryKey } from "@/lib/queries/keys";
-import { PREFETCH_INTENT_DELAY_MS } from "@/lib/queries/usePrefetchProjectsStats";
 import { createTestQueryClient, renderWithProviders } from "@/test/render";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, screen } from "@testing-library/react";
@@ -111,7 +109,7 @@ describe("ComparisonCard server render", () => {
   });
 });
 
-describe("ComparisonCard stats prefetch", () => {
+describe("ComparisonCard upstream traffic", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -120,80 +118,60 @@ describe("ComparisonCard stats prefetch", () => {
     vi.useRealTimers();
   });
 
-  const renderCard = () =>
+  const renderCards = () =>
     renderWithProviders(
-      <ComparisonCard
-        projects={["react", "vue"]}
-        title="Frameworks"
-        href="/compare/react-vs-vue"
-      />,
+      <>
+        <ComparisonCard
+          projects={["react", "vue"]}
+          title="Frameworks"
+          href="/compare/react-vs-vue"
+        />
+        <ComparisonCard
+          projects={["@angular/core", "svelte"]}
+          title="More frameworks"
+          onProjectsClick={vi.fn()}
+        />
+      </>,
     );
 
-  const getCard = () =>
-    screen.getByRole("link").closest<HTMLElement>(".rounded-xl");
+  const getCards = () =>
+    screen
+      .getAllByRole("link")
+      .concat(screen.getAllByRole("button"))
+      .map((action) => action.closest<HTMLElement>(".rounded-xl")!);
 
-  it("prefetches every project's stats after a short hover", () => {
-    const { queryClient } = renderCard();
+  it.each([
+    [
+      "hovering",
+      (card: HTMLElement) => {
+        fireEvent.pointerEnter(card);
+      },
+    ],
+    [
+      "focusing",
+      (card: HTMLElement) => {
+        fireEvent.focus(card);
+      },
+    ],
+    [
+      "sweeping the pointer over",
+      (card: HTMLElement) => {
+        fireEvent.pointerEnter(card);
+        fireEvent.pointerMove(card);
+        fireEvent.pointerLeave(card);
+      },
+    ],
+  ])("does not load downloads when %s cards", (_, interact) => {
+    const { queryClient } = renderCards();
     const prefetchSpy = vi.spyOn(queryClient, "prefetchQuery");
 
-    fireEvent.pointerEnter(getCard()!);
+    getCards().forEach(interact);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
     expect(prefetchSpy).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(PREFETCH_INTENT_DELAY_MS);
-    });
-
-    expect(prefetchSpy).toHaveBeenCalledTimes(2);
-    expect(prefetchSpy.mock.calls.map(([options]) => options.queryKey)).toEqual(
-      [getProjectStatsQueryKey("react"), getProjectStatsQueryKey("vue")],
-    );
-    expect(loadDownloads).toHaveBeenCalledWith(
-      "react",
-      expect.any(AbortSignal),
-    );
-    expect(loadDownloads).toHaveBeenCalledWith("vue", expect.any(AbortSignal));
-  });
-
-  it("skips the prefetch when the pointer only passes over the card", () => {
-    const { queryClient } = renderCard();
-    const prefetchSpy = vi.spyOn(queryClient, "prefetchQuery");
-
-    fireEvent.pointerEnter(getCard()!);
-    fireEvent.pointerLeave(getCard()!);
-    act(() => {
-      vi.advanceTimersByTime(PREFETCH_INTENT_DELAY_MS);
-    });
-
-    expect(prefetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("prefetches when the card action keeps keyboard focus", () => {
-    const { queryClient } = renderCard();
-    const prefetchSpy = vi.spyOn(queryClient, "prefetchQuery");
-
-    act(() => {
-      screen.getByRole("link").focus();
-    });
-    act(() => {
-      vi.advanceTimersByTime(PREFETCH_INTENT_DELAY_MS);
-    });
-
-    expect(screen.getByRole("link")).toHaveFocus();
-    expect(prefetchSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not refetch stats that are already in flight", () => {
-    renderCard();
-
-    fireEvent.pointerEnter(getCard()!);
-    act(() => {
-      vi.advanceTimersByTime(PREFETCH_INTENT_DELAY_MS);
-    });
-    fireEvent.pointerEnter(getCard()!);
-    act(() => {
-      vi.advanceTimersByTime(PREFETCH_INTENT_DELAY_MS);
-    });
-
-    expect(loadDownloads).toHaveBeenCalledTimes(2);
+    expect(loadDownloads).not.toHaveBeenCalled();
   });
 });
 

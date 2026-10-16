@@ -18,7 +18,15 @@ import {
   RateLimitError,
   RetryConfig,
 } from "adaptive-promise-pool";
-import { isBefore, isValid, max, startOfDay, sub } from "date-fns";
+import {
+  eachDayOfInterval,
+  isBefore,
+  isValid,
+  max,
+  min,
+  startOfDay,
+  sub,
+} from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 const NPM_RANGE_BASE_URL = "https://api.npmjs.org/downloads/range";
@@ -52,6 +60,7 @@ export type AdaptiveDownloadsResult = {
 
 type FetchNpmDownloadsAdaptiveOptions = {
   startDate?: Date;
+  firstPublished?: Partial<Record<string, Date>>;
   fetchImpl?: typeof fetch;
   concurrency?: ConcurrencyConfig;
   retry?: RetryConfig;
@@ -104,27 +113,23 @@ export const parsePackageList = (raw: string | null): string[] =>
     ),
   ].sort();
 
-const buildWindows = (from: Date, to: Date) => {
-  const anchor = parseDate(NPM_API_FIRST_DAY);
-  return {
-    bulk: getTimePeriods(
-      from,
-      to,
-      NPM_BULK_RANGE_API_PERIOD_DAYS,
-      "days",
-      anchor,
-    ),
-    scoped: getTimePeriods(
-      from,
-      to,
-      NPM_RANGE_API_PERIOD_MONTHS,
-      "months",
-      anchor,
-    ),
-  };
-};
+const WINDOW_SIZES = {
+  bulk: { count: NPM_BULK_RANGE_API_PERIOD_DAYS, unit: "days" },
+  scoped: { count: NPM_RANGE_API_PERIOD_MONTHS, unit: "months" },
+} as const;
 
-type DownloadWindows = ReturnType<typeof buildWindows>;
+type WindowKind = keyof typeof WINDOW_SIZES;
+
+type PackageGroup = { kind: WindowKind; packages: string[] };
+
+const buildWindows = (kind: WindowKind, from: Date, to: Date) =>
+  getTimePeriods(
+    from,
+    to,
+    WINDOW_SIZES[kind].count,
+    WINDOW_SIZES[kind].unit,
+    parseDate(NPM_API_FIRST_DAY),
+  );
 
 const getOpenWindowThreshold = (today: Date) =>
   sub(today, { days: NPM_MAX_LAG_DAYS });
@@ -148,34 +153,53 @@ const buildTask = (
   revalidateSeconds: getWindowRevalidateSeconds(window, openThreshold),
 });
 
-function buildTasks(
-  packages: string[],
-  windows: DownloadWindows,
-  today: Date,
-): DownloadTask[] {
+const toPackageGroups = (packages: string[]): PackageGroup[] => {
   const { unscoped, scoped } = partitionPackages(packages);
+  const bulkGroups: PackageGroup[] =
+    unscoped.length === 0 ? [] : [{ kind: "bulk", packages: unscoped }];
+  return [
+    ...bulkGroups,
+    ...scoped.map((pkg): PackageGroup => ({ kind: "scoped", packages: [pkg] })),
+  ];
+};
+
+function planDownloads(
+  packages: string[],
+  resolveFrom: (name: string) => Date,
+  today: Date,
+) {
   const openThreshold = getOpenWindowThreshold(today);
+  const groups = toPackageGroups(packages).map(({ kind, packages }) => {
+    const from = min(packages.map(resolveFrom));
+    const windows = buildWindows(kind, from, today).toReversed();
+    const fetchStart = windows.at(-1)?.start ?? from;
+    return {
+      tasks: windows.map((window) =>
+        buildTask(window, packages, openThreshold),
+      ),
+      fetchStarts: packages.map((name) => [name, fetchStart] as const),
+    };
+  });
 
-  const bulkTasks =
-    unscoped.length === 0
-      ? []
-      : windows.bulk
-          .toReversed()
-          .map((window) => buildTask(window, unscoped, openThreshold));
-
-  const scopedTasks = scoped.flatMap((pkg) =>
-    windows.scoped
-      .toReversed()
-      .map((window) => buildTask(window, [pkg], openThreshold)),
-  );
-
-  return [...bulkTasks, ...scopedTasks];
+  return {
+    tasks: groups.flatMap((group) => group.tasks),
+    fetchStarts: new Map(groups.flatMap((group) => group.fetchStarts)),
+  };
 }
 
-const resolveStartDate = (startDate: Date | undefined) => {
-  const firstDay = parseDate(NPM_API_FIRST_DAY);
-  if (!startDate || !isValid(startDate)) return firstDay;
-  return max([startDate, firstDay]);
+const resolveStartDate = (...candidates: (Date | undefined)[]) =>
+  max([
+    parseDate(NPM_API_FIRST_DAY),
+    ...candidates.filter(
+      (date): date is Date => date !== undefined && isValid(date),
+    ),
+  ]);
+
+const zeroFill = (from: Date, until: Date): NPMDownloadCount[] => {
+  if (!isBefore(from, until)) return [];
+  return eachDayOfInterval({ start: from, end: sub(until, { days: 1 }) }).map(
+    (day) => ({ date: formatDate(day), count: 0 }),
+  );
 };
 
 function mergeDownloads(downloads: NPMDownloadCount[]): NPMDownloadCount[] {
@@ -208,14 +232,13 @@ const createAccumulator = (): PackageAccumulator => ({
 function resolvePackage(
   name: string,
   acc: PackageAccumulator,
+  leadingZeros: NPMDownloadCount[],
 ): ResolvedPackage {
+  const downloads = () => [...leadingZeros, ...mergeDownloads(acc.downloads)];
   if (acc.sawData && acc.failedWindows > 0) {
-    return {
-      downloads: mergeDownloads(acc.downloads),
-      error: partialMessage(name),
-    };
+    return { downloads: downloads(), error: partialMessage(name) };
   }
-  if (acc.sawData) return { downloads: mergeDownloads(acc.downloads) };
+  if (acc.sawData) return { downloads: downloads() };
   if (acc.failedWindows > 0) {
     return { downloads: null, error: failedMessage(name) };
   }
@@ -237,7 +260,11 @@ export default async function fetchNpmDownloadsAdaptive(
 
   const from = resolveStartDate(opts?.startDate);
   const today = startOfDay(toZonedTime(new Date(), "UTC"));
-  const tasks = buildTasks(uniquePackages, buildWindows(from, today), today);
+  const { tasks, fetchStarts } = planDownloads(
+    uniquePackages,
+    (name) => resolveStartDate(opts?.startDate, opts?.firstPublished?.[name]),
+    today,
+  );
 
   const processor = async (
     task: DownloadTask,
@@ -322,7 +349,15 @@ export default async function fetchNpmDownloadsAdaptive(
   }
 
   const resolved = [...accumulators].map(
-    ([name, acc]) => [name, resolvePackage(name, acc)] as const,
+    ([name, acc]) =>
+      [
+        name,
+        resolvePackage(
+          name,
+          acc,
+          zeroFill(from, fetchStarts.get(name) ?? from),
+        ),
+      ] as const,
   );
   const data = trimToDataHorizon(
     Object.fromEntries(

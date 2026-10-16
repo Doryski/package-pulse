@@ -4,6 +4,7 @@ import fetchNpmDownloadsAdaptive, {
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
 import { buildProjectStats } from "@/lib/stats/buildProjectStats";
 import { toCompactSeries } from "@/lib/utils/compactSeries";
+import getFirstPublished from "@/lib/server/firstPublished";
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prefetchCompareStats, {
@@ -11,10 +12,14 @@ import prefetchCompareStats, {
   shouldSkipPrefetch,
 } from "./prefetchCompareStats";
 
+vi.mock("@/lib/server/firstPublished", () => ({ default: vi.fn() }));
+
 vi.mock("@/api/fetchNpmDownloadsAdaptive", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/fetchNpmDownloadsAdaptive")>()),
   default: vi.fn(),
 }));
+
+const FIRST_PUBLISHED = { react: new Date(2013, 4, 29) };
 
 const NOW = new Date("2024-03-10T12:00:00.000Z");
 
@@ -58,6 +63,7 @@ describe("prefetchCompareStats", () => {
     vi.stubEnv("NEXT_PHASE", "");
     vi.stubEnv("PP_E2E_TEST_PROXY", "");
     vi.mocked(fetchNpmDownloadsAdaptive).mockResolvedValue(buildResult());
+    vi.mocked(getFirstPublished).mockResolvedValue(FIRST_PUBLISHED);
   });
 
   afterEach(() => {
@@ -82,7 +88,7 @@ describe("prefetchCompareStats", () => {
     });
   });
 
-  it("fetches all projects in one call with a 4 s timeout signal", async () => {
+  it("fetches all projects in one call with a 4 s timeout signal and first-published dates", async () => {
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
 
     await prefetchCompareStats(new QueryClient(), ["react", "vue"]);
@@ -90,7 +96,28 @@ describe("prefetchCompareStats", () => {
     expect(timeoutSpy).toHaveBeenCalledWith(PREFETCH_TIMEOUT_MS);
     expect(fetchNpmDownloadsAdaptive).toHaveBeenCalledWith(["react", "vue"], {
       signal: timeoutSpy.mock.results[0]?.value,
+      firstPublished: FIRST_PUBLISHED,
     });
+  });
+
+  it("falls back to an empty firstPublished map when no lookup resolves", async () => {
+    vi.mocked(getFirstPublished).mockResolvedValue({});
+
+    await prefetchCompareStats(new QueryClient(), ["react"]);
+
+    expect(fetchNpmDownloadsAdaptive).toHaveBeenCalledWith(["react"], {
+      signal: expect.any(AbortSignal),
+      firstPublished: {},
+    });
+  });
+
+  it("shares one signal between the first-published lookup and the fetch", async () => {
+    await prefetchCompareStats(new QueryClient(), ["react", "vue"]);
+
+    expect(getFirstPublished).toHaveBeenCalledWith(
+      ["react", "vue"],
+      vi.mocked(fetchNpmDownloadsAdaptive).mock.calls[0]![1]!.signal,
+    );
   });
 
   it("seeds partial data flagged for a quick refresh and skips missing projects", async () => {

@@ -65,10 +65,15 @@ export const eachDay = (start: string, end: string) => {
   );
 };
 
+export const FIRST_RELEASE_DAY = toUtcDay(new Date(FIRST_RELEASE.date));
+
+const publishedDownloads = (pkg: string, day: string) =>
+  day < FIRST_RELEASE_DAY ? 0 : seededDownloads(pkg, day);
+
 export const buildRangePeriod = (pkg: string, start: string, end: string) => ({
   downloads: eachDay(start, end).map((day) => ({
     day,
-    downloads: seededDownloads(pkg, day),
+    downloads: publishedDownloads(pkg, day),
   })),
   start,
   end,

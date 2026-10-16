@@ -8,9 +8,15 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { GET } from "./route";
 
-const { fetchAdaptiveMock, checkRateLimitMock } = vi.hoisted(() => ({
-  fetchAdaptiveMock: vi.fn(),
-  checkRateLimitMock: vi.fn(),
+const { fetchAdaptiveMock, checkRateLimitMock, getFirstPublishedMock } =
+  vi.hoisted(() => ({
+    fetchAdaptiveMock: vi.fn(),
+    checkRateLimitMock: vi.fn(),
+    getFirstPublishedMock: vi.fn(),
+  }));
+
+vi.mock("@/lib/server/firstPublished", () => ({
+  default: getFirstPublishedMock,
 }));
 
 vi.mock("@/api/fetchNpmDownloadsAdaptive", async (importOriginal) => ({
@@ -30,7 +36,11 @@ vi.mock("@/lib/utils/rateLimit", async (importOriginal) => {
 const MAX_REQUESTS_PER_WINDOW = 20;
 const SUCCESS_CACHE_CONTROL =
   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
-const SIGNAL_OPTS = { signal: expect.any(AbortSignal) };
+const FIRST_PUBLISHED = { react: new Date(2013, 4, 29) };
+const SIGNAL_OPTS = {
+  signal: expect.any(AbortSignal),
+  firstPublished: FIRST_PUBLISHED,
+};
 const B6_PACKAGES = 10;
 const B6_DAYS = 4_300;
 const B6_MAX_BYTES = 400 * 1024;
@@ -88,6 +98,8 @@ const buildFullHistory = (seed: number) =>
 beforeEach(() => {
   fetchAdaptiveMock.mockReset();
   fetchAdaptiveMock.mockResolvedValue(cannedResult);
+  getFirstPublishedMock.mockReset();
+  getFirstPublishedMock.mockResolvedValue(FIRST_PUBLISHED);
 });
 
 describe("GET /api/downloads", () => {
@@ -102,6 +114,27 @@ describe("GET /api/downloads", () => {
       SIGNAL_OPTS,
     );
     await expect(response.json()).resolves.toEqual(cannedResult);
+  });
+
+  test("falls back to an empty firstPublished map when no lookup resolves", async () => {
+    getFirstPublishedMock.mockResolvedValue({});
+
+    const response = await GET(buildRequest({ packages: ["react"] }));
+
+    expect(response.status).toBe(200);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(["react"], {
+      signal: expect.any(AbortSignal),
+      firstPublished: {},
+    });
+  });
+
+  test("hands the same signal to the first-published lookup and the fetch", async () => {
+    await GET(buildRequest({ packages: ["react", "vue"] }));
+
+    expect(getFirstPublishedMock).toHaveBeenCalledWith(
+      ["react", "vue"],
+      fetchAdaptiveMock.mock.calls[0]![1].signal,
+    );
   });
 
   test("checks the durable rate limiter with the downloads key and limits", async () => {

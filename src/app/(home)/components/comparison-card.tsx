@@ -1,7 +1,6 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DotIndicator from "@/components/ui/dot-indicator";
-import usePrefetchProjectsStats from "@/lib/queries/usePrefetchProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import Link from "next/link";
 import { ReactNode } from "react";
@@ -62,8 +61,6 @@ const ComparisonCard = ({
   headerExtra,
   ...action
 }: ComparisonCardProps) => {
-  const prefetch = usePrefetchProjectsStats();
-  const prefetchStats = () => prefetch.schedule(projects);
   const defaultFooterText = `Press to compare ${
     projects.length === 1 ? "this project" : `these ${projects.length} projects`
   }`;
@@ -75,10 +72,6 @@ const ComparisonCard = ({
 
   return (
     <Card
-      onPointerEnter={prefetchStats}
-      onPointerLeave={prefetch.cancel}
-      onFocus={prefetchStats}
-      onBlur={prefetch.cancel}
       className={cn(
         "relative cursor-pointer transition-all duration-200",
         "hover:bg-accent/50 hover:shadow-md",

@@ -5,6 +5,7 @@ import fetchNpmDownloadsAdaptive, {
   parsePackageList,
 } from "@/api/fetchNpmDownloadsAdaptive";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
+import getFirstPublished from "@/lib/server/firstPublished";
 import { isAppError } from "@/lib/utils/AppError";
 import { toCompactSeries } from "@/lib/utils/compactSeries";
 import getClientIp from "@/lib/utils/getClientIp";
@@ -103,7 +104,10 @@ export async function GET(request: NextRequest) {
   const signal = createUpstreamSignal(request.signal);
 
   try {
-    const result = await fetchNpmDownloadsAdaptive(packages, { signal });
+    const result = await fetchNpmDownloadsAdaptive(packages, {
+      signal,
+      firstPublished: await getFirstPublished(packages, signal),
+    });
     const cacheControl = hasTransientErrors(result.errors)
       ? CACHE_CONTROL.error
       : CACHE_CONTROL.success;

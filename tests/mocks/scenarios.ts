@@ -1,4 +1,3 @@
-import { NPM_API_FIRST_DAY } from "@/lib/config/constants";
 import type { NextFixture } from "next/experimental/testmode/playwright.js";
 import {
   depsDevVersionBatchResponse,
@@ -13,7 +12,12 @@ import {
   similarResponse,
   targetPackages,
 } from "./handlers";
-import { buildBulkRange, buildRangePeriod, isMissingPackage } from "./data";
+import {
+  buildBulkRange,
+  buildRangePeriod,
+  FIRST_RELEASE_DAY,
+  isMissingPackage,
+} from "./data";
 
 export type MockRegistrar = Pick<NextFixture, "onFetch">;
 
@@ -96,10 +100,13 @@ export const upstreamRateLimited = (next: MockRegistrar, pkg: string) =>
     }),
   );
 
+const coversFirstRelease = ({ start, end }: { start: string; end: string }) =>
+  start <= FIRST_RELEASE_DAY && FIRST_RELEASE_DAY < end;
+
 export const partial = (next: MockRegistrar, pkg: string) =>
   next.onFetch(
     forPackage(pkg, (target) => {
-      if (target.kind !== "range" || target.start !== NPM_API_FIRST_DAY) {
+      if (target.kind !== "range" || !coversFirstRelease(target)) {
         return undefined;
       }
       return serverErrorResponse();
