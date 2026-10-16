@@ -58,6 +58,7 @@ import {
 } from "react";
 import {
   CartesianGrid,
+  type LegendPayload,
   Line,
   LineChart,
   ReferenceLine,
@@ -191,6 +192,7 @@ function MultipleLineChart({
       LocalStorageKey.CHART_MODE,
       chartModeSchema,
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedMode) setChartMode(storedMode);
   }, [hasModeParam]);
 
@@ -249,6 +251,11 @@ function MultipleLineChart({
     if (!first) return [];
     return Object.keys(first).filter((key) => key !== xKey);
   }, [chartData, xKey]);
+
+  const sortLegendBySeries = useCallback(
+    (item: LegendPayload) => seriesKeys.indexOf(`${item.dataKey}`),
+    [seriesKeys],
+  );
 
   const formatYAxisTick = useCallback(
     (value: number) => {
@@ -348,7 +355,7 @@ function MultipleLineChart({
   return (
     <div
       className={cn(
-        "size-full flex flex-col gap-8",
+        "flex size-full flex-col gap-8",
         data.length === 0 && "hidden",
       )}
     >
@@ -356,7 +363,7 @@ function MultipleLineChart({
         <div className="flex items-center gap-2">
           <label
             htmlFor="time-period-select"
-            className="text-nowrap text-sm font-medium"
+            className="text-sm font-medium text-nowrap"
           >
             Time period
           </label>
@@ -371,10 +378,7 @@ function MultipleLineChart({
               content="Time period is unavailable in “Since first release” mode"
               open={isNormalized ? undefined : false}
             >
-              <SelectTrigger
-                id="time-period-select"
-                className="w-full md:w-[180px]"
-              >
+              <SelectTrigger id="time-period-select" className="w-full md:w-45">
                 <SelectValue />
               </SelectTrigger>
             </SimpleTooltip>
@@ -390,7 +394,7 @@ function MultipleLineChart({
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center justify-between gap-2 sm:justify-start">
-            <label className="text-nowrap text-sm font-medium">Scale</label>
+            <label className="text-sm font-medium text-nowrap">Scale</label>
             <ToggleGroup
               type="single"
               value={chartScale}
@@ -416,7 +420,7 @@ function MultipleLineChart({
           </div>
 
           <div className="flex items-center justify-between gap-2 sm:justify-start">
-            <label className="text-nowrap text-sm font-medium">Timeline</label>
+            <label className="text-sm font-medium text-nowrap">Timeline</label>
             <ToggleGroup
               type="single"
               value={chartMode}
@@ -494,7 +498,7 @@ function MultipleLineChart({
         </div>
       </div>
 
-      <div ref={chartRef} className={cn("relative mx-auto w-full h-full")}>
+      <div ref={chartRef} className={cn("relative mx-auto size-full")}>
         <ChartContainer config={config} className="max-h-[450px] w-full">
           <LineChart
             accessibilityLayer
@@ -507,7 +511,10 @@ function MultipleLineChart({
           >
             <ChartLegend
               content={
-                <ChartLegendContent chartKey={chartKey}>
+                <ChartLegendContent
+                  chartKey={chartKey}
+                  className="max-w-[100vw] flex-wrap"
+                >
                   {!isNormalized && (
                     <div className="flex items-center gap-1.5 text-xs text-foreground md:text-sm">
                       <Dash />
@@ -517,8 +524,8 @@ function MultipleLineChart({
                 </ChartLegendContent>
               }
               layout="horizontal"
-              className="max-w-[100vw] flex-wrap"
               verticalAlign="top"
+              itemSorter={sortLegendBySeries}
             />
             <CartesianGrid vertical={false} />
             <XAxis
@@ -541,6 +548,7 @@ function MultipleLineChart({
             />
             <ChartTooltip
               cursor={false}
+              includeHidden
               content={
                 <ChartTooltipContent
                   chartKey={chartKey}

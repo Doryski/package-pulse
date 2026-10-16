@@ -3,11 +3,16 @@ import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import { cn } from "@/lib/utils/cn";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
+import type { TooltipValueType } from "recharts";
 import Dash from "./dash";
 import { ChartConfig, useLineChart } from "./line-chart";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
+
+const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
+
+type TooltipNameType = number | string;
 
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
@@ -26,13 +31,15 @@ const ChartContainer = React.forwardRef<
       data-chart={chartId}
       ref={ref}
       className={cn(
-        "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+        "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick-label_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
         className,
       )}
       {...props}
     >
       <ChartStyle id={chartId} config={config} />
-      <RechartsPrimitive.ResponsiveContainer>
+      <RechartsPrimitive.ResponsiveContainer
+        initialDimension={INITIAL_DIMENSION}
+      >
         {children}
       </RechartsPrimitive.ResponsiveContainer>
     </div>
@@ -86,7 +93,13 @@ const ChartTooltipContent = React.forwardRef<
       labelKey?: string;
       chartKey: string;
       children?: React.ReactNode;
-    }
+    } & Omit<
+      RechartsPrimitive.DefaultTooltipContentProps<
+        TooltipValueType,
+        TooltipNameType
+      >,
+      "accessibilityLayer"
+    >
 >(
   (
     {
@@ -110,7 +123,7 @@ const ChartTooltipContent = React.forwardRef<
   ) => {
     const { config, isHiddenElement } = useLineChart(chartKey)();
 
-    const tooltipLabel = React.useMemo(() => {
+    const getTooltipLabel = () => {
       if (hideLabel || !payload?.length) {
         return null;
       }
@@ -136,27 +149,20 @@ const ChartTooltipContent = React.forwardRef<
       }
 
       return <div className={cn("font-medium", labelClassName)}>{value}</div>;
-    }, [
-      label,
-      labelFormatter,
-      payload,
-      hideLabel,
-      labelClassName,
-      config,
-      labelKey,
-    ]);
+    };
 
     if (!active || !payload?.length) {
       return null;
     }
 
     const nestLabel = payload.length === 1 && indicator !== "dot";
+    const tooltipLabel = getTooltipLabel();
 
     return (
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-32 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
           className,
         )}
       >
@@ -165,14 +171,14 @@ const ChartTooltipContent = React.forwardRef<
           {payload.map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload.fill || item.color;
+            const indicatorColor = color || item.payload?.fill || item.color;
             const isHidden = isHiddenElement(normalizeProjectName(key));
 
             return (
               <div
-                key={item.dataKey}
+                key={`${item.dataKey ?? index}`}
                 className={cn(
-                  "flex w-full flex-wrap items-stretch gap-2 text-left [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground rounded",
+                  "flex w-full flex-wrap items-stretch gap-2 rounded text-left [&>svg]:size-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center",
                   isHidden && "opacity-50",
                 )}
@@ -194,7 +200,7 @@ const ChartTooltipContent = React.forwardRef<
                     )}
                     <div
                       className={cn(
-                        "flex flex-1 justify-between leading-none gap-1",
+                        "flex flex-1 justify-between gap-1 leading-none",
                         nestLabel ? "items-end" : "items-center",
                         isHidden && "line-through",
                       )}
@@ -205,9 +211,9 @@ const ChartTooltipContent = React.forwardRef<
                           {itemConfig?.label || item.name}
                         </span>
                       </div>
-                      {item.value && (
-                        <span className="font-mono font-medium tabular-nums text-foreground">
-                          {item.value.toLocaleString()}
+                      {item.value != null && (
+                        <span className="font-mono font-medium text-foreground tabular-nums">
+                          {formatTooltipValue(item.value)}
                         </span>
                       )}
                     </div>
@@ -229,7 +235,10 @@ const ChartLegend = RechartsPrimitive.Legend;
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> &
-    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+    Pick<
+      RechartsPrimitive.DefaultLegendContentProps,
+      "payload" | "verticalAlign"
+    > & {
       hideIcon?: boolean;
       nameKey?: string;
       chartKey: string;
@@ -263,7 +272,7 @@ const ChartLegendContent = React.forwardRef<
           className,
         )}
       >
-        {payload.map((item) => {
+        {payload.map((item, index) => {
           const key = `${nameKey || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
           const isHidden = isHiddenElement(normalizeProjectName(key));
@@ -273,12 +282,12 @@ const ChartLegendContent = React.forwardRef<
 
           return (
             <button
-              key={item.value}
+              key={item.value ?? index}
               type="button"
               aria-pressed={!isHidden}
               aria-label={ariaLabel}
               className={cn(
-                "flex cursor-pointer items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded",
+                "flex cursor-pointer items-center gap-1.5 rounded focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden [&>svg]:size-3 [&>svg]:text-muted-foreground",
                 isHidden && "opacity-50",
               )}
               onClick={() => toggleElement(normalizeProjectName(key))}
@@ -322,8 +331,8 @@ function ChartDotIndicator({
   indicatorColor,
 }: ChartDotIndicatorProps) {
   const style = {
-    "--color-bg": indicatorColor,
-    "--color-border": indicatorColor,
+    "--indicator-bg": indicatorColor,
+    "--indicator-border": indicatorColor,
   } as React.CSSProperties;
 
   if (indicator === "dashed") {
@@ -333,7 +342,7 @@ function ChartDotIndicator({
   return (
     <div
       className={cn(
-        "shrink-0 rounded-full border-[--color-border] bg-[--color-bg]",
+        "shrink-0 rounded-full border-(--indicator-border) bg-(--indicator-bg)",
         {
           "h-2.5 w-2.5": indicator === "dot",
           "w-1": indicator === "line",
@@ -344,7 +353,10 @@ function ChartDotIndicator({
   );
 }
 
-// Helper to extract item config from a payload.
+function formatTooltipValue(value: TooltipValueType) {
+  return typeof value === "number" ? value.toLocaleString() : String(value);
+}
+
 function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,

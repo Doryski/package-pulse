@@ -44,7 +44,7 @@ test.describe("Chart Section", () => {
 
     const initialXAxisLabels = await page
       .locator(
-        "[data-testid='main-chart'] .recharts-xAxis .recharts-cartesian-axis-tick-value",
+        "[data-testid='main-chart'] .recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
       )
       .allTextContents();
 
@@ -61,7 +61,7 @@ test.describe("Chart Section", () => {
 
     const updatedXAxisLabels = await page
       .locator(
-        "[data-testid='main-chart'] .recharts-xAxis .recharts-cartesian-axis-tick-value",
+        "[data-testid='main-chart'] .recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
       )
       .allTextContents();
 

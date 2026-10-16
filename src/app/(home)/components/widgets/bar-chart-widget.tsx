@@ -19,6 +19,10 @@ import {
 } from "recharts";
 import getPeakAndLatestDownloads from "../../utils/getPeakAndLatestStats";
 
+const AXIS_TEXT_CLASS_NAME = "fill-muted-foreground text-xs";
+
+const AXIS_TICK = { fontSize: 12, className: AXIS_TEXT_CLASS_NAME } as const;
+
 export type BarChartMode = "downloads" | "growth";
 
 export type BarChartWidgetProps = {
@@ -85,16 +89,14 @@ const BarChartWidget = memo(
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
               dataKey="name"
-              className="fill-muted-foreground text-xs"
-              tick={{ fontSize: 12 }}
+              tick={AXIS_TICK}
               interval={0}
               angle={-45}
               textAnchor="end"
               height={80}
             />
             <YAxis
-              className="fill-muted-foreground text-xs"
-              tick={{ fontSize: 12 }}
+              tick={AXIS_TICK}
               tickFormatter={(value) => {
                 if (comparisonMode === "growth") {
                   return `${value}%`;
@@ -105,6 +107,7 @@ const BarChartWidget = memo(
                 value: getYAxisLabel(),
                 angle: -90,
                 position: "insideLeft",
+                className: AXIS_TEXT_CLASS_NAME,
               }}
             />
             <Tooltip
@@ -113,7 +116,8 @@ const BarChartWidget = memo(
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "6px",
               }}
-              formatter={(value: number) => {
+              formatter={(value) => {
+                if (typeof value !== "number") return value;
                 return formatTooltipValue(value);
               }}
               labelFormatter={(label, payload) => {
@@ -126,12 +130,13 @@ const BarChartWidget = memo(
                       <span>Project:</span>
                       <span>{label}</span>
                     </span>
-                    {comparisonMode === "downloads" && value !== undefined && (
-                      <span className="flex items-center gap-2">
-                        <span>Downloads:</span>
-                        <span>{formatInteger(value)}</span>
-                      </span>
-                    )}
+                    {comparisonMode === "downloads" &&
+                      typeof value === "number" && (
+                        <span className="flex items-center gap-2">
+                          <span>Downloads:</span>
+                          <span>{formatInteger(value)}</span>
+                        </span>
+                      )}
                     {comparisonMode === "growth" &&
                       growthValue !== undefined && (
                         <span className="flex items-center gap-2">

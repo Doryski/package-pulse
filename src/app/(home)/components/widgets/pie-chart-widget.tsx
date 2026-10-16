@@ -8,6 +8,7 @@ import {
   Legend,
   Pie,
   PieChart,
+  type PieLabelRenderProps,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
@@ -57,7 +58,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
+      <div className="flex h-100 items-center justify-center">
         <div className="text-center">
           <div className="mb-2 text-4xl">📊</div>
           <p className="font-medium text-muted-foreground">No data available</p>
@@ -76,14 +77,8 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
     innerRadius,
     outerRadius,
     percent,
-  }: {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    innerRadius: number;
-    outerRadius: number;
-    percent: number;
-  }) => {
+  }: PieLabelRenderProps) => {
+    if (midAngle === undefined || percent === undefined) return null;
     if (percent < 0.05) return null;
 
     const RADIAN = Math.PI / 180;
@@ -101,7 +96,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
         dominantBaseline="central"
         fontSize={11}
         fontWeight="600"
-        className="drop-shadow-sm"
+        className="drop-shadow-xs"
       >
         {formatPercentage(percent * 100, 1)}
       </text>
@@ -114,7 +109,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
   return (
     <div className="w-full">
       <style dangerouslySetInnerHTML={{ __html: styleContent }} />
-      <div className="h-[400px]" data-chart={chartId}>
+      <div className="h-100" data-chart={chartId}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart margin={{ top: 20, right: 20, bottom: 25, left: 20 }}>
             <defs>
@@ -159,7 +154,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend content={<CustomLegend />} />
+            <Legend content={<CustomLegend />} itemSorter={null} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -191,7 +186,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   const fillColor = `var(--color-${data.payload.normalizedName})`;
 
   return (
-    <div className="min-w-[120px] rounded-lg border border-border bg-background/95 p-3 shadow-lg backdrop-blur-sm">
+    <div className="min-w-30 rounded-lg border border-border bg-background/95 p-3 shadow-lg backdrop-blur-xs">
       <div className="mb-1 flex items-center gap-2">
         <div
           className="size-3 rounded-full"
