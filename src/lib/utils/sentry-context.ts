@@ -39,7 +39,37 @@ export function getSearchParamsContext(): Record<string, unknown> {
   }
 }
 
-export function scrubRequestUrl<TEvent extends Sentry.ErrorEvent>(
+export const SENTRY_TRACES_SAMPLE_RATE =
+  process.env.NODE_ENV === "production" ? 0.1 : 1;
+
+const BREADCRUMB_URL_KEYS = ["url", "to", "from"] as const;
+
+const stripQuery = (raw: string) => {
+  try {
+    const url = new URL(raw, "http://localhost");
+    const isRelative = !/^[a-z][a-z\d+.-]*:/i.test(raw);
+    return isRelative ? url.pathname : `${url.origin}${url.pathname}`;
+  } catch {
+    return raw.split(/[?#]/)[0] ?? raw;
+  }
+};
+
+export function scrubBreadcrumb(
+  breadcrumb: Sentry.Breadcrumb,
+): Sentry.Breadcrumb {
+  const data = breadcrumb.data;
+  if (!data) return breadcrumb;
+
+  const scrubbed = Object.fromEntries(
+    BREADCRUMB_URL_KEYS.filter((key) => typeof data[key] === "string").map(
+      (key) => [key, stripQuery(data[key])],
+    ),
+  );
+
+  return { ...breadcrumb, data: { ...data, ...scrubbed } };
+}
+
+export function scrubRequestUrl<TEvent extends Sentry.Event>(
   event: TEvent,
 ): TEvent {
   const request = event.request;

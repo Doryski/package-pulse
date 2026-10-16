@@ -1,11 +1,12 @@
 import fetchNpmDownloadsAdaptive, {
-  notFoundMessage,
+  hasTransientErrors,
+  parsePackageList,
 } from "@/api/fetchNpmDownloadsAdaptive";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { colors } from "@/lib/theme/colors";
 import { formatLargeNumber } from "@/lib/utils/formatters";
 import getClientIp from "@/lib/utils/getClientIp";
-import isRateLimited from "@/lib/utils/rateLimit";
+import { checkRateLimit } from "@/lib/utils/rateLimit";
 import isValidPackageName from "@/lib/utils/isValidPackageName";
 import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import { isAppError } from "@/lib/utils/AppError";
@@ -165,15 +166,12 @@ function svgResponse(
 
 export async function GET(request: NextRequest) {
   const clientIP = getClientIp(request.headers);
-  if (isRateLimited(`badge:${clientIP}`, RATE_LIMIT)) {
+  if (await checkRateLimit(`badge:${clientIP}`, RATE_LIMIT)) {
     return svgResponse(renderMessageSvg("Rate limit exceeded"), 429);
   }
 
   const { searchParams } = new URL(request.url);
-  const packages = (searchParams.get("packages") || "")
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
+  const packages = parsePackageList(searchParams.get("packages"));
 
   if (packages.length === 0) {
     return svgResponse(renderMessageSvg("No packages provided"), 400);
@@ -221,11 +219,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const hasTransientError = Object.entries(errors).some(
-      ([name, message]) => message !== notFoundMessage(name),
+    return svgResponse(
+      renderBadgeSvg(series),
+      200,
+      !hasTransientErrors(errors),
     );
-    return svgResponse(renderBadgeSvg(series), 200, !hasTransientError);
   } catch (error) {
+    console.error("Error in GET /api/badge:", error);
     const message = isAppError(error)
       ? error.message
       : "Failed to load download data";

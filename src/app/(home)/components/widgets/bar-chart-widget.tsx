@@ -121,25 +121,25 @@ const BarChartWidget = memo(
                 const growthValue: number | undefined =
                   payload?.[0]?.payload?.growth;
                 return (
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <span className="block">
+                    <span className="flex items-center gap-2">
                       <span>Project:</span>
                       <span>{label}</span>
-                    </div>
+                    </span>
                     {comparisonMode === "downloads" && value !== undefined && (
-                      <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-2">
                         <span>Downloads:</span>
                         <span>{formatInteger(value)}</span>
-                      </div>
+                      </span>
                     )}
                     {comparisonMode === "growth" &&
                       growthValue !== undefined && (
-                        <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-2">
                           <span>Growth rate:</span>
                           <span>{formatPercentage(growthValue)}</span>
-                        </div>
+                        </span>
                       )}
-                  </div>
+                  </span>
                 );
               }}
             />

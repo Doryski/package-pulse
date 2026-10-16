@@ -1,34 +1,17 @@
-import { PackageInfo } from "@/api/fetchPackageInfo";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { fetchSimilarProjects } from "../utils/fetchSimilarProjects";
 
-export default function useSimilarProjects(packagesInfo: PackageInfo[]) {
-  const stableProjectNames = useMemo(
-    () =>
-      packagesInfo
-        .map((info) => info.projectName)
-        .sort()
-        .join(","),
-    [packagesInfo],
-  );
-
-  const stablePackagesInfo = useMemo(
-    () =>
-      packagesInfo
-        .map((info) => ({
-          projectName: info.projectName,
-          keywords: info.keywords,
-          description: info.description,
-        }))
-        .sort((a, b) => a.projectName.localeCompare(b.projectName)),
-    [packagesInfo],
+export default function useSimilarProjects(projectNames: string[]) {
+  const sortedProjectNames = useMemo(
+    () => projectNames.toSorted(),
+    [projectNames],
   );
 
   return useQuery({
-    queryKey: ["similarProjects", stableProjectNames],
-    queryFn: () => fetchSimilarProjects(stablePackagesInfo),
-    enabled: packagesInfo.length > 0,
+    queryKey: ["similarProjects", sortedProjectNames.join(",")],
+    queryFn: () => fetchSimilarProjects(sortedProjectNames),
+    enabled: sortedProjectNames.length > 0,
     staleTime: 1000 * 60 * 60 * 24, // 24 hours
     gcTime: 1000 * 60 * 60 * 48, // 48 hours
     retry: (failureCount, error) => {

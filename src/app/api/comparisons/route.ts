@@ -1,3 +1,4 @@
+import { encodeRegistryPackageName } from "@/api/fetchPackageInfo";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import {
   comparisonsStorage,
@@ -11,8 +12,12 @@ import {
   PublicComparison,
 } from "@/lib/types/global-comparison";
 import getClientIp from "@/lib/utils/getClientIp";
-import isRateLimited from "@/lib/utils/rateLimit";
+import { checkRateLimit } from "@/lib/utils/rateLimit";
 import isValidPackageName from "@/lib/utils/isValidPackageName";
+import {
+  COMPARISONS_READ_RATE_LIMIT,
+  ComparisonsLimitSchema,
+} from "@/lib/schemas/comparisonsQuery.schema";
 import { NextRequest, NextResponse } from "next/server";
 
 type CreateComparisonResponse = PublicComparison & {
@@ -29,34 +34,98 @@ function toPublicComparison(comparison: GlobalComparison): PublicComparison {
 
 const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 10 } as const;
 
+const VALIDATION_CACHE = {
+  ttlMs: 5 * 60 * 1000,
+  maxEntries: 1000,
+} as const;
+const REGISTRY_TIMEOUT_MS = 5000;
+const ABBREVIATED_PACKUMENT = "application/vnd.npm.install-v1+json";
+
 const packageValidationCache = new Map<
   string,
   { isValid: boolean; timestamp: number }
 >();
-const VALIDATION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const isFresh = (timestamp: number, now: number) =>
+  now - timestamp < VALIDATION_CACHE.ttlMs;
+
+function readCachedValidation(packageName: string): boolean | undefined {
+  const cached = packageValidationCache.get(packageName);
+  if (!cached || !isFresh(cached.timestamp, Date.now())) return undefined;
+  return cached.isValid;
+}
+
+function evictValidationCache(now: number): void {
+  for (const [name, entry] of packageValidationCache) {
+    if (!isFresh(entry.timestamp, now)) packageValidationCache.delete(name);
+  }
+  const overflow = packageValidationCache.size - VALIDATION_CACHE.maxEntries;
+  [...packageValidationCache.keys()]
+    .slice(0, Math.max(0, overflow))
+    .forEach((name) => packageValidationCache.delete(name));
+}
+
+function cacheValidation(packageName: string, isValid: boolean): void {
+  const now = Date.now();
+  packageValidationCache.delete(packageName);
+  packageValidationCache.set(packageName, { isValid, timestamp: now });
+  if (packageValidationCache.size <= VALIDATION_CACHE.maxEntries) return;
+  evictValidationCache(now);
+}
+
+async function fetchPackageExists(packageName: string): Promise<boolean> {
+  const response = await fetch(
+    `https://registry.npmjs.org/${encodeRegistryPackageName(packageName)}`,
+    {
+      method: "HEAD",
+      headers: { Accept: ABBREVIATED_PACKUMENT },
+      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+    },
+  );
+  return response.status === 200;
+}
 
 async function validatePackageExists(packageName: string): Promise<boolean> {
+  const cached = readCachedValidation(packageName);
+  if (cached !== undefined) return cached;
+
   try {
-    const cached = packageValidationCache.get(packageName);
-    if (cached && Date.now() - cached.timestamp < VALIDATION_CACHE_TTL) {
-      return cached.isValid;
-    }
-
-    const response = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(packageName)}`,
-    );
-    const isValid = response.status === 200;
-
-    packageValidationCache.set(packageName, {
-      isValid,
-      timestamp: Date.now(),
-    });
-
+    const isValid = await fetchPackageExists(packageName);
+    cacheValidation(packageName, isValid);
     return isValid;
   } catch (_error) {
     return false;
   }
 }
+
+const hostOf = (value: string | null): string | null => {
+  if (!value) return null;
+  try {
+    return new URL(value).host;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const getRequestHost = (request: NextRequest) =>
+  request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+  request.headers.get("host") ||
+  request.nextUrl.host;
+
+function isSameOriginRequest(request: NextRequest): boolean {
+  const requestHost = getRequestHost(request);
+  const origin = request.headers.get("origin");
+  const sourceHost = origin
+    ? hostOf(origin)
+    : hostOf(request.headers.get("referer"));
+  return sourceHost !== null && sourceHost === requestHost;
+}
+
+const errorResponse = (error: string, status: number) =>
+  NextResponse.json<GlobalComparisonError>({ error }, { status });
+
+const rateLimitedResponse = () =>
+  errorResponse("Rate limit exceeded. Too many requests.", 429);
 
 async function validateAndFilterPackages(packages: string[]): Promise<{
   validPackages: string[];
@@ -93,9 +162,19 @@ function generateComparisonId(): string {
 export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<GlobalComparisonResponse | GlobalComparisonError>> {
+  const clientIP = getClientIp(request.headers);
+  if (
+    await checkRateLimit(
+      `comparisons-read:${clientIP}`,
+      COMPARISONS_READ_RATE_LIMIT,
+    )
+  ) {
+    return rateLimitedResponse();
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
+    const limit = ComparisonsLimitSchema.parse(searchParams.get("limit"));
 
     const comparisons = await comparisonsStorage.getComparisons();
     const uniqueComparisons = getUniqueComparisons(comparisons, limit);
@@ -104,25 +183,24 @@ export async function GET(
       comparisons: uniqueComparisons.map(toPublicComparison),
       total: comparisons.length,
     });
-  } catch (_error) {
-    return NextResponse.json(
-      { error: "Failed to read comparisons" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Error in GET /api/comparisons:", error);
+    return errorResponse("Failed to read comparisons", 500);
   }
 }
 
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<CreateComparisonResponse | GlobalComparisonError>> {
+  if (!isSameOriginRequest(request)) {
+    return errorResponse("Cross-origin requests are not allowed.", 403);
+  }
+
   try {
     const clientIP = getClientIp(request.headers);
 
-    if (isRateLimited(`comparisons:${clientIP}`, RATE_LIMIT)) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Too many requests." },
-        { status: 429 },
-      );
+    if (await checkRateLimit(`comparisons:${clientIP}`, RATE_LIMIT)) {
+      return rateLimitedResponse();
     }
 
     const rawBody = await request.json().catch(() => null);
@@ -185,12 +263,6 @@ export async function POST(
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("Error in POST /api/comparisons:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to create comparison",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+    return errorResponse("Failed to create comparison", 500);
   }
 }

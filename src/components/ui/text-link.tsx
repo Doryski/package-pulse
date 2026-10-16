@@ -14,8 +14,8 @@ const TextLink = forwardRef<HTMLAnchorElement, TextLinkProps>(
           "hover:underline hover:opacity-80 transition-opacity",
           className,
         )}
-        {...(outside ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         {...props}
+        {...(outside ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
         {children}
       </a>

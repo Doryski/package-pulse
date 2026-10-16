@@ -5,6 +5,8 @@
 import * as Sentry from "@sentry/nextjs";
 import {
   getSearchParamsContext,
+  SENTRY_TRACES_SAMPLE_RATE,
+  scrubBreadcrumb,
   scrubRequestUrl,
 } from "./lib/utils/sentry-context";
 
@@ -14,7 +16,7 @@ Sentry.init({
   integrations: [Sentry.replayIntegration()],
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
+  tracesSampleRate: SENTRY_TRACES_SAMPLE_RATE,
 
   // Define how likely Replay events are sampled.
   // This sets the sample rate to be 10%. You may want this to be 100% while
@@ -26,6 +28,10 @@ Sentry.init({
 
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
+
+  beforeSendTransaction: scrubRequestUrl,
+
+  beforeBreadcrumb: scrubBreadcrumb,
 
   beforeSend(event) {
     if (typeof window !== "undefined") {

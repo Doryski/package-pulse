@@ -20,6 +20,7 @@ import useGithubRepoInfo from "@/lib/queries/useGithubRepoInfo";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import { formatLargeNumber } from "@/lib/utils/formatters";
 import { round } from "@/lib/utils/math";
+import safeExternalUrl from "@/lib/utils/safeExternalUrl";
 import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
 import { UseQueryResult } from "@tanstack/react-query";
 import { differenceInDays, formatDistanceToNow } from "date-fns";
@@ -177,6 +178,10 @@ const ProjectInfoRow = memo(
       npmPackage.data?.projectName!,
       !!npmPackage.data?.repoName && !!githubRepo.data,
     );
+
+    const projectName = npmPackage.data?.projectName ?? "";
+    const homepageUrl = safeExternalUrl(npmPackage.data?.homepage);
+    const repositoryUrl = safeExternalUrl(npmPackage.data?.repositoryUrl);
 
     return (
       <TableRow key={`${npmPackage.data?.projectName}-${index}`}>
@@ -368,9 +373,13 @@ const ProjectInfoRow = memo(
             fallback={<Skeleton className="h-4 w-full" />}
           >
             <div className="flex items-center gap-2">
-              {npmPackage.data?.homepage && (
+              {homepageUrl && (
                 <SimpleTooltip content={<span>Homepage</span>}>
-                  <TextLink href={npmPackage.data?.homepage} outside>
+                  <TextLink
+                    href={homepageUrl}
+                    outside
+                    aria-label={`${projectName} homepage`}
+                  >
                     <HomeIcon className="size-5" />
                   </TextLink>
                 </SimpleTooltip>
@@ -380,6 +389,7 @@ const ProjectInfoRow = memo(
                   <TextLink
                     href={getNpmLink(npmPackage.data?.projectName)}
                     outside
+                    aria-label={`${projectName} on npm`}
                   >
                     <Image
                       src="/images/npm-logo.svg"
@@ -391,12 +401,13 @@ const ProjectInfoRow = memo(
                   </TextLink>
                 </SimpleTooltip>
               )}
-              {npmPackage.data?.repositoryUrl && (
+              {repositoryUrl && (
                 <SimpleTooltip content={<span>GitHub repository</span>}>
                   <TextLink
-                    href={npmPackage.data?.repositoryUrl}
+                    href={repositoryUrl}
                     outside
                     className="text-white"
+                    aria-label={`${projectName} GitHub repository`}
                   >
                     <GitHubLogoIcon className="size-5" />
                   </TextLink>

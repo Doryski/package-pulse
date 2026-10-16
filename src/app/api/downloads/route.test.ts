@@ -7,13 +7,24 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { GET } from "./route";
 
-const { fetchAdaptiveMock } = vi.hoisted(() => ({
+const { fetchAdaptiveMock, checkRateLimitMock } = vi.hoisted(() => ({
   fetchAdaptiveMock: vi.fn(),
+  checkRateLimitMock: vi.fn(),
 }));
 
-vi.mock("@/api/fetchNpmDownloadsAdaptive", () => ({
+vi.mock("@/api/fetchNpmDownloadsAdaptive", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/fetchNpmDownloadsAdaptive")>()),
   default: fetchAdaptiveMock,
 }));
+
+vi.mock("@/lib/utils/rateLimit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/utils/rateLimit")>();
+  checkRateLimitMock.mockImplementation(
+    async (...args: Parameters<typeof actual.checkRateLimit>) =>
+      actual.default(...args),
+  );
+  return { ...actual, checkRateLimit: checkRateLimitMock };
+});
 
 const MAX_REQUESTS_PER_WINDOW = 20;
 
@@ -61,8 +72,94 @@ describe("GET /api/downloads", () => {
 
     expect(response.status).toBe(200);
     expect(fetchAdaptiveMock).toHaveBeenCalledTimes(1);
-    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages.toSorted());
     await expect(response.json()).resolves.toEqual(cannedResult);
+  });
+
+  test("checks the durable rate limiter with the downloads key and limits", async () => {
+    await GET(
+      buildRequest({
+        packages: ["react"],
+        headers: { "x-real-ip": "7.7.7.7" },
+      }),
+    );
+
+    expect(checkRateLimitMock).toHaveBeenCalledWith("downloads:7.7.7.7", {
+      windowMs: 60 * 1000,
+      maxRequests: MAX_REQUESTS_PER_WINDOW,
+    });
+  });
+
+  test("trims, dedupes and sorts the package list", async () => {
+    const response = await GET(
+      buildRequest({ packages: [" vue", "react ", "vue", "react", "@a/b"] }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(["@a/b", "react", "vue"]);
+  });
+
+  test("counts unique packages against SELECTED_PROJECTS_LIMIT", async () => {
+    const packages = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT + 1 },
+      () => "react",
+    );
+    const response = await GET(buildRequest({ packages }));
+
+    expect(response.status).toBe(200);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(["react"]);
+  });
+
+  test("serves complete data with a public CDN cache header", async () => {
+    const response = await GET(buildRequest({ packages: ["react"] }));
+
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=3600, stale-while-revalidate=86400",
+    );
+  });
+
+  test("does not cache a response with transient package errors", async () => {
+    fetchAdaptiveMock.mockResolvedValue({
+      ...cannedResult,
+      errors: { react: 'Some download data for "react" could not be loaded' },
+    });
+
+    const response = await GET(buildRequest({ packages: ["react"] }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  test("keeps caching when the only error is a missing package", async () => {
+    fetchAdaptiveMock.mockResolvedValue({
+      ...cannedResult,
+      errors: { "no-such-pkg": 'Package "no-such-pkg" not found' },
+    });
+
+    const response = await GET(
+      buildRequest({ packages: ["react", "no-such-pkg"] }),
+    );
+
+    expect(response.headers.get("Cache-Control")).toContain("public");
+  });
+
+  test("returns a generic 500 with no-store when the fetch throws", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchAdaptiveMock.mockRejectedValue(new Error("secret internal detail"));
+
+    const response = await GET(buildRequest({ packages: ["react"] }));
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch NPM download data",
+    });
+  });
+
+  test("returns no-store on validation errors", async () => {
+    const response = await GET(buildRequest({}));
+
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   test("accepts exactly SELECTED_PROJECTS_LIMIT packages", async () => {
@@ -73,7 +170,7 @@ describe("GET /api/downloads", () => {
     const response = await GET(buildRequest({ packages }));
 
     expect(response.status).toBe(200);
-    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages.toSorted());
   });
 
   test("rejects an invalid package name with 400", async () => {
@@ -105,7 +202,7 @@ describe("GET /api/downloads", () => {
     const response = await GET(buildRequest({ packages }));
 
     expect(response.status).toBe(200);
-    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(packages.toSorted());
   });
 
   test("rejects empty packages with 400", async () => {

@@ -11,6 +11,14 @@ type StructuredDataProps = {
   };
 };
 
+const JSON_LD_UNSAFE_CHARS = /[<>&\u2028\u2029]/g;
+
+export const serializeJsonLd = (data: unknown) =>
+  JSON.stringify(data).replace(
+    JSON_LD_UNSAFE_CHARS,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+
 const StructuredData = ({
   type,
   name,
@@ -79,7 +87,7 @@ const StructuredData = ({
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify(getStructuredData()),
+        __html: serializeJsonLd(getStructuredData()),
       }}
     />
   );

@@ -16,15 +16,16 @@ const baseUrl = "https://www.package-pulse.com";
 export const dynamicParams = true;
 
 type ComparePageProps = {
-  params: { slug: string[] };
+  params: Promise<{ slug: string[] }>;
 };
 
 function formatProjectsList(projects: string[]): string {
   return projects.join(" vs ");
 }
 
-function getProjectsFromParams(params: ComparePageProps["params"]) {
-  return slugToProjects(params.slug.join("/"));
+async function getProjectsFromParams(params: ComparePageProps["params"]) {
+  const { slug } = await params;
+  return slugToProjects(slug.join("/"));
 }
 
 export function generateStaticParams() {
@@ -36,7 +37,7 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: ComparePageProps): Promise<Metadata> {
-  const projects = getProjectsFromParams(params);
+  const projects = await getProjectsFromParams(params);
 
   if (projects.length === 0) {
     return {
@@ -79,8 +80,8 @@ export async function generateMetadata({
   };
 }
 
-export default function ComparePage({ params }: ComparePageProps) {
-  const projects = getProjectsFromParams(params);
+export default async function ComparePage({ params }: ComparePageProps) {
+  const projects = await getProjectsFromParams(params);
 
   if (projects.length === 0) notFound();
 

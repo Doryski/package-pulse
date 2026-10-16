@@ -28,6 +28,7 @@ export const exportCsv = (filename: string, data: unknown[]) => {
   const csvContent = Papa.unparse(data, {
     header: true,
     skipEmptyLines: true,
+    escapeFormulae: true,
   });
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

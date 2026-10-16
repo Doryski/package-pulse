@@ -5,6 +5,7 @@ import {
 } from "@/lib/types/global-comparison";
 import safeParse from "@/lib/utils/safeParse";
 import { Redis } from "@upstash/redis";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 const GlobalComparisonsSchema = z.array(GlobalComparisonSchema);
@@ -15,6 +16,34 @@ const MAX_COMPARISONS = 500;
 const MAX_COMPARISONS_PER_USER = 20;
 const DEDUP_WINDOW_MS = 5 * 60 * 1000;
 const USER_KEY_TTL_SECONDS = 90 * 24 * 60 * 60;
+const UNKNOWN_CLIENT = "unknown";
+const IP_HASH_LENGTH = 32;
+const IP_HASH_FALLBACK_SALT = "package-pulse-ip-hash-v1";
+const MAX_USER_AGENT_LENGTH = 200;
+
+export function hashClientIp(clientIP: string | undefined): string {
+  const salt = process.env.PP_IP_HASH_SALT || IP_HASH_FALLBACK_SALT;
+  return createHash("sha256")
+    .update(`${salt}:${clientIP || UNKNOWN_CLIENT}`)
+    .digest("hex")
+    .slice(0, IP_HASH_LENGTH);
+}
+
+export function truncateUserAgent(
+  userAgent: string | undefined,
+): string | undefined {
+  return userAgent?.slice(0, MAX_USER_AGENT_LENGTH);
+}
+
+export function anonymizeComparison(
+  comparison: GlobalComparison,
+): GlobalComparison {
+  return {
+    ...comparison,
+    clientIP: hashClientIp(comparison.clientIP),
+    userAgent: truncateUserAgent(comparison.userAgent),
+  };
+}
 
 const ADD_COMPARISON_SCRIPT = `
 local raw = redis.call('GET', KEYS[1])
@@ -161,9 +190,12 @@ let redis: Redis | null = null;
 function getRedisClient(): Redis {
   if (!redis) {
     try {
+      if (!env.PP_KV_REST_API_URL || !env.PP_KV_REST_API_TOKEN) {
+        throw new Error("Missing Redis URL or token");
+      }
       redis = new Redis({
-        url: env.PP_KV_REST_API_URL!,
-        token: env.PP_KV_REST_API_TOKEN!,
+        url: env.PP_KV_REST_API_URL,
+        token: env.PP_KV_REST_API_TOKEN,
       });
     } catch (error) {
       console.error("Failed to initialize Redis client:", error);
@@ -187,10 +219,11 @@ const redisStorage: ComparisonStorage = {
     }
   },
 
-  async addComparison(newComparison: GlobalComparison) {
+  async addComparison(rawComparison: GlobalComparison) {
     try {
       const client = getRedisClient();
-      const clientIP = newComparison.clientIP || "unknown";
+      const newComparison = anonymizeComparison(rawComparison);
+      const clientIP = newComparison.clientIP ?? UNKNOWN_CLIENT;
 
       const result = await client.eval<string[], string>(
         ADD_COMPARISON_SCRIPT,
@@ -220,11 +253,11 @@ const redisStorage: ComparisonStorage = {
     }
   },
 
-  async getComparisonsByUser(clientIP: string) {
+  async getComparisonsByUser(rawClientIP: string) {
     try {
       const client = getRedisClient();
       const raw = await client.get<GlobalComparison[]>(
-        `${COMPARISONS_BY_USER_KEY}:${clientIP}`,
+        `${COMPARISONS_BY_USER_KEY}:${hashClientIp(rawClientIP)}`,
       );
       const comparisons = safeParse(raw, GlobalComparisonsSchema);
       return Array.isArray(comparisons) ? comparisons : [];
@@ -242,7 +275,8 @@ const memoryStorage: ComparisonStorage = {
     return memoryComparisons;
   },
 
-  async addComparison(newComparison: GlobalComparison) {
+  async addComparison(rawComparison: GlobalComparison) {
+    const newComparison = anonymizeComparison(rawComparison);
     if (isDuplicateComparison(newComparison, memoryComparisons)) {
       throw new Error("DUPLICATE_COMPARISON");
     }
@@ -273,12 +307,12 @@ const memoryStorage: ComparisonStorage = {
     const userComparisons = memoryComparisons.filter(
       (c) => c.clientIP === newComparison.clientIP,
     );
-    const clientIP = newComparison.clientIP || "unknown";
+    const clientIP = newComparison.clientIP ?? UNKNOWN_CLIENT;
     memoryComparisonsByUser[clientIP] = userComparisons;
   },
 
-  async getComparisonsByUser(clientIP: string) {
-    return memoryComparisonsByUser[clientIP] || [];
+  async getComparisonsByUser(rawClientIP: string) {
+    return memoryComparisonsByUser[hashClientIp(rawClientIP)] || [];
   },
 
   isDuplicateComparison,

@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
-import usePackagesInfo from "@/lib/queries/usePackagesInfo";
 import useSimilarProjects from "@/lib/queries/useSimilarProjects";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -27,13 +26,7 @@ const SimilarProjects = ({
     }
   }, [selectedProjects.length]);
 
-  const packagesInfo = usePackagesInfo(selectedProjects);
-  const validPackagesInfo = useMemo(
-    () => packagesInfo.map((info) => info.data).filter((info) => info != null),
-    [packagesInfo],
-  );
-
-  const similarProjectsQuery = useSimilarProjects(validPackagesInfo);
+  const similarProjectsQuery = useSimilarProjects(selectedProjects);
 
   const filteredSimilarProjects = useMemo(() => {
     if (!similarProjectsQuery.data) return [];

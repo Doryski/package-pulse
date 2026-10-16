@@ -2,10 +2,15 @@
  * @vitest-environment node
  */
 import { formatDate } from "@/app/(home)/utils/date-utils";
-import fetchNpmDownloadsAdaptive from "@/api/fetchNpmDownloadsAdaptive";
+import fetchNpmDownloadsAdaptive, {
+  hasTransientErrors,
+  parsePackageList,
+} from "@/api/fetchNpmDownloadsAdaptive";
 import {
   NPM_BULK_RANGE_API_PERIOD_DAYS,
+  NPM_API_FIRST_DAY,
   NPM_RANGE_API_PERIOD_MONTHS,
+  SELECTED_PROJECTS_LIMIT,
 } from "@/lib/config/constants";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import { RetryConfig } from "adaptive-promise-pool";
@@ -478,5 +483,116 @@ describe("fetchNpmDownloadsAdaptive - systemic vs not-found outcomes", () => {
     expect(result.data.react).not.toBeNull();
     expect(result.data["@gone/pkg"]).toBeNull();
     expect(Object.keys(result.errors)).toEqual(["@gone/pkg"]);
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - upstream bounds", () => {
+  const emptyBulk = (_url: string) =>
+    Promise.resolve(makeResponse(200, bulkBody({})));
+
+  test("clamps a start date before the npm API first day", async () => {
+    const fetchImpl = vi.fn(emptyBulk);
+
+    await fetchNpmDownloadsAdaptive(["react"], {
+      startDate: new Date("1990-01-01T00:00:00.000Z"),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    const starts = fetchImpl.mock.calls.map((call) => startOf(call[0]));
+    expect(starts.toSorted()[0]).toBe(NPM_API_FIRST_DAY);
+  });
+
+  test("dedupes repeated package names before building tasks", async () => {
+    const fetchImpl = vi.fn(emptyBulk);
+
+    const result = await fetchNpmDownloadsAdaptive(["@scope/a", "@scope/a"], {
+      startDate: daysAgo(30),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.stats.requestCount).toBe(1);
+  });
+
+  test("requests upstream data through the revalidating fetch cache", async () => {
+    const fetchImpl = vi.fn(emptyBulk);
+
+    await fetchNpmDownloadsAdaptive(["react"], {
+      startDate: daysAgo(30),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ next: { revalidate: 3600 } }),
+    );
+  });
+
+  test("serves SELECTED_PROJECTS_LIMIT scoped packages over the full history", async () => {
+    const fetchImpl = vi.fn(emptyBulk);
+    const packages = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT },
+      (_, index) => `@scope/pkg-${index}`,
+    );
+    const fullHistoryWindows = getTimePeriods(
+      new Date(`${NPM_API_FIRST_DAY}T00:00:00.000Z`),
+      getToday(),
+      NPM_RANGE_API_PERIOD_MONTHS,
+      "months",
+    );
+
+    const result = await fetchNpmDownloadsAdaptive(packages, {
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(result.stats.requestCount).toBe(
+      SELECTED_PROJECTS_LIMIT * fullHistoryWindows.length,
+    );
+  });
+
+  test("rejects more than SELECTED_PROJECTS_LIMIT unique packages before any upstream call", async () => {
+    const fetchImpl = vi.fn(emptyBulk);
+    const packages = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT + 1 },
+      (_, index) => `@scope/pkg-${index}`,
+    );
+
+    await expect(
+      fetchNpmDownloadsAdaptive(packages, {
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+      }),
+    ).rejects.toThrow("Too many packages requested");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("parsePackageList", () => {
+  test("trims, drops empties, dedupes and sorts", () => {
+    expect(parsePackageList(" vue,react,, vue ,@a/b")).toEqual([
+      "@a/b",
+      "react",
+      "vue",
+    ]);
+  });
+
+  test("returns an empty list for a missing value", () => {
+    expect(parsePackageList(null)).toEqual([]);
+  });
+});
+
+describe("hasTransientErrors", () => {
+  test("ignores not-found errors", () => {
+    expect(hasTransientErrors({ x: 'Package "x" not found' })).toBe(false);
+  });
+
+  test("flags any other error", () => {
+    expect(hasTransientErrors({ x: 'Failed to load downloads for "x"' })).toBe(
+      true,
+    );
   });
 });

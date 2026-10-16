@@ -3,6 +3,7 @@ import {
   NPM_API_FIRST_DAY,
   NPM_BULK_RANGE_API_PERIOD_DAYS,
   NPM_RANGE_API_PERIOD_MONTHS,
+  SELECTED_PROJECTS_LIMIT,
 } from "@/lib/config/constants";
 import { NPMDownloadCount } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import { normalizeRangeResponse } from "@/lib/schemas/npmBulkDownloads.schema";
@@ -15,10 +16,12 @@ import {
   RateLimitError,
   RetryConfig,
 } from "adaptive-promise-pool";
-import { isValid, startOfDay } from "date-fns";
+import { isValid, max, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 const NPM_RANGE_BASE_URL = "https://api.npmjs.org/downloads/range";
+const UPSTREAM_REVALIDATE_SECONDS = 3600;
+const PACKAGE_LIST_DELIMITER = ",";
 
 const DEFAULT_CONCURRENCY: ConcurrencyConfig = { initial: 4, min: 1, max: 8 };
 const DEFAULT_RETRY: RetryConfig = {
@@ -61,6 +64,11 @@ const isTaskFailure = (result: TaskResult): result is TaskFailure =>
   "error" in result;
 
 export const notFoundMessage = (name: string) => `Package "${name}" not found`;
+
+export const hasTransientErrors = (errors: Record<string, string>) =>
+  Object.entries(errors).some(
+    ([name, message]) => message !== notFoundMessage(name),
+  );
 const failedMessage = (name: string) =>
   `Failed to load downloads for "${name}"`;
 const partialMessage = (name: string) =>
@@ -74,43 +82,53 @@ const isNotFoundErrorBody = (message: string) => {
 const buildRangeUrl = (start: Date, end: Date, packages: string) =>
   `${NPM_RANGE_BASE_URL}/${formatDate(start)}:${formatDate(end)}/${packages}`;
 
-function buildTasks(packages: string[], from: Date, to: Date): DownloadTask[] {
+export const parsePackageList = (raw: string | null): string[] =>
+  [
+    ...new Set(
+      (raw ?? "")
+        .split(PACKAGE_LIST_DELIMITER)
+        .map((name) => name.trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+
+const buildWindows = (from: Date, to: Date) => ({
+  bulk: getTimePeriods(from, to, NPM_BULK_RANGE_API_PERIOD_DAYS, "days"),
+  scoped: getTimePeriods(from, to, NPM_RANGE_API_PERIOD_MONTHS, "months"),
+});
+
+type DownloadWindows = ReturnType<typeof buildWindows>;
+
+function buildTasks(
+  packages: string[],
+  windows: DownloadWindows,
+): DownloadTask[] {
   const { unscoped, scoped } = partitionPackages(packages);
-  const tasks: DownloadTask[] = [];
+  const joined = unscoped.join(PACKAGE_LIST_DELIMITER);
 
-  if (unscoped.length > 0) {
-    const joined = unscoped.join(",");
-    const windows = getTimePeriods(
-      from,
-      to,
-      NPM_BULK_RANGE_API_PERIOD_DAYS,
-      "days",
-    );
-    for (const window of windows) {
-      tasks.push({
-        url: buildRangeUrl(window.start, window.end, joined),
-        packages: unscoped,
-      });
-    }
-  }
+  const bulkTasks =
+    unscoped.length === 0
+      ? []
+      : windows.bulk.map((window) => ({
+          url: buildRangeUrl(window.start, window.end, joined),
+          packages: unscoped,
+        }));
 
-  for (const pkg of scoped) {
-    const windows = getTimePeriods(
-      from,
-      to,
-      NPM_RANGE_API_PERIOD_MONTHS,
-      "months",
-    );
-    for (const window of windows) {
-      tasks.push({
-        url: buildRangeUrl(window.start, window.end, pkg),
-        packages: [pkg],
-      });
-    }
-  }
+  const scopedTasks = scoped.flatMap((pkg) =>
+    windows.scoped.map((window) => ({
+      url: buildRangeUrl(window.start, window.end, pkg),
+      packages: [pkg],
+    })),
+  );
 
-  return tasks;
+  return [...bulkTasks, ...scopedTasks];
 }
+
+const resolveStartDate = (startDate: Date | undefined) => {
+  const firstDay = parseDate(NPM_API_FIRST_DAY);
+  if (!startDate || !isValid(startDate)) return firstDay;
+  return max([startDate, firstDay]);
+};
 
 function mergeDownloads(downloads: NPMDownloadCount[]): NPMDownloadCount[] {
   const byDate = new Map<string, NPMDownloadCount>();
@@ -164,20 +182,23 @@ export default async function fetchNpmDownloadsAdaptive(
   opts?: FetchNpmDownloadsAdaptiveOptions,
 ): Promise<AdaptiveDownloadsResult> {
   const fetchImpl = opts?.fetchImpl ?? fetch;
-
-  let from = parseDate(NPM_API_FIRST_DAY);
-  if (opts?.startDate && isValid(opts.startDate)) {
-    from = opts.startDate;
+  const uniquePackages = [...new Set(packages)];
+  if (uniquePackages.length > SELECTED_PROJECTS_LIMIT) {
+    throw new AppError("Too many packages requested");
   }
-  const today = startOfDay(toZonedTime(new Date(), "UTC"));
 
-  const tasks = buildTasks(packages, from, today);
+  const from = resolveStartDate(opts?.startDate);
+  const today = startOfDay(toZonedTime(new Date(), "UTC"));
+  const tasks = buildTasks(uniquePackages, buildWindows(from, today));
 
   const processor = async (
     task: DownloadTask,
     ctx: { signal: AbortSignal },
   ): Promise<TaskResult> => {
-    const res = await fetchImpl(task.url, { signal: ctx.signal });
+    const res = await fetchImpl(task.url, {
+      signal: ctx.signal,
+      next: { revalidate: UPSTREAM_REVALIDATE_SECONDS },
+    });
 
     if (res.status === 429) {
       throw new RateLimitError({
@@ -220,7 +241,7 @@ export default async function fetchNpmDownloadsAdaptive(
   });
 
   const accumulators = new Map(
-    packages.map((name) => [name, createAccumulator()] as const),
+    uniquePackages.map((name) => [name, createAccumulator()] as const),
   );
   const update = (names: string[], apply: (acc: PackageAccumulator) => void) =>
     names

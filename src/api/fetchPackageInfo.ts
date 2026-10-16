@@ -50,10 +50,20 @@ const processPackageVersions = (
     );
 };
 
+export const encodeRegistryPackageName = (name: string) =>
+  encodeURIComponent(name).replace(/^%40/, "@");
+
 export const fetchPackageInfo = async (projectName: string) => {
   try {
     return await npmApiQueue.add(async () => {
-      const response = await fetch(`https://registry.npmjs.org/${projectName}`);
+      const response = await fetch(
+        `https://registry.npmjs.org/${encodeRegistryPackageName(projectName)}`,
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch package "${projectName}": ${response.status}`,
+        );
+      }
       const data = await response.json();
 
       const parsedData = safeParse(data, NPMPackageInfoSchema);

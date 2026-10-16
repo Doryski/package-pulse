@@ -12,7 +12,7 @@ import { notFound } from "next/navigation";
 const baseUrl = "https://www.package-pulse.com";
 
 type CategoryPageProps = {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 };
 
 function findPresetByCategory(category: string) {
@@ -30,7 +30,8 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: CategoryPageProps): Promise<Metadata> {
-  const preset = findPresetByCategory(params.category);
+  const { category } = await params;
+  const preset = findPresetByCategory(category);
 
   if (!preset) {
     return {
@@ -43,7 +44,7 @@ export async function generateMetadata({
 
   const title = `${preset.title} — compare npm packages | Package Pulse`;
   const description = `Compare npm download trends for ${preset.projects.join(", ")}. Explore ${preset.title.toLowerCase()} package popularity with interactive charts on Package Pulse.`;
-  const canonical = `/categories/${params.category}`;
+  const canonical = `/categories/${category}`;
 
   return {
     title,
@@ -72,8 +73,9 @@ export async function generateMetadata({
   };
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
-  const preset = findPresetByCategory(params.category);
+export default async function CategoryPage({ params }: CategoryPageProps) {
+  const { category } = await params;
+  const preset = findPresetByCategory(category);
 
   if (!preset) notFound();
 

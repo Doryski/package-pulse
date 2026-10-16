@@ -1,4 +1,3 @@
-import { isError } from "lodash";
 import { ZodError } from "zod";
 import { isAppError } from "./AppError";
 
@@ -14,6 +13,6 @@ export default function getRequestErrorMessage(
 
   if (error instanceof ZodError) return defaultMessage;
   if (error instanceof TypeError) return defaultMessage;
-  if (isError(error)) return error.message;
+  if (error instanceof Error) return error.message;
   return defaultMessage;
 }
