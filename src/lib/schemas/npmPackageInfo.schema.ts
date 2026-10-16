@@ -8,6 +8,13 @@ const RepositorySchema = z.union([
   z.string(),
 ]);
 
+const BugsSchema = z.union([
+  z.object({
+    url: z.string(),
+  }),
+  z.string(),
+]);
+
 export const VersionSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -34,14 +41,7 @@ export const VersionSchema = z.object({
       z.array(z.string()),
     ])
     .optional(),
-  bugs: z
-    .union([
-      z.object({
-        url: z.string(),
-      }),
-      z.string(),
-    ])
-    .optional(),
+  bugs: BugsSchema.optional(),
   homepage: z.string().optional(),
   devDependencies: z.record(z.string(), z.string()).optional(),
   dependencies: z.record(z.string(), z.string()).optional(),
@@ -114,11 +114,7 @@ export const NPMPackageInfoSchema = z.object({
     )
     .optional(),
   license: z.union([z.string(), z.array(z.string())]).optional(),
-  bugs: z
-    .object({
-      url: z.string(),
-    })
-    .optional(),
+  bugs: BugsSchema.optional(),
   readmeFilename: z.string().optional(),
   users: z.record(z.string(), z.boolean()).optional(),
 });
