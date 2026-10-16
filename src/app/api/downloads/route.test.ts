@@ -2,6 +2,7 @@
  * @vitest-environment node
  */
 import type { AdaptiveDownloadsResult } from "@/api/fetchNpmDownloadsAdaptive";
+import AppError from "@/lib/utils/AppError";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -298,5 +299,18 @@ describe("GET /api/downloads", () => {
     );
 
     expect(limited.status).toBe(429);
+  });
+
+  test("returns 500 with the AppError message when the fetch fails with one", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchAdaptiveMock.mockRejectedValue(new AppError("upstream exploded"));
+
+    const response = await GET(buildRequest({ packages: ["react"] }));
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: "upstream exploded",
+    });
   });
 });

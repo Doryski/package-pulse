@@ -28,6 +28,7 @@ const ProjectTag = ({
         backgroundColor: error ? "hsl(0deg 100% 50% / 25%)" : undefined,
       }}
       onRemove={onRemove}
+      removeLabel={`Remove ${project}`}
     >
       {project}
     </Tag>

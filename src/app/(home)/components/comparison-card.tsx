@@ -23,23 +23,27 @@ const ComparisonCard = ({
     projects.length === 1 ? "this project" : `these ${projects.length} projects`
   }`;
 
+  const projectsLabel = projects.join(", ");
+  const cardLabel = title
+    ? `Compare ${title}: ${projectsLabel}`
+    : `Compare ${projectsLabel}`;
+
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200",
+        "relative cursor-pointer transition-all duration-200",
         "hover:bg-accent/50 hover:shadow-md",
         "border hover:border-primary/20",
         "flex min-h-40 flex-col",
         className,
       )}
-      onClick={() => onProjectsClick(projects)}
     >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {title}
           </CardTitle>
-          {headerExtra}
+          <div className="relative z-10">{headerExtra}</div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between pt-0">
@@ -56,9 +60,18 @@ const ComparisonCard = ({
             </div>
           ))}
         </div>
-        <div className="mt-3 text-xs text-muted-foreground">
+        <button
+          type="button"
+          aria-label={cardLabel}
+          onClick={() => onProjectsClick(projects)}
+          className={cn(
+            "mt-3 text-left text-xs text-muted-foreground outline-none",
+            "after:absolute after:inset-0 after:rounded-[inherit] after:content-['']",
+            "focus-visible:after:ring-2 focus-visible:after:ring-ring",
+          )}
+        >
           {defaultFooterText}
-        </div>
+        </button>
       </CardContent>
     </Card>
   );

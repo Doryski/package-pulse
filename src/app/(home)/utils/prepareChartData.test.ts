@@ -1,7 +1,9 @@
 import { ProjectStats } from "@/lib/queries/useProjectsStats";
 import { UseQueryResult } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import { prepareNormalizedChartData } from "./prepareChartData";
+import prepareChartData, {
+  prepareNormalizedChartData,
+} from "./prepareChartData";
 
 const makeQuery = (projectName: string, counts: number[]) =>
   ({
@@ -59,5 +61,26 @@ describe("prepareNormalizedChartData", () => {
       { weekIndex: 1, react: 6 },
     ]);
     expect(rows.every((row) => typeof row.weekIndex === "number")).toBe(true);
+  });
+});
+
+describe("prepareChartData", () => {
+  it("merges series sharing a week end into one row", () => {
+    const rows = prepareChartData([
+      makeQuery("react", [1, 2]),
+      makeQuery("vue", [10, 20, 30]),
+    ]);
+
+    expect(rows).toEqual([
+      { time: "2024-01-01", react: 1, vue: 10 },
+      { time: "2024-01-02", react: 2, vue: 20 },
+      { time: "2024-01-03", vue: 30 },
+    ]);
+  });
+
+  it("skips queries without data", () => {
+    const pending = { data: undefined } as UseQueryResult<ProjectStats>;
+
+    expect(prepareChartData([pending])).toEqual([]);
   });
 });

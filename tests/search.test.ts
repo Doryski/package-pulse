@@ -1,11 +1,13 @@
+import type { Page } from "@playwright/test";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
-import { expect, Page, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { projectNames, projectNamesExcessive, projectNamesLimit } from "./data";
 import {
   addManyProjects,
   fillSearchInput,
   getOptionsList,
   getSearchInput,
+  getTagRemoveButton,
   getTags,
   goToProjectsPage,
   waitForSearchResponse,
@@ -14,8 +16,9 @@ import {
 const prepareFilledCombobox = async (page: Page, projectName: string) => {
   const searchInput = getSearchInput(page);
 
+  const searchResponse = waitForSearchResponse(page, projectName);
   await fillSearchInput(searchInput, projectName);
-  await waitForSearchResponse(page, projectName);
+  await searchResponse;
 
   return searchInput;
 };
@@ -23,12 +26,6 @@ const prepareFilledCombobox = async (page: Page, projectName: string) => {
 test.describe("Search Projects Form", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-  });
-
-  test.afterEach(async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.removeItem("pp:selected-projects");
-    });
   });
 
   test("should allow searching for and selecting projects", async ({
@@ -63,8 +60,7 @@ test.describe("Search Projects Form", () => {
     const selectedProject = getTags(page).getByText(projectName);
     await expect(selectedProject).toBeVisible();
 
-    const removeButton = selectedProject.locator("button");
-    await removeButton.click();
+    await getTagRemoveButton(page, projectName).click();
 
     await expect(selectedProject).not.toBeVisible();
   });
@@ -76,7 +72,7 @@ test.describe("Search Projects Form", () => {
     await addManyProjects(page, searchInput, projectNames);
 
     const url = page.url();
-    expect(url).toContain("projects=react,vue");
+    expect(decodeURIComponent(url)).toContain("projects=react,vue");
   });
 
   test("should load projects from URL and show the tags", async ({ page }) => {
@@ -84,7 +80,7 @@ test.describe("Search Projects Form", () => {
     await page.waitForSelector("[role='list']");
     const tags = getTags(page);
     for (const projectName of projectNames) {
-      expect(tags.getByText(projectName)).toBeVisible();
+      await expect(tags.getByText(projectName)).toBeVisible();
     }
   });
 
@@ -107,7 +103,7 @@ test.describe("Search Projects Form", () => {
 
   test("should show error for non-existent project", async ({ page }) => {
     const searchInput = getSearchInput(page);
-    const nonExistentProject = "this-project-does-not-exist-12345";
+    const nonExistentProject = "missing-project-12345";
 
     await fillSearchInput(searchInput, nonExistentProject);
     await searchInput.press("Enter");
@@ -248,7 +244,9 @@ test.describe("Search Projects Form", () => {
 
     const remainingProjects = urlProjects.slice(SELECTED_PROJECTS_LIMIT);
     for (const projectName of remainingProjects) {
-      expect(tags.getByText(projectName, { exact: true })).not.toBeVisible();
+      await expect(
+        tags.getByText(projectName, { exact: true }),
+      ).not.toBeVisible();
     }
   });
 });

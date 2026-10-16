@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { getSearchInput } from "./utils";
 
-test("smoke test", async ({ page }) => {
+test("smoke test @responsive", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
 

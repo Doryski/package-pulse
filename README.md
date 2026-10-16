@@ -23,8 +23,8 @@ Choosing between npm packages is harder than it should be. Download counts on np
 ## Tech Stack
 
 - TypeScript
-- Next.js 14 (App Router)
-- React 18, React Hook Form, Zustand, TanStack Query
+- Next.js 16 (App Router)
+- React 19, React Hook Form, Zustand, TanStack Query
 - Tailwind CSS, Radix UI, shadcn-style components, Recharts
 - Vitest (unit) and Playwright (end-to-end)
 - Sentry for error monitoring, Vercel Analytics
@@ -35,15 +35,15 @@ Choosing between npm packages is harder than it should be. Download counts on np
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm (recommended) or npm
+- Node.js 24.x
+- npm
 
 ### Installation
 
 ```bash
 git clone https://github.com/doryski/package-pulse.git
 cd package-pulse
-pnpm install
+npm ci
 ```
 
 ### Environment Variables
@@ -64,15 +64,17 @@ cp .env.example .env.local
 ### Running
 
 ```bash
-pnpm dev          # start the Next.js dev server
-pnpm build        # production build
-pnpm start        # serve the production build
-pnpm lint         # ESLint
-pnpm test         # Vitest unit tests
-pnpm test:e2e     # Playwright end-to-end tests
+npm run dev       # start the Next.js dev server
+npm run build     # production build
+npm start         # serve the production build
+npm run lint      # ESLint
+npm test          # Vitest unit tests
+npm run coverage  # unit tests with the 90% coverage gate
+npm run test:e2e  # Playwright end-to-end tests (mocked upstreams)
+npm run verify    # build, lint, unit tests and e2e in one pass
 ```
 
-The dev server listens on http://localhost:3000.
+The dev server listens on http://localhost:3000. Playwright starts its own server on port 3210 (override with `PW_PORT`) with every external request mocked, so e2e needs no network access or API keys.
 
 ## Project Structure
 

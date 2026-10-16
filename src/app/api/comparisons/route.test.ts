@@ -260,4 +260,175 @@ describe("POST /api/comparisons", () => {
     expect(body).not.toHaveProperty("clientIP");
     expect(body).not.toHaveProperty("userAgent");
   });
+
+  test("returns 400 for a malformed JSON body", async () => {
+    const response = await POST(
+      new NextRequest("http://localhost/api/comparisons", {
+        method: "POST",
+        body: "{not json",
+        headers: { "x-real-ip": uniqueIp(), origin: "http://localhost" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(storageMock.addComparison).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["a missing projects array", {}],
+    ["an empty projects array", { projects: [] }],
+    ["non-string projects", { projects: [1, 2] }],
+    [
+      "too many projects",
+      { projects: Array.from({ length: 11 }, (_, i) => `p${i}`) },
+    ],
+  ])("returns 400 for %s", async (_label, body) => {
+    const response = await POST(postRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("returns 400 listing invalid packages when none are valid", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+
+    const response = await POST(
+      postRequest({ projects: ["ghost-pkg", "Bad Name!", "   "] }),
+    );
+
+    expect(response.status).toBe(400);
+    const { error } = await response.json();
+    expect(error).toContain("ghost-pkg");
+    expect(error).toContain("Bad Name!");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(storageMock.addComparison).not.toHaveBeenCalled();
+  });
+
+  test("returns 409 for a duplicate comparison", async () => {
+    storageMock.addComparison.mockRejectedValue(
+      new Error("DUPLICATE_COMPARISON"),
+    );
+
+    const response = await POST(postRequest({ projects: ["dup-pkg"] }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Duplicate comparison detected.",
+    });
+  });
+
+  test("treats a registry network failure as an invalid package and does not cache it", async () => {
+    fetchMock.mockRejectedValue(new DOMException("timeout", "TimeoutError"));
+
+    const first = await POST(postRequest({ projects: ["flaky-pkg"] }));
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+    const second = await POST(postRequest({ projects: ["flaky-pkg"] }));
+
+    expect(first.status).toBe(400);
+    expect(second.status).toBe(201);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("passes an abort timeout signal to the registry HEAD request", async () => {
+    await POST(postRequest({ projects: ["signal-pkg"] }));
+
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  test("caches a negative registry result", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+
+    await POST(postRequest({ projects: ["negative-cached"] }));
+    await POST(postRequest({ projects: ["negative-cached"] }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("trusts the first x-forwarded-host entry", async () => {
+    const response = await POST(
+      postRequest(
+        { projects: ["fwd-first"] },
+        {
+          origin: "https://www.package-pulse.com",
+          "x-forwarded-host": "www.package-pulse.com, internal.proxy",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(201);
+  });
+
+  test("falls back to the request URL host when no Host header is present", async () => {
+    const request = new NextRequest("https://app.example/api/comparisons", {
+      method: "POST",
+      body: JSON.stringify({ projects: ["no-host-hdr"] }),
+      headers: { "x-real-ip": uniqueIp(), origin: "https://app.example" },
+    });
+    request.headers.delete("host");
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+  });
+
+  describe("validation cache lifecycle", () => {
+    const seedBatches = async (prefix: string, total: number) => {
+      for (let start = 0; start < total; start += 10) {
+        const projects = Array.from(
+          { length: Math.min(10, total - start) },
+          (_, offset) => `${prefix}-${start + offset}`,
+        );
+        await POST(postRequest({ projects }));
+      }
+    };
+
+    const registryCallsFor = (name: string) =>
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith(`/${name}`))
+        .length;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("serves a lookup from cache just before the 5 minute TTL", async () => {
+      await POST(postRequest({ projects: ["ttl-fresh"] }));
+      vi.advanceTimersByTime(5 * 60 * 1000 - 1);
+      await POST(postRequest({ projects: ["ttl-fresh"] }));
+
+      expect(registryCallsFor("ttl-fresh")).toBe(1);
+    });
+
+    test("refetches a lookup once the TTL has elapsed", async () => {
+      await POST(postRequest({ projects: ["ttl-stale"] }));
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      await POST(postRequest({ projects: ["ttl-stale"] }));
+
+      expect(registryCallsFor("ttl-stale")).toBe(2);
+    });
+
+    test("evicts expired entries when the cache overflows", async () => {
+      await seedBatches("exp-old", 1000);
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      await seedBatches("exp-new", 10);
+      fetchMock.mockClear();
+
+      await POST(postRequest({ projects: ["exp-old-0"] }));
+
+      expect(registryCallsFor("exp-old-0")).toBe(1);
+    });
+
+    test("drops the oldest fresh entries beyond the max size", async () => {
+      await seedBatches("cap", 1010);
+      fetchMock.mockClear();
+
+      await POST(postRequest({ projects: ["cap-0", "cap-1009"] }));
+
+      expect(registryCallsFor("cap-0")).toBe(1);
+      expect(registryCallsFor("cap-1009")).toBe(0);
+    });
+  });
 });

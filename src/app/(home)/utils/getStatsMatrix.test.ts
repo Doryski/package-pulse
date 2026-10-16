@@ -186,4 +186,26 @@ describe("getStatsMatrix", () => {
     expect(result.stats).toHaveLength(2);
     expect(result.stats[0]?.color).not.toBe(result.stats[1]?.color);
   });
+
+  it("returns the cached row for identical repeated input", () => {
+    const query = makeQuery("cache-hit", comprehensiveData);
+
+    const first = getStatsMatrix([query], "light");
+    const second = getStatsMatrix([query], "light");
+
+    expect(second.stats[0]).toBe(first.stats[0]);
+  });
+
+  it("evicts old cache entries beyond the limit and still computes correctly", () => {
+    const queries = Array.from({ length: 120 }, (_, index) =>
+      makeQuery(`evict-${index}`, comprehensiveData),
+    );
+
+    const first = getStatsMatrix(queries, undefined);
+    const second = getStatsMatrix(queries, undefined);
+
+    expect(second.stats).toHaveLength(120);
+    expect(second.stats[0]).not.toBe(first.stats[0]);
+    expect(second.stats[0]?.yearlyChange).toEqual(first.stats[0]?.yearlyChange);
+  });
 });

@@ -92,6 +92,8 @@ const ProjectsForm = () => {
     previousProjectsRef.current = selectedProjects;
   }, [selectedProjects]);
 
+  const focusSearch = () => projectsSearchForm.setFocus("search");
+
   const handleAddProject = (projectName: string) => {
     if (!selectedProjects.includes(projectName)) {
       projectsSearchForm.setValue("projects", [
@@ -99,6 +101,7 @@ const ProjectsForm = () => {
         projectName,
       ]);
     }
+    focusSearch();
   };
 
   const handleAddMultipleProjects = (projectNames: string[]) => {
@@ -110,6 +113,7 @@ const ProjectsForm = () => {
       const updatedProjects = [...selectedProjects, ...newProjects];
       projectsSearchForm.setValue("projects", updatedProjects);
     }
+    focusSearch();
   };
 
   const handleSearch = async (query: string) => {
@@ -217,6 +221,7 @@ const ProjectsForm = () => {
       <SavedComparisons
         selectedProjects={selectedProjects}
         onAddMultipleProjects={handleAddMultipleProjects}
+        onFavoriteRemoved={focusSearch}
       />
       <QuickComparisons
         selectedProjects={selectedProjects}

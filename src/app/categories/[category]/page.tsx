@@ -38,7 +38,6 @@ export async function generateMetadata({
       title: "Compare npm packages | Package Pulse",
       description:
         "Browse npm package categories and compare download trends on Package Pulse.",
-      alternates: { canonical: "/categories" },
     };
   }
 

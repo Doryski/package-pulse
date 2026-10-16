@@ -142,3 +142,109 @@ describe("checkRateLimit", () => {
     vi.useRealTimers();
   });
 });
+
+describe("memory limiter housekeeping", () => {
+  test("sweeps expired entries once the map reaches the threshold", async () => {
+    vi.useFakeTimers();
+    const { default: isRateLimited } = await loadModule();
+    const options = { windowMs: 1000, maxRequests: 1 };
+
+    for (let index = 0; index < 10_000; index += 1) {
+      isRateLimited(`sweep-${index}`, options);
+    }
+    vi.advanceTimersByTime(2000);
+
+    expect(isRateLimited("sweep-new", options)).toBe(false);
+    expect(isRateLimited("sweep-0", options)).toBe(false);
+    expect(isRateLimited("sweep-0", options)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  test("keeps unexpired entries during a sweep", async () => {
+    vi.useFakeTimers();
+    const { default: isRateLimited } = await loadModule();
+    const options = { windowMs: 60_000, maxRequests: 1 };
+
+    for (let index = 0; index < 10_000; index += 1) {
+      isRateLimited(`keep-${index}`, options);
+    }
+
+    expect(isRateLimited("keep-new", options)).toBe(false);
+    expect(isRateLimited("keep-0", options)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  test("starts a fresh window after the previous one expires", async () => {
+    vi.useFakeTimers();
+    const { default: isRateLimited } = await loadModule();
+    const options = { windowMs: 1000, maxRequests: 1 };
+
+    expect(isRateLimited("w", options)).toBe(false);
+    expect(isRateLimited("w", options)).toBe(true);
+    vi.advanceTimersByTime(1001);
+    expect(isRateLimited("w", options)).toBe(false);
+    vi.useRealTimers();
+  });
+});
+
+describe("checkRateLimit durable path details", () => {
+  test("applies default window and max requests", async () => {
+    configureRedis();
+    const { checkRateLimit } = await loadModule();
+    limitMock.mockResolvedValue({ success: true });
+
+    await checkRateLimit("defaults");
+
+    expect(ratelimitConstructor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limiter: { tokens: 10, window: "60000 ms" },
+        prefix: "ratelimit:60000:10",
+        timeout: 1000,
+        analytics: false,
+      }),
+    );
+  });
+
+  test("does not use Upstash when only the URL or only the token is set", async () => {
+    envState.PP_KV_REST_API_URL = "https://redis.example.com";
+    const { checkRateLimit } = await loadModule();
+
+    expect(await checkRateLimit(nextKey())).toBe(false);
+    expect(ratelimitConstructor).not.toHaveBeenCalled();
+  });
+
+  test("logs the error and enters cooldown, using memory during it", async () => {
+    configureRedis();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { checkRateLimit } = await loadModule();
+    limitMock.mockRejectedValueOnce(new Error("boom"));
+    const key = nextKey();
+    const options = { windowMs: 60_000, maxRequests: 1 };
+
+    expect(await checkRateLimit(key, options)).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Durable rate limit failed, using memory limiter:",
+      expect.any(Error),
+    );
+    expect(await checkRateLimit(key, options)).toBe(true);
+    expect(limitMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("a timeout starts the cooldown without logging", async () => {
+    configureRedis();
+    vi.useFakeTimers();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { checkRateLimit } = await loadModule();
+    limitMock.mockResolvedValueOnce({ success: true, reason: "timeout" });
+    limitMock.mockResolvedValue({ success: false });
+
+    await checkRateLimit(nextKey());
+    expect(await checkRateLimit(nextKey())).toBe(false);
+    expect(limitMock).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(60_001);
+    expect(await checkRateLimit(nextKey())).toBe(true);
+    vi.useRealTimers();
+  });
+});

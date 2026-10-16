@@ -31,10 +31,8 @@ import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
-import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
 import { exportCsv } from "@/lib/utils/exportUtils";
-import { formatLargeNumber } from "@/lib/utils/formatters";
 import { copyAsImage, downloadAsImage } from "@/lib/utils/imageExport";
 import sortByVersion from "@/lib/utils/sortByVersion";
 import {
@@ -45,7 +43,6 @@ import {
   TableIcon,
   TwitterLogoIcon,
 } from "@radix-ui/react-icons";
-import { isAfter, subMonths, subYears } from "date-fns";
 import {
   Fragment,
   memo,
@@ -70,6 +67,21 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import Dash from "./dash";
 import {
+  buildShareToXUrl,
+  ChartConfig,
+  ChartData,
+  ChartRow,
+  filterByTimePeriod,
+  formatLatestVersion,
+  formatNormalizedLabel,
+  formatXAxisTick,
+  formatYAxisTick,
+  getSeriesKeys,
+  getYAxisDomain,
+  NormalizedChartData,
+  nullifyZeroValues,
+} from "./line-chart-utils";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -79,31 +91,12 @@ import {
 import { Separator } from "./separator";
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 
-export type ChartData = {
-  time: string | Date;
-} & Record<string, number | null>;
-
-export type NormalizedChartData = {
-  weekIndex: number;
-} & Record<string, number | null>;
-
-type ChartRow = Record<string, number | string | Date | null>;
-
-export type VersionData = {
-  version: string;
-  date: string;
-};
-
-export type ChartConfig = {
-  [k in string]: {
-    label?: React.ReactNode;
-    icon?: React.ComponentType;
-    versions?: VersionData[];
-  } & (
-    | { color?: string; theme?: never }
-    | { color?: never; theme: Record<"light" | "dark", string> }
-  );
-};
+export type {
+  ChartConfig,
+  ChartData,
+  NormalizedChartData,
+  VersionData,
+} from "./line-chart-utils";
 
 type LineChartStore = {
   config: ChartConfig;
@@ -151,15 +144,42 @@ export const useLineChart = (key: string) => {
   return storeCache.get(key)!;
 };
 
-const getLatestVersion = (versions?: VersionData[]) => {
-  if (!versions) return;
-  return sortByVersion(versions).at(-1);
+type LastReleasesListProps = {
+  config: ChartConfig;
 };
 
-const formatVersion = (version: VersionData) => {
-  const formattedDate = formatDate(version.date);
-  return `${version.version} (${formattedDate})`;
-};
+export function LastReleasesList({ config }: LastReleasesListProps) {
+  return (
+    <>
+      <Separator />
+      <div className="flex items-center gap-1.5 text-sm text-foreground">
+        <span>Last releases</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {Object.keys(config).map((key) => {
+          const displayName = config[key]?.label || key;
+          return (
+            <div key={key} className="flex w-full items-center gap-2">
+              <ChartDotIndicator
+                indicator="dashed"
+                nestLabel={false}
+                indicatorColor={`var(--color-${key})`}
+              />
+              <div className="flex w-full items-center justify-between gap-1">
+                <span className="text-xs text-muted-foreground">
+                  {displayName}
+                </span>
+                <span className="text-right text-xs text-foreground">
+                  {formatLatestVersion(config[key]?.versions)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
 
 type MultipleLineChartProps = {
   data: ChartData[];
@@ -221,92 +241,33 @@ function MultipleLineChart({
     if (isNormalized) {
       return normalizedData;
     }
-
-    const today = new Date();
-    return data.filter((item) => {
-      const date = new Date(item.time);
-      switch (timePeriod) {
-        case "months-1":
-          return isAfter(date, subMonths(today, 1));
-        case "months-3":
-          return isAfter(date, subMonths(today, 3));
-        case "months-6":
-          return isAfter(date, subMonths(today, 6));
-        case "years-1":
-          return isAfter(date, subYears(today, 1));
-        case "years-2":
-          return isAfter(date, subYears(today, 2));
-        case "years-5":
-          return isAfter(date, subYears(today, 5));
-        case "all-time":
-          return true;
-        default:
-          return assertUnreachable(timePeriod, "Invalid time period");
-      }
-    });
+    return filterByTimePeriod(data, timePeriod, new Date());
   }, [data, normalizedData, timePeriod, isNormalized]);
 
-  const seriesKeys = useMemo(() => {
-    const first = chartData[0];
-    if (!first) return [];
-    return Object.keys(first).filter((key) => key !== xKey);
-  }, [chartData, xKey]);
+  const seriesKeys = useMemo(
+    () => getSeriesKeys(chartData, xKey),
+    [chartData, xKey],
+  );
 
   const sortLegendBySeries = useCallback(
     (item: LegendPayload) => seriesKeys.indexOf(`${item.dataKey}`),
     [seriesKeys],
   );
 
-  const formatYAxisTick = useCallback(
-    (value: number) => {
-      if (chartScale === "logarithmic" && value <= 0) {
-        return "0";
-      }
-      return formatLargeNumber(value);
-    },
+  const handleFormatYAxisTick = useCallback(
+    (value: number) => formatYAxisTick(value, chartScale),
     [chartScale],
   );
 
-  const yAxisDomain = useMemo(() => {
-    if (chartScale === "logarithmic") {
-      const allValues = chartData.flatMap((item) =>
-        Object.keys(item)
-          .filter((key) => key !== xKey)
-          .map((key) => item[key])
-          .filter(
-            (value): value is number => typeof value === "number" && value > 0,
-          ),
-      );
-
-      if (allValues.length === 0) {
-        return [1, 100];
-      }
-
-      const minValue = Math.min(...allValues);
-      const maxValue = Math.max(...allValues);
-
-      return [
-        Math.max(1, Math.floor(minValue * 0.9)),
-        Math.ceil(maxValue * 1.1),
-      ];
-    }
-
-    return ["auto", "auto"];
-  }, [chartData, chartScale, xKey]);
+  const yAxisDomain = useMemo(
+    () => getYAxisDomain(chartData, xKey, chartScale),
+    [chartData, chartScale, xKey],
+  );
 
   const transformedData = useMemo(() => {
     if (chartScale === "logarithmic") {
-      return chartData.map((item) => {
-        const newItem = { ...item };
-        Object.keys(newItem).forEach((key) => {
-          if (key !== xKey && newItem[key] === 0) {
-            newItem[key] = null;
-          }
-        });
-        return newItem;
-      });
+      return nullifyZeroValues(chartData, xKey);
     }
-
     return chartData;
   }, [chartData, chartScale, xKey]);
 
@@ -345,11 +306,11 @@ function MultipleLineChart({
   }, []);
 
   const handleShareToX = useCallback(() => {
-    const text = "Compare npm package download trends on Package Pulse";
-    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-      text,
-    )}&url=${encodeURIComponent(window.location.href)}`;
-    window.open(intentUrl, "_blank", "noopener,noreferrer");
+    window.open(
+      buildShareToXUrl(window.location.href),
+      "_blank",
+      "noopener,noreferrer",
+    );
   }, []);
 
   return (
@@ -397,6 +358,7 @@ function MultipleLineChart({
             <label className="text-sm font-medium text-nowrap">Scale</label>
             <ToggleGroup
               type="single"
+              aria-label="Scale"
               value={chartScale}
               onValueChange={(value) => {
                 if (value) {
@@ -423,6 +385,7 @@ function MultipleLineChart({
             <label className="text-sm font-medium text-nowrap">Timeline</label>
             <ToggleGroup
               type="single"
+              aria-label="Timeline"
               value={chartMode}
               onValueChange={(value) => {
                 if (value) {
@@ -536,15 +499,13 @@ function MultipleLineChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) =>
-                isNormalized ? `wk ${value}` : formatDate(value)
-              }
+              tickFormatter={(value) => formatXAxisTick(value, isNormalized)}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={formatYAxisTick}
+              tickFormatter={handleFormatYAxisTick}
               tickCount={12}
               scale={yAxisScale}
               domain={yAxisDomain}
@@ -557,45 +518,10 @@ function MultipleLineChart({
                   chartKey={chartKey}
                   labelFormatter={(value, payload) => {
                     if (!isNormalized) return value;
-                    const [first] = payload ?? [];
-                    const weekIndex = first?.payload?.weekIndex;
-                    return `wk ${weekIndex}`;
+                    return formatNormalizedLabel(payload);
                   }}
                 >
-                  <Separator />
-                  <div className="flex items-center gap-1.5 text-sm text-foreground">
-                    <span>Last releases</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {Object.keys(config).map((key) => {
-                      const latestVersion = getLatestVersion(
-                        config[key]?.versions,
-                      );
-                      const displayName = config[key]?.label || key;
-                      return (
-                        <div
-                          key={key}
-                          className="flex w-full items-center gap-2"
-                        >
-                          <ChartDotIndicator
-                            indicator="dashed"
-                            nestLabel={false}
-                            indicatorColor={`var(--color-${key})`}
-                          />
-                          <div className="flex w-full items-center justify-between gap-1">
-                            <span className="text-xs text-muted-foreground">
-                              {displayName}
-                            </span>
-                            <span className="text-right text-xs text-foreground">
-                              {latestVersion
-                                ? formatVersion(latestVersion)
-                                : "-"}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <LastReleasesList config={config} />
                 </ChartTooltipContent>
               }
             />
@@ -638,6 +564,8 @@ function MultipleLineChart({
         {isPending && (
           <div
             role="status"
+            aria-label="Updating chart"
+            data-testid="main-chart-loader"
             className="absolute inset-0 flex items-center justify-center bg-background/65"
           >
             <div className="size-12 animate-spin rounded-full border-y-2 border-primary" />

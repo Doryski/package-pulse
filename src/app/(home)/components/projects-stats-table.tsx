@@ -14,14 +14,12 @@ import TableHeadSortable, {
   SortColumn,
   SortDirection,
 } from "@/components/ui/table-head-sortable";
-import LocalStorageKey from "@/lib/enums/LocalStorageKey";
-import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { ProjectStats, sortStatsMatrix } from "@/lib/queries/useProjectsStats";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { UseQueryResult } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useTheme } from "next-themes";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import getStatsMatrix from "../utils/getStatsMatrix";
 
 const formatMonthPeriod = (period: { start: string; end: string }) => {
@@ -44,15 +42,20 @@ const formatYearPeriod = (period: { start: string; end: string }) => {
 
 type ProjectStatsQuery = UseQueryResult<ProjectStats, Error>;
 
-type ProjectsStatsTableProps = { projectsStats: ProjectStatsQuery[] };
+type ProjectsStatsTableProps = {
+  projectsStats: ProjectStatsQuery[];
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  onSort: (column: SortColumn) => void;
+};
 
-const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
+const ProjectsStatsTable = ({
+  projectsStats,
+  sortColumn,
+  sortDirection,
+  onSort: handleSort,
+}: ProjectsStatsTableProps) => {
   const { resolvedTheme } = useTheme();
-  const [sortColumn, setSortColumn] = useState<SortColumn>("yoyMonth");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
-  useLocalStorage(LocalStorageKey.TABLE_SORT_COLUMN, sortColumn);
-  useLocalStorage(LocalStorageKey.TABLE_SORT_DIRECTION, sortDirection);
 
   const statsMatrix = useMemo(
     () => getStatsMatrix(projectsStats, resolvedTheme),
@@ -65,18 +68,6 @@ const ProjectsStatsTable = ({ projectsStats }: ProjectsStatsTableProps) => {
   );
 
   const { dates } = statsMatrix;
-
-  const handleSort = useCallback(
-    (column: SortColumn) => {
-      if (column === sortColumn) {
-        setSortDirection(sortDirection === "desc" ? "asc" : "desc");
-      } else {
-        setSortColumn(column);
-        setSortDirection("desc");
-      }
-    },
-    [sortColumn, sortDirection],
-  );
 
   return (
     <div className="relative overflow-x-auto">

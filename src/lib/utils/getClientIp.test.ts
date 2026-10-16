@@ -19,6 +19,15 @@ describe("normalizeIp", () => {
     ["64:ff9b::192.0.2.33", "64:ff9b:0:0::/64"],
     ["not-an-ip", "not-an-ip"],
     ["1:2:3:4:5:6:7:8:9", "1:2:3:4:5:6:7:8:9"],
+    ["1::2::3", "1::2::3"],
+    ["1:2:3", "1:2:3"],
+    ["1:2:3:4:5:6:7::8", "1:2:3:4:5:6:7::8"],
+    ["zzzz::1", "zzzz::1"],
+    ["  203.0.113.7  ", "203.0.113.7"],
+    ["[::1]", "0:0:0:0::/64"],
+    ["2001:db8::", "2001:db8:0:0::/64"],
+    ["::ffff:c000:221", "0:0:0:0::/64"],
+    ["::192.0.2.33", "0:0:0:0::/64"],
   ])("normalizes %s to %s", (input, expected) => {
     expect(normalizeIp(input)).toBe(expected);
   });
@@ -54,6 +63,23 @@ describe("getClientIp", () => {
         headersFrom({ "x-forwarded-for": "6.6.6.6, 2001:db8:a:b:c:d:e:f" }),
       ),
     ).toBe("2001:db8:a:b::/64");
+  });
+
+  test("uses the rightmost non-empty x-forwarded-for hop", () => {
+    expect(
+      getClientIp(headersFrom({ "x-forwarded-for": "1.1.1.1, 2.2.2.2:80, " })),
+    ).toBe("2.2.2.2");
+    expect(
+      getClientIp(headersFrom({ "x-forwarded-for": "::ffff:9.9.9.9" })),
+    ).toBe("9.9.9.9");
+  });
+
+  test("ignores a blank x-real-ip and falls back to x-forwarded-for", () => {
+    expect(
+      getClientIp(
+        headersFrom({ "x-real-ip": "   ", "x-forwarded-for": "4.4.4.4" }),
+      ),
+    ).toBe("4.4.4.4");
   });
 
   test("normalizes IPv6 x-real-ip to its /64 prefix", () => {

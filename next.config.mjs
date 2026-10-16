@@ -45,6 +45,9 @@ const badgeHeaders = [
 const nextConfig = {
   distDir: "build",
   poweredByHeader: false,
+  ...(process.env.PP_E2E_TEST_PROXY === "1" && {
+    experimental: { testProxy: true },
+  }),
   async headers() {
     return [
       { source: "/((?!api/badge).*)", headers: securityHeaders },

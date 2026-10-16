@@ -85,4 +85,70 @@ describe("GET /api/comparisons/popular", () => {
       error: "Failed to read popular comparisons",
     });
   });
+
+  test("excludes comparisons older than the 7 day trending window", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    getComparisonsMock.mockResolvedValue([
+      { id: "old", timestamp: Date.now() - 8 * day, projects: ["old-a", "b"] },
+      { id: "new", timestamp: Date.now() - day / 2, projects: ["new-a", "b"] },
+    ]);
+
+    const body = await (await GET(buildRequest())).json();
+
+    expect(
+      body.comparisons.map((c: { projects: string[] }) => c.projects),
+    ).toEqual([["new-a", "b"]]);
+    expect(body.total).toBe(1);
+  });
+
+  test("groups combinations regardless of order and tracks count and lastUsed", async () => {
+    const now = Date.now();
+    getComparisonsMock.mockResolvedValue([
+      { id: "1", timestamp: now - 5000, projects: ["a", "b"] },
+      { id: "2", timestamp: now - 1000, projects: ["b", "a"] },
+    ]);
+
+    const body = await (await GET(buildRequest())).json();
+
+    expect(body.comparisons).toEqual([
+      {
+        projects: ["a", "b"],
+        count: 2,
+        lastUsed: now - 1000,
+        averageProjectsCount: 2,
+      },
+    ]);
+  });
+
+  test("ranks by trending score, weighting the last 24 hours highest", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    getComparisonsMock.mockResolvedValue([
+      { id: "1", timestamp: now - 3 * day, projects: ["old-1", "x"] },
+      { id: "2", timestamp: now - 4 * day, projects: ["old-1", "x"] },
+      { id: "3", timestamp: now - 1000, projects: ["hot", "x"] },
+      { id: "4", timestamp: now - 2000, projects: ["hot", "x"] },
+    ]);
+
+    const body = await (await GET(buildRequest())).json();
+
+    expect(body.comparisons[0].projects).toEqual(["hot", "x"]);
+    expect(body.comparisons[1].projects).toEqual(["old-1", "x"]);
+  });
+
+  test("breaks equal trending scores by comparison count", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    getComparisonsMock.mockResolvedValue([
+      { id: "1", timestamp: now - 1000, projects: ["single", "x"] },
+      { id: "2", timestamp: now - 2 * day, projects: ["double", "x"] },
+      { id: "3", timestamp: now - 3 * day, projects: ["double", "x"] },
+    ]);
+
+    const body = await (await GET(buildRequest())).json();
+
+    expect(body.comparisons.map((c: { count: number }) => c.count)).toEqual([
+      2, 1,
+    ]);
+  });
 });

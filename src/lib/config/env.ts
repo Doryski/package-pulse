@@ -8,6 +8,7 @@ const EnvSchema = z.object({
   PP_KV_REST_API_URL: z.url().optional().catch(undefined),
   PP_KV_REST_API_TOKEN: z.string().min(1).optional().catch(undefined),
   OPENAI_API_KEY: z.string().min(1).optional().catch(undefined),
+  PP_E2E_TEST_PROXY: z.literal("1").optional().catch(undefined),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

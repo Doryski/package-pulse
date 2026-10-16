@@ -88,4 +88,28 @@ describe("fetchDownloadsBatch", () => {
     expect(retry).toEqual({ data: { react: downloads }, errors: {} });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  test("throws the server error message on a non-ok response", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "Too many packages" }),
+    });
+
+    await expect(fetchDownloadsBatch(["react"])).rejects.toThrow(
+      "Too many packages",
+    );
+  });
+
+  test("falls back to a generic message when the error body is unreadable", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: async () => {
+        throw new Error("bad json");
+      },
+    });
+
+    await expect(fetchDownloadsBatch(["vue"])).rejects.toThrow(
+      "Failed to fetch NPM download data",
+    );
+  });
 });

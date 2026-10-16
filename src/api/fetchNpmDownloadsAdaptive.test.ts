@@ -596,3 +596,212 @@ describe("hasTransientErrors", () => {
     );
   });
 });
+
+describe("fetchNpmDownloadsAdaptive - rate limits and client errors", () => {
+  test("honors the retry-after header on a 429 and recovers", async () => {
+    vi.useRealTimers();
+    let calls = 0;
+    const fetchImpl = vi.fn(() => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          makeResponse(429, undefined, { "retry-after": "1" }),
+        );
+      }
+      return Promise.resolve(
+        makeResponse(
+          200,
+          flatBody("limited", [{ day: "2024-01-01", downloads: 3 }]),
+        ),
+      );
+    });
+
+    const result = await fetchNpmDownloadsAdaptive(["limited"], {
+      startDate: daysAgo(30),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result.data.limited).toEqual([{ date: "2024-01-01", count: 3 }]);
+    expect(result.stats.rateLimitEvents).toBeGreaterThan(0);
+  });
+
+  test("treats a non-404 4xx as a non-retryable failure", async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url.includes("@scope/forbidden")) {
+        return Promise.resolve(makeResponse(403));
+      }
+      return Promise.resolve(
+        makeResponse(
+          200,
+          flatBody("react", [{ day: "2024-01-01", downloads: 1 }]),
+        ),
+      );
+    });
+
+    const result = await fetchNpmDownloadsAdaptive(
+      ["react", "@scope/forbidden"],
+      {
+        startDate: daysAgo(30),
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+      },
+    );
+
+    expect(
+      fetchImpl.mock.calls.filter((call) => call[0].includes("forbidden")),
+    ).toHaveLength(1);
+    expect(result.data["@scope/forbidden"]).toBeNull();
+    expect(result.errors["@scope/forbidden"]).toBe(
+      'Failed to load downloads for "@scope/forbidden"',
+    );
+  });
+
+  test("rejects with the underlying AppError when an invalid body leaves no data", async () => {
+    vi.useRealTimers();
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(makeResponse(200, { error: "upstream exploded" })),
+    );
+
+    await expect(
+      fetchNpmDownloadsAdaptive(["boom"], {
+        startDate: daysAgo(30),
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+      }),
+    ).rejects.toThrow("upstream exploded");
+  });
+
+  test("skips null entries in a bulk response", async () => {
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        makeResponse(200, {
+          react: {
+            package: "react",
+            start: "2015-01-10",
+            end: "2024-03-15",
+            downloads: [{ day: "2024-01-01", downloads: 2 }],
+          },
+          ghost: null,
+        }),
+      ),
+    );
+
+    const result = await fetchNpmDownloadsAdaptive(["react", "ghost"], {
+      startDate: daysAgo(30),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(result.data.react).toEqual([{ date: "2024-01-01", count: 2 }]);
+    expect(result.data.ghost).toBeNull();
+    expect(result.errors).toEqual({});
+  });
+
+  test("uses the global fetch and default retry config when no overrides are given", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        makeResponse(
+          200,
+          flatBody("react", [{ day: "2024-01-01", downloads: 1 }]),
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchNpmDownloadsAdaptive(["react"], {
+      startDate: daysAgo(30),
+    });
+    vi.unstubAllGlobals();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.data.react).toEqual([{ date: "2024-01-01", count: 1 }]);
+  });
+
+  test("works without any options", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(makeResponse(404)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchNpmDownloadsAdaptive([]);
+    vi.unstubAllGlobals();
+
+    expect(result.data).toEqual({});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("ignores an invalid start date and falls back to the npm first day", async () => {
+    const fetchImpl = vi.fn((_url: string) =>
+      Promise.resolve(makeResponse(200, bulkBody({}))),
+    );
+
+    await fetchNpmDownloadsAdaptive(["react"], {
+      startDate: new Date("not-a-date"),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    const starts = fetchImpl.mock.calls.map((call) => startOf(call[0]));
+    expect(starts.toSorted()[0]).toBe(NPM_API_FIRST_DAY);
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - e2e test proxy", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  test("bypasses the fetch cache when PP_E2E_TEST_PROXY is set", async () => {
+    vi.stubEnv("PP_E2E_TEST_PROXY", "1");
+    vi.resetModules();
+    const { default: fetchProxied } =
+      await import("@/api/fetchNpmDownloadsAdaptive");
+    const fetchImpl = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(makeResponse(200, bulkBody({}))),
+    );
+
+    await fetchProxied(["react"], {
+      startDate: daysAgo(30),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchImpl.mock.calls[0]![1]).not.toHaveProperty("next");
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - trailing zero days", () => {
+  test("drops trailing zero days that npm has not computed yet", async () => {
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        makeResponse(
+          200,
+          flatBody("@scope/a", [
+            { day: "2024-03-10", downloads: 4 },
+            { day: "2024-03-11", downloads: 0 },
+            { day: "2024-03-12", downloads: 6 },
+            { day: "2024-03-13", downloads: 0 },
+            { day: "2024-03-14", downloads: 0 },
+          ]),
+        ),
+      ),
+    );
+
+    const result = await fetchNpmDownloadsAdaptive(["@scope/a"], {
+      startDate: daysAgo(10),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(result.data["@scope/a"]?.map((entry) => entry.date)).toEqual([
+      "2024-03-10",
+      "2024-03-11",
+      "2024-03-12",
+    ]);
+  });
+});

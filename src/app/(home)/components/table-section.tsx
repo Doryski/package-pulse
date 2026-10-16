@@ -1,12 +1,9 @@
 import { Button } from "@/components/ui/button";
-import {
-  SortColumnSchema,
-  SortDirectionSchema,
-} from "@/components/ui/table-head-sortable";
+import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
+import useTableSort from "@/lib/hooks/useTableSort";
 import useBundleSize from "@/lib/queries/useBundleSize";
 import useDepsDev from "@/lib/queries/useDepsDev";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
@@ -16,7 +13,6 @@ import {
 } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import { exportCsv, exportJson } from "@/lib/utils/exportUtils";
-import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import {
   BarChartIcon,
   DownloadIcon,
@@ -33,25 +29,20 @@ type TableSectionProps = {
   projectsStats: ProjectStatsQuery[];
 };
 
-function useExportData(projectsStats: ProjectStatsQuery[]) {
+type ExportSort = {
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+};
+
+function useExportData(
+  projectsStats: ProjectStatsQuery[],
+  { sortColumn, sortDirection }: ExportSort,
+) {
   const form = useFormContext<ProjectsSearchFormValues>();
   const selectedProjects = form.watch("projects");
   const statsMatrix = useStatsMatrix(projectsStats);
-  const sortColumn = getLocalStorageValue(
-    LocalStorageKey.TABLE_SORT_COLUMN,
-    SortColumnSchema,
-  );
-  const sortDirection = getLocalStorageValue(
-    LocalStorageKey.TABLE_SORT_DIRECTION,
-    SortDirectionSchema,
-  );
   const sortedStatsMatrix = useMemo(
-    () =>
-      sortStatsMatrix(
-        statsMatrix,
-        sortColumn ?? "projectName",
-        sortDirection ?? "asc",
-      ),
+    () => sortStatsMatrix(statsMatrix, sortColumn, sortDirection),
     [sortColumn, sortDirection, statsMatrix],
   );
   const projectsInfo = usePackagesInfo(selectedProjects);
@@ -174,12 +165,17 @@ function useExportData(projectsStats: ProjectStatsQuery[]) {
 }
 
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
-  const { exportToCsv, exportToJson } = useExportData(projectsStats);
+  const { sortColumn, sortDirection, handleSort } = useTableSort();
+  const { exportToCsv, exportToJson } = useExportData(projectsStats, {
+    sortColumn,
+    sortDirection,
+  });
   const isLoading = projectsStats.some((project) => project.isLoading);
   const [isInfoTableVisible, showInfoTable, hideInfoTable] =
     useBooleanState(false);
 
   const handleToggleChange = (value: string) => {
+    if (!value) return;
     if (value === "info") {
       showInfoTable();
     } else {
@@ -221,8 +217,9 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
           </Button>
           <ToggleGroup
             type="single"
+            aria-label="Table view"
             onValueChange={handleToggleChange}
-            defaultValue="stats"
+            value={isInfoTableVisible ? "info" : "stats"}
           >
             <ToggleGroupItem value="stats" aria-label="Toggle stats">
               <BarChartIcon />
@@ -237,7 +234,12 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
         {isInfoTableVisible ? (
           <ProjectsInfoTable />
         ) : (
-          <ProjectsStatsTable projectsStats={projectsStats} />
+          <ProjectsStatsTable
+            projectsStats={projectsStats}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
         )}
       </div>
     </div>

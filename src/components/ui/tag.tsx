@@ -6,10 +6,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 type TagProps = {
   children: React.ReactNode;
   onRemove: () => void;
+  removeLabel: string;
   tooltipContent?: React.ReactNode;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-const Tag = ({ children, onRemove, tooltipContent, ...props }: TagProps) => {
+const Tag = ({
+  children,
+  onRemove,
+  removeLabel,
+  tooltipContent,
+  ...props
+}: TagProps) => {
   return (
     <div
       {...props}
@@ -25,14 +32,12 @@ const Tag = ({ children, onRemove, tooltipContent, ...props }: TagProps) => {
             variant="link"
             size="icon"
             onClick={onRemove}
-            aria-label={
-              typeof tooltipContent === "string" ? tooltipContent : "Remove"
-            }
+            aria-label={removeLabel}
           >
             <Cross1Icon aria-hidden />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{tooltipContent ?? "Remove"}</TooltipContent>
+        <TooltipContent>{tooltipContent ?? removeLabel}</TooltipContent>
       </Tooltip>
       {children}
     </div>

@@ -17,17 +17,17 @@ For non-trivial changes, please open an issue first to discuss the approach. Thi
 
 ### Prerequisites
 
-- Node.js 20+ (the repository ships an `.nvmrc`; run `nvm use` if you have nvm)
-- pnpm (recommended) or npm
+- Node.js 24.x
+- npm (the repo ships `package-lock.json`; CI uses `npm ci`)
 
 ### Install and run
 
 ```bash
 git clone https://github.com/doryski/package-pulse.git
 cd package-pulse
-pnpm install
+npm ci
 cp .env.example .env.local   # fill in any keys you need
-pnpm dev
+npm run dev
 ```
 
 ### Useful scripts
@@ -37,8 +37,8 @@ pnpm dev
 | `pnpm dev` | Start the Next.js dev server |
 | `pnpm build` | Production build |
 | `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Auto-fix lint errors |
-| `pnpm test` | Run Vitest unit tests |
+| `npm run lint:fix` | Auto-fix lint errors |
+| `npm test` | Run Vitest unit tests |
 | `pnpm test:watch` | Vitest in watch mode |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
 | `pnpm coverage` | Vitest with coverage report |
@@ -48,18 +48,20 @@ pnpm dev
 - TypeScript with strict mode
 - Functional, composable patterns; small reusable utilities
 - Prefer type inference; use `type` aliases over `interface`
-- ESLint + Prettier enforce formatting; please run `pnpm lint:fix` before pushing
+- ESLint + Prettier enforce formatting; please run `npm run lint:fix` before pushing
 - Use early returns over nested conditionals
 - Avoid `useEffect` unless strictly necessary
 
 ## Testing expectations
 
-- Add or update unit tests for any logic change
-- For UI flows, prefer a Playwright scenario when feasible
+- Add or update unit tests for any logic change. `npm run coverage` enforces 90% lines, statements, functions and branches; CI fails below that
+- For UI flows, add a Playwright scenario under `tests/`. E2E runs against mocked upstreams (`tests/mocks/`), so a test that triggers an unmocked external request fails
+- Shared unit-test helpers live in `src/test/` (`renderWithProviders`, `renderWithForm`, `createNavigationMock`, `mockRecharts`, factories)
 - For targeted runs use:
 
   ```bash
-  pnpm exec vitest run --bail=5 path/to/file.test.ts
+  npx vitest run --bail=5 path/to/file.test.ts
+  npm run test:e2e -- tests/search.test.ts
   ```
 
 ## Commit messages
@@ -79,7 +81,7 @@ Keep the subject line under 72 characters; explain the why in the body.
 
 1. Fork the repository and create a feature branch from `main`.
 2. Make your changes with tests and documentation as needed.
-3. Run `pnpm lint` and `pnpm test` locally before pushing.
+3. Run `pnpm lint` and `npm test` locally before pushing.
 4. Open a pull request using the supplied template; link any related issues.
 5. Be ready to iterate on review feedback. CI must pass before a merge.
 

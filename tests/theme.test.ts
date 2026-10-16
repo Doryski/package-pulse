@@ -1,11 +1,13 @@
-import { expect, Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const getThemeToggleGroup = (page: Page) => page.getByLabel(/Theme/);
 
-const selectTheme = async (page: Page, theme: string) => {
-  const themeToggle = getThemeToggleGroup(page);
-  await themeToggle.getByLabel(theme).click();
-};
+const selectTheme = (page: Page, theme: string) =>
+  getThemeToggleGroup(page).getByLabel(theme).click();
+
+const expectHtmlClass = (page: Page, themeClass: string) =>
+  expect(page.locator("html")).toHaveAttribute("class", themeClass);
 
 test.describe("Theme Switch", () => {
   test.beforeEach(async ({ page }) => {
@@ -13,18 +15,19 @@ test.describe("Theme Switch", () => {
   });
 
   test("should have default theme set to system", async ({ page }) => {
-    const systemButton = getThemeToggleGroup(page).getByLabel("System");
-    await expect(systemButton).toHaveAttribute("data-state", "on");
+    await expect(
+      getThemeToggleGroup(page).getByLabel("System"),
+    ).toHaveAttribute("data-state", "on");
   });
 
   test("should change theme to dark when selected", async ({ page }) => {
     await selectTheme(page, "Dark");
-    await expect(page.locator("html")).toHaveAttribute("class", "dark");
+    await expectHtmlClass(page, "dark");
   });
 
   test("should change theme to light when selected", async ({ page }) => {
     await selectTheme(page, "Light");
-    await expect(page.locator("html")).toHaveAttribute("class", "light");
+    await expectHtmlClass(page, "light");
   });
 
   test("should persist theme selection across page reloads", async ({
@@ -32,6 +35,19 @@ test.describe("Theme Switch", () => {
   }) => {
     await selectTheme(page, "Dark");
     await page.reload();
-    await expect(page.locator("html")).toHaveAttribute("class", "dark");
+    await expectHtmlClass(page, "dark");
+  });
+
+  test("should persist theme selection across navigation", async ({ page }) => {
+    await selectTheme(page, "Dark");
+    await expectHtmlClass(page, "dark");
+
+    await page.goto("/compare/react-vs-vue");
+
+    await expectHtmlClass(page, "dark");
+    await expect(getThemeToggleGroup(page).getByLabel("Dark")).toHaveAttribute(
+      "data-state",
+      "on",
+    );
   });
 });

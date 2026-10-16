@@ -1,14 +1,42 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   SENTRY_DATA_COLLECTION,
   SENTRY_SERVER_OPTIONS,
   SENTRY_SHARED_OPTIONS,
+  captureExceptionWithSearchParams,
+  getSearchParamsContext,
+  getSearchParamsContextFromUrl,
+  scrubBreadcrumb,
+  scrubRequestUrl,
   scrubSpan,
   withServerSearchParamsContext,
 } from "./sentry-context";
+
+const { scopeMock, captureExceptionMock, withScopeMock } = vi.hoisted(() => {
+  const scopeMock = { setContext: vi.fn() };
+  return {
+    scopeMock,
+    captureExceptionMock: vi.fn(() => "event-id"),
+    withScopeMock: vi.fn((callback: (scope: typeof scopeMock) => unknown) =>
+      callback(scopeMock),
+    ),
+  };
+});
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: captureExceptionMock,
+  withScope: withScopeMock,
+}));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
 
 const createSpan = (
   overrides: Partial<Parameters<typeof scrubSpan>[0]> = {},
@@ -176,5 +204,223 @@ describe("Sentry options", () => {
       searchParams: {},
       pathname: "/api/downloads",
     });
+  });
+});
+
+describe("getSearchParamsContext", () => {
+  test("returns an empty object without a window", () => {
+    expect(getSearchParamsContext()).toEqual({});
+  });
+
+  test("picks only allowed params and the pathname from window.location", () => {
+    vi.stubGlobal("window", {
+      location: {
+        search: "?projects=react,vue&period=1y&scale=log&mode=a&token=secret",
+        pathname: "/compare",
+      },
+    });
+
+    expect(getSearchParamsContext()).toEqual({
+      searchParams: {
+        projects: "react,vue",
+        period: "1y",
+        scale: "log",
+        mode: "a",
+      },
+      pathname: "/compare",
+    });
+  });
+
+  test("omits allowed params that are absent", () => {
+    vi.stubGlobal("window", { location: { search: "", pathname: "/" } });
+
+    expect(getSearchParamsContext()).toEqual({
+      searchParams: {},
+      pathname: "/",
+    });
+  });
+
+  test("warns and returns an empty object when reading location throws", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal("window", {
+      get location(): never {
+        throw new Error("denied");
+      },
+    });
+
+    expect(getSearchParamsContext()).toEqual({});
+    expect(warn).toHaveBeenCalledWith(
+      "Failed to extract search params for Sentry context:",
+      expect.any(Error),
+    );
+  });
+});
+
+describe("getSearchParamsContextFromUrl", () => {
+  test("extracts allowed params and pathname", () => {
+    expect(
+      getSearchParamsContextFromUrl("https://x.dev/a/b?period=7d&secret=1"),
+    ).toEqual({ searchParams: { period: "7d" }, pathname: "/a/b" });
+  });
+
+  test("warns and returns an empty object for an invalid URL", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(getSearchParamsContextFromUrl("not a url")).toEqual({});
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("scrubBreadcrumb", () => {
+  test("returns the breadcrumb unchanged when it has no data", () => {
+    const breadcrumb = { message: "hi" };
+
+    expect(scrubBreadcrumb(breadcrumb)).toBe(breadcrumb);
+  });
+
+  test("strips queries from url, to and from while keeping other data", () => {
+    const result = scrubBreadcrumb({
+      category: "navigation",
+      data: {
+        url: "https://example.com/a?x=1#h",
+        to: "/compare?projects=react",
+        from: "/?q=1",
+        status: 200,
+      },
+    });
+
+    expect(result.data).toEqual({
+      url: "https://example.com/a",
+      to: "/compare",
+      from: "/",
+      status: 200,
+    });
+  });
+
+  test("ignores non-string url values", () => {
+    const result = scrubBreadcrumb({ data: { url: 5, to: "/b?x=1" } });
+
+    expect(result.data).toEqual({ url: 5, to: "/b" });
+  });
+
+  test("falls back to text stripping when the URL cannot be parsed", () => {
+    const result = scrubBreadcrumb({ data: { url: "http://[bad?x=1" } });
+
+    expect(result.data).toEqual({ url: "http://[bad" });
+  });
+});
+
+describe("scrubRequestUrl", () => {
+  test("returns the event when there is no request", () => {
+    const event = { type: undefined };
+
+    expect(scrubRequestUrl(event)).toBe(event);
+  });
+
+  test("clears the query string even when the URL is not a string", () => {
+    const event = {
+      type: undefined,
+      request: { query_string: "a=1" },
+    };
+
+    expect(scrubRequestUrl(event).request).toEqual({
+      query_string: undefined,
+    });
+  });
+
+  test("leaves a request without a query string untouched except the URL", () => {
+    const event = {
+      type: undefined,
+      request: { url: "https://x.dev/p?q=1#f" },
+    };
+
+    expect(scrubRequestUrl(event).request?.url).toBe("https://x.dev/p");
+  });
+
+  test("warns and keeps the URL when it cannot be parsed", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const event = { type: undefined, request: { url: "garbage" } };
+
+    expect(scrubRequestUrl(event).request?.url).toBe("garbage");
+    expect(warn).toHaveBeenCalledWith(
+      "Failed to scrub request URL for Sentry event:",
+      expect.any(Error),
+    );
+  });
+});
+
+describe("withServerSearchParamsContext URL sources", () => {
+  test("falls back to the trace data URL", () => {
+    const result = withServerSearchParamsContext({
+      type: undefined,
+      contexts: {
+        trace: {
+          span_id: "s",
+          trace_id: "t",
+          data: { url: "https://x.dev/t?mode=m" },
+        },
+      },
+    });
+
+    expect(result.contexts?.searchParams).toEqual({
+      searchParams: { mode: "m" },
+      pathname: "/t",
+    });
+    expect(result.contexts?.trace).toBeDefined();
+  });
+
+  test("falls back to the url tag", () => {
+    const result = withServerSearchParamsContext({
+      type: undefined,
+      tags: { url: "https://x.dev/tag?scale=s" },
+    });
+
+    expect(result.contexts?.searchParams).toEqual({
+      searchParams: { scale: "s" },
+      pathname: "/tag",
+    });
+  });
+
+  test("ignores a non-string URL", () => {
+    const event = { type: undefined, tags: { url: 5 } };
+
+    expect(withServerSearchParamsContext(event)).toBe(event);
+  });
+});
+
+describe("captureExceptionWithSearchParams", () => {
+  test("attaches the searchParams context and forwards the exception and options", () => {
+    const error = new Error("boom");
+    const options = { level: "warning" as const };
+
+    const result = captureExceptionWithSearchParams(error, options);
+
+    expect(scopeMock.setContext).toHaveBeenCalledWith("searchParams", {});
+    expect(captureExceptionMock).toHaveBeenCalledWith(error, options);
+    expect(result).toBe("event-id");
+  });
+});
+
+describe("SENTRY_TRACES_SAMPLE_RATE", () => {
+  test.each([
+    ["production", 0.1],
+    ["development", 1],
+  ])("is based on NODE_ENV=%s", async (nodeEnv, expected) => {
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.resetModules();
+
+    const sentryContext = await import("./sentry-context");
+
+    expect(sentryContext.SENTRY_TRACES_SAMPLE_RATE).toBe(expected);
+  });
+});
+
+describe("scrubSpan attribute edge cases", () => {
+  test("keeps attribute objects with a non-string value", () => {
+    const result = scrubSpan(
+      createSpan({ attributes: { url: { value: 5 } } as never }),
+    );
+
+    expect(result.attributes.url).toEqual({ value: 5 });
   });
 });

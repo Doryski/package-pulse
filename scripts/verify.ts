@@ -68,10 +68,13 @@ async function runPlaywrightTests() {
 
 async function verify() {
   try {
-    await runCommand("npx kill-port 3000", "Stopping dev server");
+    await runCommand(
+      `npx kill-port ${process.env.PW_PORT ?? 3210}`,
+      "Stopping dev server",
+    );
     await runCommand("npm run build", "Building project");
     await runCommand("npm run lint:fix", "Fixing lint issues");
-    await runCommand("npm test", "Running unit tests");
+    await runCommand("npm run coverage", "Running unit tests with coverage");
 
     console.info("\n🚀 Starting dev server...");
     await runPlaywrightTests();

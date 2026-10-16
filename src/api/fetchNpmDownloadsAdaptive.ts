@@ -7,20 +7,23 @@ import {
 } from "@/lib/config/constants";
 import { NPMDownloadCount } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import { normalizeRangeResponse } from "@/lib/schemas/npmBulkDownloads.schema";
+import { getUpstreamFetchInit } from "@/lib/config/upstreamFetchInit";
 import AppError from "@/lib/utils/AppError";
 import getTimePeriods from "@/lib/utils/getTimePeriods";
 import partitionPackages from "@/lib/utils/partitionPackages";
+import trimToDataHorizon from "@/lib/utils/trimToDataHorizon";
 import {
   adaptiveMap,
   ConcurrencyConfig,
   RateLimitError,
   RetryConfig,
 } from "adaptive-promise-pool";
-import { isValid, max, startOfDay } from "date-fns";
+import { isValid, max, startOfDay, sub } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 const NPM_RANGE_BASE_URL = "https://api.npmjs.org/downloads/range";
 const UPSTREAM_REVALIDATE_SECONDS = 3600;
+const NPM_MAX_LAG_DAYS = 7;
 const PACKAGE_LIST_DELIMITER = ",";
 
 const DEFAULT_CONCURRENCY: ConcurrencyConfig = { initial: 4, min: 1, max: 8 };
@@ -197,7 +200,7 @@ export default async function fetchNpmDownloadsAdaptive(
   ): Promise<TaskResult> => {
     const res = await fetchImpl(task.url, {
       signal: ctx.signal,
-      next: { revalidate: UPSTREAM_REVALIDATE_SECONDS },
+      ...getUpstreamFetchInit(UPSTREAM_REVALIDATE_SECONDS),
     });
 
     if (res.status === 429) {
@@ -275,8 +278,11 @@ export default async function fetchNpmDownloadsAdaptive(
   const resolved = [...accumulators].map(
     ([name, acc]) => [name, resolvePackage(name, acc)] as const,
   );
-  const data = Object.fromEntries(
-    resolved.map(([name, { downloads }]) => [name, downloads]),
+  const data = trimToDataHorizon(
+    Object.fromEntries(
+      resolved.map(([name, { downloads }]) => [name, downloads]),
+    ),
+    formatDate(sub(today, { days: NPM_MAX_LAG_DAYS })),
   );
   const errors = Object.fromEntries(
     resolved.flatMap(([name, { error }]) =>

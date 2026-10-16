@@ -72,6 +72,7 @@ const getClientKey = async () =>
 const isAnyRateLimited = async (): Promise<boolean> => {
   if (await checkRateLimit(await getClientKey(), RATE_LIMITS.client))
     return true;
+  if (env.PP_E2E_TEST_PROXY) return false;
   return checkRateLimit(GLOBAL_RATE_LIMIT_KEY, RATE_LIMITS.global);
 };
 

@@ -1,4 +1,5 @@
 "use client";
+import { getLatestDownloads } from "@/app/(home)/utils/getPeakAndLatestStats";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { formatInteger, formatPercentage } from "@/lib/utils/formatters";
@@ -28,8 +29,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
         .filter((project) => project.data)
         .map((project, index) => {
           const projectData = project.data!;
-          const latestDownloads =
-            projectData.rawSortedData.slice(-2)[0]?.count || 0;
+          const latestDownloads = getLatestDownloads(projectData.rawSortedData);
 
           const normalizedName = normalizeProjectName(projectData.projectName);
 

@@ -7,6 +7,7 @@ import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import useDebounce from "@/lib/hooks/useDebounce";
 import useSearchNPMRegistry from "@/lib/queries/useSearchNPMRegistry";
 import { cn } from "@/lib/utils/cn";
+import { flushSync } from "react-dom";
 import { UseFormReturn } from "react-hook-form";
 import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
@@ -27,6 +28,11 @@ const ComboboxForm = ({ form, onFormSubmit }: ComboboxFormProps) => {
 
   function resetSearch() {
     form.setValue("search", "");
+    form.setFocus("search");
+  }
+
+  function updateProjects(projects: string[]) {
+    flushSync(() => form.setValue("projects", projects));
     form.setFocus("search");
   }
 
@@ -91,17 +97,14 @@ const ComboboxForm = ({ form, onFormSubmit }: ComboboxFormProps) => {
                       error={error}
                       colorIndex={field.value.indexOf(project)}
                       onRemove={() =>
-                        form.setValue(
-                          "projects",
-                          field.value.filter((p) => p !== project),
-                        )
+                        updateProjects(field.value.filter((p) => p !== project))
                       }
                     />
                   </ClientOnly>
                 );
               })}
               <ClientOnly>
-                <ClearAllTag onClick={() => form.setValue("projects", [])} />
+                <ClearAllTag onClick={() => updateProjects([])} />
               </ClientOnly>
             </div>
           </FormItem>
@@ -119,6 +122,7 @@ const ClearAllTag = ({ onClick }: ClearAllTagProps) => {
   return (
     <Tag
       onRemove={onClick}
+      removeLabel="Clear All"
       onClick={onClick}
       className="cursor-pointer"
       tooltipContent="Clear All"

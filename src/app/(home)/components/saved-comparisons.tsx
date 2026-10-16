@@ -9,11 +9,13 @@ import ComparisonCard from "./comparison-card";
 type SavedComparisonsProps = {
   selectedProjects: string[];
   onAddMultipleProjects: (projectNames: string[]) => void;
+  onFavoriteRemoved: () => void;
 };
 
 const SavedComparisonsContent = ({
   selectedProjects,
   onAddMultipleProjects,
+  onFavoriteRemoved,
 }: SavedComparisonsProps) => {
   const { favorites, removeFavorite } = useFavorites();
 
@@ -39,10 +41,11 @@ const SavedComparisonsContent = ({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Remove saved comparison"
+                aria-label={`Remove saved comparison ${projects.join(", ")}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   removeFavorite(projects);
+                  onFavoriteRemoved();
                 }}
               >
                 <X className="size-4" />

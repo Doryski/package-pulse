@@ -16,10 +16,12 @@ import { z } from "zod";
 
 const AnyObjectSchema = z.record(z.string(), z.unknown());
 const AnyArraySchema = z.array(AnyObjectSchema);
+const NO_CONTENT_STATUS = 204;
 
 export const fetchGithubRepoInfo = async (repoName: string) => {
   return githubApiQueue.add(async () => {
     const response = await fetch(`https://api.github.com/repos/${repoName}`);
+    if (!response.ok) return null;
     const data = await response.json();
     return safeParse(data, GithubRepoInfoSchema);
   });
@@ -128,6 +130,8 @@ export const fetchContributorsCount = async (repoName: string) => {
     const response = await fetch(
       `https://api.github.com/repos/${repoName}/contributors`,
     );
+    if (response.status === NO_CONTENT_STATUS) return 0;
+    if (!response.ok) return null;
     const data = await response.json();
     return safeParse(data, AnyArraySchema).length;
   });
@@ -138,6 +142,7 @@ export const fetchGithubPullRequestsCount = async (repoName: string) => {
     const response = await fetch(
       `https://api.github.com/repos/${repoName}/pulls`,
     );
+    if (!response.ok) return null;
     const data = await response.json();
     return safeParse(data, AnyArraySchema).length;
   });
@@ -150,6 +155,7 @@ export const fetchBundleSize = async (name: string, version?: string) => {
       const response = await fetch(
         `https://bundlephobia.com/api/size?package=${encodeURIComponent(pkg)}`,
       );
+      if (!response.ok) return null;
       const data = await response.json();
       const parsed = safeParse(data, BundlephobiaSchema);
       const treeShakeable =
@@ -181,9 +187,12 @@ export const fetchDepsDev = async (name: string, version: string) => {
           name,
         )}/versions/${encodeURIComponent(version)}`,
       );
+      if (!response.ok) return null;
       const data = await response.json();
       return safeParse(data, DepsDevVersionSchema);
     });
+
+    if (!versionData) return null;
 
     const vulnerabilityCount = versionData.advisoryKeys?.length;
     const licenses = versionData.licenses;
@@ -204,6 +213,7 @@ export const fetchDepsDev = async (name: string, version: string) => {
       const response = await fetch(
         `https://api.deps.dev/v3/projects/${encodeURIComponent(projectId)}`,
       );
+      if (!response.ok) return null;
       const data = await response.json();
       return safeParse(data, DepsDevProjectSchema);
     });
@@ -211,10 +221,10 @@ export const fetchDepsDev = async (name: string, version: string) => {
     return {
       vulnerabilityCount,
       licenses,
-      healthScore: projectData.scorecard?.overallScore,
-      starsCount: projectData.starsCount,
-      forksCount: projectData.forksCount,
-      openIssuesCount: projectData.openIssuesCount,
+      healthScore: projectData?.scorecard?.overallScore,
+      starsCount: projectData?.starsCount,
+      forksCount: projectData?.forksCount,
+      openIssuesCount: projectData?.openIssuesCount,
     };
   } catch (error) {
     console.error(error);

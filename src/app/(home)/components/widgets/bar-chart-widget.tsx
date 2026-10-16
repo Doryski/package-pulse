@@ -21,6 +21,11 @@ import getPeakAndLatestDownloads from "../../utils/getPeakAndLatestStats";
 
 const AXIS_TEXT_CLASS_NAME = "fill-muted-foreground text-xs";
 
+const ZERO_BASELINE_DOMAIN = [
+  (dataMin: number) => Math.min(0, dataMin),
+  (dataMax: number) => Math.max(0, dataMax),
+] as const;
+
 const AXIS_TICK = { fontSize: 12, className: AXIS_TEXT_CLASS_NAME } as const;
 
 export type BarChartMode = "downloads" | "growth";
@@ -97,6 +102,7 @@ const BarChartWidget = memo(
             />
             <YAxis
               tick={AXIS_TICK}
+              domain={ZERO_BASELINE_DOMAIN}
               tickFormatter={(value) => {
                 if (comparisonMode === "growth") {
                   return `${value}%`;

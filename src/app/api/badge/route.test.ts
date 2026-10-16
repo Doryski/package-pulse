@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
  */
+import AppError from "@/lib/utils/AppError";
+import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { GET } from "./route";
@@ -151,5 +153,112 @@ describe("GET /api/badge", () => {
 
     expect(response.status).not.toBe(400);
     expect(fetchAdaptiveMock).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ["abc", 52],
+    ["Infinity", 52],
+    ["1", 4],
+    ["-20", 4],
+    ["500", 104],
+    ["10.9", 10],
+  ])("clamps period=%s to %i weeks", async (period, weeks) => {
+    await GET(buildRequest(`packages=react&period=${period}`));
+
+    expectWeeksAgo(passedStartDate(), weeks);
+  });
+
+  test("returns an SVG with cacheable headers on success", async () => {
+    const response = await GET(buildRequest("packages=react"));
+
+    expect(response.headers.get("Content-Type")).toBe(
+      "image/svg+xml; charset=utf-8",
+    );
+    expect(response.headers.get("Cache-Control")).toContain("max-age=3600");
+    expect(await response.text()).toContain("npm weekly downloads");
+  });
+
+  test("draws a flat line for a single data point", async () => {
+    const response = await GET(buildRequest("packages=react"));
+
+    expect(await response.text()).toMatch(/<polyline points="[^"]+ [^"]+"/);
+  });
+
+  test("draws a sparkline across several weekly buckets", async () => {
+    fetchAdaptiveMock.mockResolvedValue({
+      ...cannedResult,
+      data: {
+        react: [
+          { date: "2025-01-01", count: 10 },
+          { date: "2025-01-08", count: 30 },
+          { date: "2025-01-15", count: 20 },
+        ],
+      },
+    });
+
+    const response = await GET(buildRequest("packages=react"));
+
+    const svg = await response.text();
+    expect(svg).toContain("<polyline");
+    expect(svg).toContain("/ week");
+  });
+
+  test.each([
+    ["null data", { "no-such-pkg": null }],
+    ["empty data", { "no-such-pkg": [] }],
+  ])("renders an unavailable row for %s", async (_label, data) => {
+    fetchAdaptiveMock.mockResolvedValue({ data, errors: {}, stats: {} });
+
+    const response = await GET(buildRequest("packages=no-such-pkg"));
+
+    const svg = await response.text();
+    expect(response.status).toBe(200);
+    expect(svg).toContain("no data");
+    expect(svg).toContain("unavailable");
+  });
+
+  test("returns 400 with no-store when no packages are provided", async () => {
+    const response = await GET(buildRequest(""));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.text()).toContain("No packages provided");
+    expect(fetchAdaptiveMock).not.toHaveBeenCalled();
+  });
+
+  test("returns 400 when too many packages are requested", async () => {
+    const names = Array.from(
+      { length: SELECTED_PROJECTS_LIMIT + 1 },
+      (_, index) => `pkg-${index}`,
+    ).join(",");
+
+    const response = await GET(buildRequest(`packages=${names}`));
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain(
+      `Max ${SELECTED_PROJECTS_LIMIT} packages allowed`,
+    );
+  });
+
+  test("returns 400 and escapes XML for invalid package names", async () => {
+    const response = await GET(
+      buildRequest(`packages=${encodeURIComponent("<b>&")}`),
+    );
+
+    const svg = await response.text();
+    expect(response.status).toBe(400);
+    expect(svg).toContain("Invalid package names: &lt;b&gt;&amp;");
+    expect(svg).not.toContain("<b>");
+    expect(fetchAdaptiveMock).not.toHaveBeenCalled();
+  });
+
+  test("surfaces an AppError message in the 502 SVG", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchAdaptiveMock.mockRejectedValue(new AppError("registry down"));
+
+    const response = await GET(buildRequest("packages=react"));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toContain("registry down");
   });
 });
