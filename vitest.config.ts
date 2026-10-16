@@ -4,10 +4,8 @@ import { defineConfig } from "vitest/config";
 
 const UNMODIFIED_SHADCN_PRIMITIVES = [
   "card",
-  "command",
   "dialog",
   "dropdown-menu",
-  "form",
   "input",
   "label",
   "popover",
@@ -24,6 +22,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      "next/dynamic": "next/dist/api/app-dynamic",
+      "server-only": path.resolve(
+        import.meta.dirname,
+        "./src/test/server-only.ts",
+      ),
     },
   },
   test: {

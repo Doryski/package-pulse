@@ -1,28 +1,35 @@
 "use client";
-import ClientOnly from "@/components/ui/client-only";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormItem, FormMessage } from "@/components/ui/form";
 import Tag from "@/components/ui/tag";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import useDebounce from "@/lib/hooks/useDebounce";
 import useSearchNPMRegistry from "@/lib/queries/useSearchNPMRegistry";
+import type { NPMPackageSearch } from "@/lib/schemas/npmPackageSearch.schema";
 import { cn } from "@/lib/utils/cn";
 import { flushSync } from "react-dom";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, useWatch } from "react-hook-form";
 import ProjectTag from "./project-tag";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
+import SearchTip from "./search-tip";
 
 type ComboboxFormProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;
   onFormSubmit: (query: string) => void;
 };
 
+const getPackageName = (option: NPMPackageSearch["objects"][number]) =>
+  option.package.name;
+
 const ComboboxForm = ({ form, onFormSubmit }: ComboboxFormProps) => {
-  const search = form.watch("search");
+  const search = useWatch({ control: form.control, name: "search" });
   const debouncedSearch = useDebounce(search, 400);
   const npmRegistry = useSearchNPMRegistry(debouncedSearch);
 
-  const selectedProjects = form.watch("projects");
+  const selectedProjects = useWatch({
+    control: form.control,
+    name: "projects",
+  });
   const hasExceededSelectedProjectsLimit =
     selectedProjects.length >= SELECTED_PROJECTS_LIMIT;
 
@@ -64,20 +71,18 @@ const ComboboxForm = ({ form, onFormSubmit }: ComboboxFormProps) => {
           fullwidth
           options={npmRegistry.data}
           isLoadingOptions={npmRegistry.isLoading}
+          hasOptionsError={npmRegistry.isError}
           form={form}
           disabled={hasExceededSelectedProjectsLimit}
           onSelectItem={selectProject}
-          optionValuePredicate={(option) => option.package.name}
+          optionValuePredicate={getPackageName}
         />
         {hasExceededSelectedProjectsLimit && (
           <FormMessage className="text-xs text-destructive">
             You cannot select more than {SELECTED_PROJECTS_LIMIT} projects
           </FormMessage>
         )}
-        <div className="text-xs text-muted-foreground">
-          Tip: You can enter multiple projects separated by commas (e.g.
-          &quot;react,vue,svelte&quot;)
-        </div>
+        <SearchTip />
       </div>
 
       <FormField
@@ -90,22 +95,18 @@ const ComboboxForm = ({ form, onFormSubmit }: ComboboxFormProps) => {
                 const error = formState.errors.projects?.[index];
 
                 return (
-                  <ClientOnly key={project}>
-                    <ProjectTag
-                      key={project}
-                      project={project}
-                      error={error}
-                      colorIndex={field.value.indexOf(project)}
-                      onRemove={() =>
-                        updateProjects(field.value.filter((p) => p !== project))
-                      }
-                    />
-                  </ClientOnly>
+                  <ProjectTag
+                    key={project}
+                    project={project}
+                    error={error}
+                    colorIndex={index}
+                    onRemove={() =>
+                      updateProjects(field.value.filter((p) => p !== project))
+                    }
+                  />
                 );
               })}
-              <ClientOnly>
-                <ClearAllTag onClick={() => updateProjects([])} />
-              </ClientOnly>
+              <ClearAllTag onClick={() => updateProjects([])} />
             </div>
           </FormItem>
         )}

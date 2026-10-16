@@ -1,19 +1,16 @@
-import { fetchGithubPullRequestsCount } from "@/api/fetchPackageInfo";
-import { useQuery } from "@tanstack/react-query";
+import { fetchGithubPullRequestsCount } from "@/api/packageData";
+import { getGithubPullRequestsCountQueryKey } from "@/lib/queries/keys";
+import { skipToken, useQuery } from "@tanstack/react-query";
 
 export default function useGithubPullRequestsCount(
-  repoName: string,
-  projectName: string,
-  enabled: boolean,
+  repoName: string | null | undefined,
 ) {
   return useQuery({
-    enabled,
-    queryKey: ["githubPullRequestsCount", repoName],
-    queryFn: async () => ({
-      count: await fetchGithubPullRequestsCount(repoName),
-      name: projectName,
-    }),
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
+    queryKey: getGithubPullRequestsCountQueryKey(repoName ?? null),
+    queryFn: repoName
+      ? ({ signal }) => fetchGithubPullRequestsCount(repoName, signal)
+      : skipToken,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }

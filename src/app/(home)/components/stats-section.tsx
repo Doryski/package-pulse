@@ -1,11 +1,17 @@
 "use client";
 import useProjectsStats from "@/lib/queries/useProjectsStats";
-import { memo } from "react";
+import dynamic from "next/dynamic";
+import { memo, Suspense } from "react";
 import { UseFormReturn } from "react-hook-form";
-import ChartSection from "./chart-section";
+import ChartSkeleton from "./chart-skeleton";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
 import TableSection from "./table-section";
 import WidgetsSection from "./widgets-section";
+
+const ChartSection = dynamic(() => import("./chart-section"), {
+  ssr: false,
+  loading: ChartSkeleton,
+});
 
 type StatsSectionProps = {
   form: UseFormReturn<ProjectsSearchFormValues>;
@@ -17,7 +23,9 @@ const StatsSection = memo(({ form, selectedProjects }: StatsSectionProps) => {
 
   return (
     <>
-      <ChartSection projectStats={selectedProjectsStats} />
+      <Suspense fallback={<ChartSkeleton />}>
+        <ChartSection projectStats={selectedProjectsStats} />
+      </Suspense>
       <TableSection projectsStats={selectedProjectsStats} />
       <WidgetsSection projectsStats={selectedProjectsStats} />
     </>

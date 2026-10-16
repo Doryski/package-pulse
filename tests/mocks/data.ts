@@ -112,6 +112,28 @@ const buildVersionDoc = (name: string, version: string) => ({
   },
 });
 
+export const buildLatestManifest = (name: string) => {
+  const {
+    version,
+    description,
+    keywords,
+    repository,
+    license,
+    homepage,
+    dependencies,
+  } = buildVersionDoc(name, LATEST_VERSION);
+  return {
+    name,
+    version,
+    description,
+    keywords,
+    repository,
+    license,
+    homepage,
+    dependencies,
+  };
+};
+
 export const buildPackageDoc = (name: string) => ({
   _id: name,
   name,
@@ -176,7 +198,12 @@ export const buildSearchResults = (text: string) => {
   };
 };
 
-export const buildBundleSize = (name: string) => ({
+export const buildBundleSize = (
+  name: string,
+  version: string = LATEST_VERSION,
+) => ({
+  name,
+  version,
   size: seededInt(`size:${name}`, 2_000, 400_000),
   gzip: seededInt(`gzip:${name}`, 1_000, 120_000),
   dependencyCount: seededInt(`deps:${name}`, 0, 12),
@@ -193,6 +220,47 @@ export const buildDepsDevVersion = (name: string) => ({
       relationType: "SOURCE_REPO",
     },
   ],
+});
+
+export type DepsDevVersionKey = { name: string; version: string };
+
+const npmVersionKey = ({ name, version }: DepsDevVersionKey) => ({
+  system: "NPM",
+  name,
+  version,
+});
+
+export const buildDepsDevVersionBatch = (
+  keys: readonly DepsDevVersionKey[],
+  isMissing: (name: string) => boolean = isMissingPackage,
+) => ({
+  responses: keys.map((key) => {
+    const request = { versionKey: npmVersionKey(key) };
+    if (isMissing(key.name)) return { request };
+    return {
+      request,
+      version: {
+        versionKey: npmVersionKey(key),
+        ...buildDepsDevVersion(key.name),
+      },
+    };
+  }),
+  nextPageToken: "",
+});
+
+export const buildDepsDevProjectBatch = (
+  projectIds: readonly string[],
+  isMissing: (projectId: string) => boolean,
+) => ({
+  responses: projectIds.map((id) => {
+    const request = { projectKey: { id } };
+    if (isMissing(id)) return { request };
+    return {
+      request,
+      project: { projectKey: { id }, ...buildDepsDevProject(id) },
+    };
+  }),
+  nextPageToken: "",
 });
 
 export const buildDepsDevProject = (projectId: string) => ({

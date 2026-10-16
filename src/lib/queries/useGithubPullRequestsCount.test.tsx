@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ fetchGithubPullRequestsCount: vi.fn() }));
 
-vi.mock("@/api/fetchPackageInfo", () => ({
+vi.mock("@/api/packageData", () => ({
   fetchGithubPullRequestsCount: mocks.fetchGithubPullRequestsCount,
 }));
 
@@ -23,28 +23,32 @@ describe("useGithubPullRequestsCount", () => {
     mocks.fetchGithubPullRequestsCount.mockReset();
   });
 
-  test("returns the count with the project name", async () => {
+  test("returns the count for the repo", async () => {
     mocks.fetchGithubPullRequestsCount.mockResolvedValue(42);
 
     const { result } = renderHook(
-      () => useGithubPullRequestsCount("facebook/react", "react", true),
+      () => useGithubPullRequestsCount("facebook/react"),
       { wrapper },
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mocks.fetchGithubPullRequestsCount).toHaveBeenCalledWith(
       "facebook/react",
+      expect.any(AbortSignal),
     );
-    expect(result.current.data).toEqual({ count: 42, name: "react" });
+    expect(result.current.data).toBe(42);
   });
 
-  test("does not fetch when disabled", () => {
-    const { result } = renderHook(
-      () => useGithubPullRequestsCount("facebook/react", "react", false),
-      { wrapper },
-    );
+  test.each([null, undefined, ""])(
+    "does not fetch without a repo name (%s)",
+    (repoName) => {
+      const { result } = renderHook(
+        () => useGithubPullRequestsCount(repoName),
+        { wrapper },
+      );
 
-    expect(result.current.fetchStatus).toBe("idle");
-    expect(mocks.fetchGithubPullRequestsCount).not.toHaveBeenCalled();
-  });
+      expect(result.current.fetchStatus).toBe("idle");
+      expect(mocks.fetchGithubPullRequestsCount).not.toHaveBeenCalled();
+    },
+  );
 });

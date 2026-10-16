@@ -7,7 +7,7 @@ const { html2canvas, downloadFile, toast } = vi.hoisted(() => ({
 }));
 
 vi.mock("html2canvas-pro", () => ({ default: html2canvas }));
-vi.mock("@/lib/utils/exportUtils", () => ({ downloadFile }));
+vi.mock("@/lib/utils/downloadFile", () => ({ downloadFile }));
 vi.mock("sonner", () => ({ toast }));
 
 import {

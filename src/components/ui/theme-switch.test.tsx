@@ -1,4 +1,6 @@
 import { screen } from "@testing-library/react";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import ThemeSwitch from "./theme-switch";
@@ -61,5 +63,27 @@ describe("ThemeSwitch", () => {
     await user.click(screen.getByRole("radio", { name: "Dark" }));
     await user.click(screen.getByRole("radio", { name: "Dark" }));
     expect(localStorage.getItem("theme")).toBe("dark");
+  });
+
+  test("server-renders a same-size placeholder box", () => {
+    const html = renderToString(createElement(ThemeSwitch));
+    const container = document.createElement("div");
+    container.innerHTML = html;
+
+    const placeholder = container.querySelector(
+      "[data-testid='theme-switch-placeholder']",
+    );
+    expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector("[role='radiogroup']")).toBeNull();
+    const items = [...(placeholder?.children ?? [])];
+    expect(items).toHaveLength(3);
+    items.forEach((item) =>
+      expect(item).toHaveClass("h-9", "px-3", "border", "border-input"),
+    );
+    expect(items[0]).toHaveClass("rounded-l-md");
+    expect(items[2]).toHaveClass("rounded-r-md");
+    items.forEach((item) =>
+      expect(item.firstElementChild).toHaveClass("size-4"),
+    );
   });
 });

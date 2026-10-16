@@ -1,7 +1,4 @@
-import Loader from "@/components/loader";
 import BreakDropIndicatorComponent from "@/components/ui/break-drop-indicator";
-import DotIndicator, { DotIndicatorProps } from "@/components/ui/dot-indicator";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -14,13 +11,18 @@ import TableHeadSortable, {
   SortColumn,
   SortDirection,
 } from "@/components/ui/table-head-sortable";
+import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
 import { ProjectStats, sortStatsMatrix } from "@/lib/queries/useProjectsStats";
-import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { cn } from "@/lib/utils/cn";
+import { TriangleAlert } from "lucide-react";
 import { UseQueryResult } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useTheme } from "next-themes";
 import { useMemo } from "react";
-import getStatsMatrix from "../utils/getStatsMatrix";
+import { ProjectNameCell } from "./project-name-cell";
+import {
+  STICKY_HEAD_CLASS_NAME,
+  statsColumnLabel,
+} from "./stats-table-columns";
 
 const formatMonthPeriod = (period: { start: string; end: string }) => {
   const startMonth = format(period.start, "yyyy-MM");
@@ -55,12 +57,7 @@ const ProjectsStatsTable = ({
   sortDirection,
   onSort: handleSort,
 }: ProjectsStatsTableProps) => {
-  const { resolvedTheme } = useTheme();
-
-  const statsMatrix = useMemo(
-    () => getStatsMatrix(projectsStats, resolvedTheme),
-    [projectsStats, resolvedTheme],
-  );
+  const statsMatrix = useStatsMatrix(projectsStats);
 
   const sortedStatsMatrix = useMemo(
     () => sortStatsMatrix(statsMatrix, sortColumn, sortDirection),
@@ -75,14 +72,14 @@ const ProjectsStatsTable = ({
         <TableHeader>
           <TableRow>
             <TableHeadSortable
-              className="sticky left-0 z-20 w-25 min-w-25 cursor-pointer bg-slate-100 md:w-50 md:min-w-[150px] dark:bg-slate-900"
+              className={cn(STICKY_HEAD_CLASS_NAME, "cursor-pointer")}
               contentClassName="justify-start"
               column="projectName"
               isSorted={sortColumn === "projectName"}
               sortDirection={sortDirection}
               handleSort={handleSort}
             >
-              Project name
+              {statsColumnLabel("projectName")}
             </TableHeadSortable>
             <TableHeadSortable
               column="weekly"
@@ -100,7 +97,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              Weekly
+              {statsColumnLabel("weekly")}
             </TableHeadSortable>
             <TableHeadSortable
               column="monthly"
@@ -119,7 +116,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              Monthly
+              {statsColumnLabel("monthly")}
             </TableHeadSortable>
             <TableHeadSortable
               column="yearly"
@@ -138,7 +135,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              Yearly
+              {statsColumnLabel("yearly")}
             </TableHeadSortable>
             <TableHeadSortable
               column="yoyWeek"
@@ -156,7 +153,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              YoY Week
+              {statsColumnLabel("yoyWeek")}
             </TableHeadSortable>
             <TableHeadSortable
               column="yoyMonth"
@@ -175,7 +172,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              YoY Month
+              {statsColumnLabel("yoyMonth")}
             </TableHeadSortable>
 
             <TableHeadSortable
@@ -201,7 +198,7 @@ const ProjectsStatsTable = ({
                 />
               }
             >
-              Vibe Coding Era
+              {statsColumnLabel("vibeCodingEra")}
             </TableHeadSortable>
 
             <TableHeadSortable
@@ -227,7 +224,7 @@ const ProjectsStatsTable = ({
                     teams are offline.
                   </p>
                   <div className="text-orange-500 dark:text-orange-500">
-                    <ExclamationTriangleIcon className="size-4 min-h-4 min-w-4" />
+                    <TriangleAlert className="size-4 min-h-4 min-w-4" />
                     <p className="flex items-center gap-1 text-xs font-medium">
                       Use as a general indicator only. Individual projects may
                       have different usage patterns regardless of their target
@@ -237,7 +234,7 @@ const ProjectsStatsTable = ({
                 </div>
               }
             >
-              Break Drop
+              {statsColumnLabel("breakDrop")}
             </TableHeadSortable>
           </TableRow>
         </TableHeader>
@@ -245,6 +242,7 @@ const ProjectsStatsTable = ({
           {sortedStatsMatrix.map((projectStats) => (
             <TableRow key={projectStats.projectName}>
               <ProjectNameCell
+                className="cursor-pointer"
                 projectName={projectStats.projectName}
                 color={projectStats.color}
               />
@@ -267,30 +265,6 @@ const ProjectsStatsTable = ({
   );
 };
 
-type ProjectNameCellProps = {
-  isLoading?: boolean;
-  projectName: string;
-} & DotIndicatorProps;
-
-export function ProjectNameCell({
-  isLoading = false,
-  projectName,
-  ...dotIndicatorProps
-}: ProjectNameCellProps) {
-  return (
-    <TableCell className="sticky left-0 z-10 table-cell cursor-pointer bg-background">
-      <Loader
-        isLoading={isLoading}
-        fallback={<Skeleton className="h-4 w-full" />}
-      >
-        <div className="flex items-center gap-2">
-          <DotIndicator {...dotIndicatorProps} />
-          <span>{projectName}</span>
-        </div>
-      </Loader>
-    </TableCell>
-  );
-}
 type StatHeaderTooltipProps<T> = {
   dates: T;
   title: string;

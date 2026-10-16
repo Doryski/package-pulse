@@ -1,4 +1,4 @@
-import fetchDownloadsBatch from "@/api/fetchDownloadsBatch";
+import loadDownloads from "@/api/downloadsLoader";
 import { ProjectsSearchFormValues } from "@/app/(home)/components/projects-form/schema";
 import {
   GetStatsMatrixResult,
@@ -6,15 +6,13 @@ import {
 } from "@/app/(home)/utils/getStatsMatrix";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { getProjectStatsQueryKey } from "@/lib/queries/keys";
-import AppError from "@/lib/utils/AppError";
+import { buildProjectStats } from "@/lib/stats/buildProjectStats";
+import { isAppError } from "@/lib/utils/AppError";
+import getMsUntilNextUtcMidnight from "@/lib/utils/getMsUntilNextUtcMidnight";
 import {
-  DownloadStat,
-  groupByWeeks,
-  PeriodStat,
-} from "@/lib/utils/groupByPeriod";
-import sortByDate from "@/lib/utils/sortByDate";
-import {
+  Query,
   QueryObserverSuccessResult,
+  queryOptions,
   useQueries,
   UseQueryResult,
 } from "@tanstack/react-query";
@@ -23,75 +21,93 @@ import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
 const BATCH_ERROR_MESSAGE = "Failed to fetch NPM download data";
+const GENERIC_FIELD_ERROR = "Something went wrong. Please try again.";
 
-export type ProjectStats = {
-  projectName: string;
-  groupedByWeekData: PeriodStat[];
-  rawSortedData: DownloadStat[];
+export type ProjectStats = ReturnType<typeof buildProjectStats> & {
+  isPartial?: boolean;
 };
+
+export const PARTIAL_STATS_STALE_MS = 5 * 60 * 1000;
 export type ProjectStatsQuery = UseQueryResult<ProjectStats, Error>;
 
 type SuccessfulProjectQuery = QueryObserverSuccessResult<ProjectStats>;
 
+type StatsForm = UseFormReturn<ProjectsSearchFormValues>;
+
+export const getProjectStatsStaleTime = (query: Query<ProjectStats>) => {
+  if (query.state.data?.isPartial) return PARTIAL_STATS_STALE_MS;
+  return getMsUntilNextUtcMidnight(query.state.dataUpdatedAt);
+};
+
+const getErrorMessages = (error: unknown) => {
+  if (isAppError(error)) return { field: error.message, toast: error.message };
+  return { field: GENERIC_FIELD_ERROR, toast: BATCH_ERROR_MESSAGE };
+};
+
+const reportStatsError = (form: StatsForm, index: number, error: unknown) => {
+  const messages = getErrorMessages(error);
+  form.setError(`projects.${index}`, { message: messages.field });
+  toast.error(messages.toast, { id: messages.toast });
+};
+
+const warnAboutPartialData = (warning: string | undefined) => {
+  if (warning) toast.warning(warning, { id: warning });
+};
+
+const loadProjectStats = async (
+  projectName: string,
+  signal: AbortSignal,
+): Promise<ProjectStats> => {
+  const { series, warning } = await loadDownloads(projectName, signal);
+  warnAboutPartialData(warning);
+  return {
+    ...buildProjectStats(projectName, series),
+    isPartial: Boolean(warning),
+  };
+};
+
+export const projectStatsQueryOptions = (projectName: string) =>
+  queryOptions({
+    queryKey: getProjectStatsQueryKey(projectName),
+    retry: false,
+    staleTime: getProjectStatsStaleTime,
+    queryFn: ({ signal }) => loadProjectStats(projectName, signal),
+  });
+
+const toStabilityKey = (data: ProjectStats | undefined) => {
+  if (!data) return "";
+  const { projectName, groupedByWeekData, summary } = data;
+  const { recentFullWeek, latestDownloads, peakDownloads } = summary;
+  return [
+    projectName,
+    groupedByWeekData.length,
+    recentFullWeek?.end ?? "",
+    recentFullWeek?.count ?? 0,
+    latestDownloads,
+    peakDownloads,
+  ].join(":");
+};
+
 export default function useProjectsStats(
   selectedProjects: string[],
-  form: UseFormReturn<ProjectsSearchFormValues>,
+  form: StatsForm,
 ) {
   const queries = useQueries({
-    queries: selectedProjects.map((projectName, index) => {
-      return {
-        queryKey: getProjectStatsQueryKey(projectName),
-        retry: false,
-        queryFn: async () => {
-          try {
-            const batch = await fetchDownloadsBatch(selectedProjects);
-            const downloads = batch.data[projectName];
-            if (!downloads) {
-              throw new AppError(
-                batch.errors[projectName] ??
-                  `Package "${projectName}" not found`,
-              );
-            }
-
-            const partialError = batch.errors[projectName];
-            if (partialError) toast.warning(partialError, { id: partialError });
-
-            const sortedDownloads = sortByDate(
-              downloads,
-              (download) => new Date(download.date),
-            );
-            const groupedDownloads = groupByWeeks(sortedDownloads).slice(0, -1);
-
-            return {
-              projectName,
-              groupedByWeekData: groupedDownloads,
-              rawSortedData: sortedDownloads,
-            };
-          } catch (error) {
-            if (error instanceof AppError) {
-              form.setError(`projects.${index}`, { message: error.message });
-              toast.error(error.message, { id: error.message });
-            } else {
-              form.setError(`projects.${index}`, {
-                message: "Something went wrong. Please try again.",
-              });
-              toast.error(BATCH_ERROR_MESSAGE, { id: BATCH_ERROR_MESSAGE });
-            }
-            throw error;
-          }
-        },
-      };
-    }),
+    queries: selectedProjects.map((projectName, index) => ({
+      ...projectStatsQueryOptions(projectName),
+      queryFn: async ({ signal }) => {
+        try {
+          return await loadProjectStats(projectName, signal);
+        } catch (error) {
+          if (!signal.aborted) reportStatsError(form, index, error);
+          throw error;
+        }
+      },
+    })),
   });
 
   const stabilityKey = queries
-    .map((query) => {
-      if (!query.data) return "";
-      const { projectName, rawSortedData } = query.data;
-      const last = rawSortedData.at(-1);
-      const total = rawSortedData.reduce((sum, entry) => sum + entry.count, 0);
-      return `${projectName}:${rawSortedData.length}:${last?.date ?? ""}:${last?.count ?? 0}:${total}`;
-    })
+    .map((query) => toStabilityKey(query.data))
     .join("|");
 
   return useMemo(

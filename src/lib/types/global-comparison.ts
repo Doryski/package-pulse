@@ -1,5 +1,5 @@
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
-import { z } from "zod";
+import * as z from "zod/mini";
 
 const NPM_PACKAGE_NAME_MAX_LENGTH = 214;
 
@@ -7,13 +7,13 @@ export const GlobalComparisonSchema = z.object({
   id: z.string(),
   timestamp: z.number(),
   projects: z.array(z.string()),
-  clientIP: z.string().optional(),
-  userAgent: z.string().optional(),
+  clientIP: z.optional(z.string()),
+  userAgent: z.optional(z.string()),
 });
 
 export type GlobalComparison = z.infer<typeof GlobalComparisonSchema>;
 
-export const PublicComparisonSchema = GlobalComparisonSchema.omit({
+export const PublicComparisonSchema = z.omit(GlobalComparisonSchema, {
   clientIP: true,
   userAgent: true,
 });
@@ -22,9 +22,12 @@ export type PublicComparison = z.infer<typeof PublicComparisonSchema>;
 
 export const CreateGlobalComparisonRequestSchema = z.object({
   projects: z
-    .array(z.string().min(1).max(NPM_PACKAGE_NAME_MAX_LENGTH))
-    .min(1)
-    .max(SELECTED_PROJECTS_LIMIT),
+    .array(
+      z
+        .string()
+        .check(z.minLength(1), z.maxLength(NPM_PACKAGE_NAME_MAX_LENGTH)),
+    )
+    .check(z.minLength(1), z.maxLength(SELECTED_PROJECTS_LIMIT)),
 });
 
 export type CreateGlobalComparisonRequest = z.infer<
@@ -42,7 +45,7 @@ export type GlobalComparisonResponse = z.infer<
 
 export const GlobalComparisonErrorSchema = z.object({
   error: z.string(),
-  details: z.string().optional(),
+  details: z.optional(z.string()),
 });
 
 export type GlobalComparisonError = z.infer<typeof GlobalComparisonErrorSchema>;

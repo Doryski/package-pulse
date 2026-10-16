@@ -8,7 +8,7 @@ const pendingQuery = { data: undefined } as ProjectStatsQuery;
 describe("getPeakAndLatestDownloads", () => {
   test("returns latest (last computed day) and peak downloads per project", () => {
     const stats = buildProjectStats("react", {
-      rawSortedData: [
+      downloads: [
         { date: "2024-01-01", count: 10 },
         { date: "2024-01-02", count: 50 },
         { date: "2024-01-03", count: 20 },
@@ -26,7 +26,7 @@ describe("getPeakAndLatestDownloads", () => {
   });
 
   test("falls back to zero for empty data", () => {
-    const stats = buildProjectStats("empty", { rawSortedData: [] });
+    const stats = buildProjectStats("empty", { downloads: [] });
 
     expect(getPeakAndLatestDownloads([buildSuccessQuery(stats)])).toEqual([
       { name: "empty", latestDownloads: 0, peakDownloads: 0 },

@@ -15,9 +15,16 @@ import {
 import { MULTI_SEARCH_DELIMITER } from "@/lib/config/constants";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import { cn } from "@/lib/utils/cn";
-import { CheckIcon } from "@radix-ui/react-icons";
-import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
-import { UseFormReturn } from "react-hook-form";
+import { Check } from "lucide-react";
+import {
+  KeyboardEvent,
+  useCallback,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { UseFormReturn, useWatch } from "react-hook-form";
 import { Input } from "./input";
 import { List, ListEmpty, ListGroup, ListItem, ListLoading } from "./list";
 
@@ -26,9 +33,33 @@ type ComboboxProps<T> = {
   disabled: boolean;
   options: T[] | undefined;
   isLoadingOptions: boolean;
+  hasOptionsError?: boolean;
   fullwidth?: boolean;
   onSelectItem: (item: string) => void;
   optionValuePredicate: (option: T) => string;
+};
+
+export const COMBOBOX_EMPTY_MESSAGES = {
+  unavailable: "Search unavailable, press Enter to add by exact name",
+  tooShort: "Type at least 2 characters to search",
+  noResults: "No project found.",
+} as const;
+
+const getEmptyMessage = (searchValue: string, hasOptionsError: boolean) => {
+  if (hasOptionsError) return COMBOBOX_EMPTY_MESSAGES.unavailable;
+  if (searchValue.length === 1) return COMBOBOX_EMPTY_MESSAGES.tooShort;
+  return COMBOBOX_EMPTY_MESSAGES.noResults;
+};
+
+const useFocusWhenPageIdle = () => {
+  const hasRunRef = useRef(false);
+
+  return useCallback((node: HTMLInputElement | null) => {
+    if (!node || hasRunRef.current) return;
+    hasRunRef.current = true;
+    if (document.activeElement !== document.body) return;
+    node.focus();
+  }, []);
 };
 
 export function Combobox<T>({
@@ -36,25 +67,34 @@ export function Combobox<T>({
   disabled,
   options,
   isLoadingOptions,
+  hasOptionsError = false,
   fullwidth,
   onSelectItem,
   optionValuePredicate,
 }: ComboboxProps<T>) {
-  const [isPopoverOpen, openPopover, closePopover] = useBooleanState(false);
+  const [isPopoverRequested, openPopover, closePopover] =
+    useBooleanState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const popoverContentRef = useRef<HTMLDivElement>(null);
-  const searchValue = form.watch("search");
+  const listboxId = useId();
+  const focusWhenPageIdle = useFocusWhenPageIdle();
+  const searchValue = useWatch({ control: form.control, name: "search" });
+  const selectedProjects = useWatch({
+    control: form.control,
+    name: "projects",
+  });
+  const selectedNames = useMemo(
+    () => new Set(selectedProjects),
+    [selectedProjects],
+  );
+  const isEmptyVisible = hasOptionsError || options?.length === 0;
+  const isPopoverOpen =
+    isPopoverRequested && !searchValue.includes(MULTI_SEARCH_DELIMITER);
 
   const getOptionsElements = useCallback(
     () => popoverContentRef.current?.querySelectorAll("li"),
     [],
   );
-
-  useEffect(() => {
-    if (isPopoverOpen && searchValue.includes(MULTI_SEARCH_DELIMITER)) {
-      closePopover();
-    }
-  }, [searchValue, openPopover, isPopoverOpen, closePopover]);
 
   const focusNextOption = useCallback(
     (index: number) => {
@@ -158,8 +198,14 @@ export function Combobox<T>({
                   </FormLabel>
                   <Input
                     {...field}
+                    ref={(node) => {
+                      field.ref(node);
+                      focusWhenPageIdle(node);
+                    }}
                     id={field.name}
                     role="combobox"
+                    aria-expanded={isPopoverOpen}
+                    aria-controls={listboxId}
                     placeholder="Search projects..."
                     autoComplete="off"
                     className={cn(
@@ -167,7 +213,6 @@ export function Combobox<T>({
                       !field.value && "text-muted-foreground",
                       fullwidth && "sm:w-full",
                     )}
-                    autoFocus
                     onChangeCapture={() => {
                       if (field.value) {
                         form.setFocus("search");
@@ -185,17 +230,13 @@ export function Combobox<T>({
               ref={popoverContentRef}
             >
               <ListGroup>
-                <ListEmpty
-                  className={options?.length === 0 ? "block" : "hidden"}
-                >
-                  {searchValue && searchValue.length === 1
-                    ? "Type at least 2 characters to search"
-                    : "No project found."}
+                <ListEmpty className={isEmptyVisible ? "block" : "hidden"}>
+                  {getEmptyMessage(searchValue, hasOptionsError)}
                 </ListEmpty>
                 <ListLoading
                   className={isLoadingOptions ? "block" : "hidden"}
                 />
-                <List role="listbox">
+                <List role="listbox" id={listboxId}>
                   {options?.map((option, index) => {
                     const optionValue = optionValuePredicate(option);
                     return (
@@ -208,10 +249,10 @@ export function Combobox<T>({
                         onKeyDown={(e) => handleOptionKeyDown(e, option)}
                       >
                         {optionValue}
-                        <CheckIcon
+                        <Check
                           className={cn(
                             "ml-auto size-4",
-                            form.watch("projects").includes(optionValue)
+                            selectedNames.has(optionValue)
                               ? "opacity-100"
                               : "opacity-0",
                           )}

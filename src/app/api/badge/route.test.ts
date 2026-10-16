@@ -261,4 +261,48 @@ describe("GET /api/badge", () => {
     expect(response.status).toBe(502);
     expect(await response.text()).toContain("registry down");
   });
+  test("exports a 30 second max duration", async () => {
+    const route = await import("./route");
+
+    expect(route.maxDuration).toBe(30);
+  });
+
+  test("passes a signal that aborts with the incoming request", async () => {
+    const controller = new AbortController();
+    const request = new NextRequest(
+      "http://localhost/api/badge?packages=react",
+      {
+        headers: { "x-real-ip": `10.1.0.${++ipCounter}` },
+        signal: controller.signal,
+      },
+    );
+    await GET(request);
+    const signal: AbortSignal = fetchAdaptiveMock.mock.calls[0]![1].signal;
+
+    expect(signal.aborted).toBe(false);
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+  });
+
+  test("returns an uncached 504 SVG when the upstream fetch times out", async () => {
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValue(
+        AbortSignal.abort(new DOMException("timed out", "TimeoutError")),
+      );
+    fetchAdaptiveMock.mockImplementation(
+      async (_packages: string[], opts: { signal: AbortSignal }) => {
+        throw opts.signal.reason;
+      },
+    );
+
+    const response = await GET(buildRequest("packages=react"));
+    const timeoutCalls = timeoutSpy.mock.calls;
+    timeoutSpy.mockRestore();
+
+    expect(timeoutCalls).toEqual([[25_000]]);
+    expect(response.status).toBe(504);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.text()).toContain("Timed out loading download data");
+  });
 });

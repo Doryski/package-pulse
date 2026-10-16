@@ -1,5 +1,5 @@
 import AppError from "@/lib/utils/AppError";
-import { downloadFile } from "@/lib/utils/exportUtils";
+import { downloadFile } from "@/lib/utils/downloadFile";
 import { toast } from "sonner";
 
 export const STYLESHEET_TIMEOUT_MS = 5_000;

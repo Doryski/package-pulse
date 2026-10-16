@@ -64,6 +64,17 @@ afterEach(() => {
 });
 
 describe("GET /api/comparisons", () => {
+  test("sets CDN cache headers on success and no-store on errors", async () => {
+    const ok = await GET(getRequest());
+    expect(ok.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=30, stale-while-revalidate=300",
+    );
+
+    checkRateLimitMock.mockResolvedValue(true);
+    const limited = await GET(getRequest());
+    expect(limited.headers.get("Cache-Control")).toBe("no-store");
+  });
+
   test.each([
     [undefined, 20],
     ["", 20],
@@ -211,6 +222,32 @@ describe("POST /api/comparisons", () => {
         headers: { Accept: "application/vnd.npm.install-v1+json" },
       }),
     );
+  });
+
+  test("runs existence checks in parallel and preserves input order", async () => {
+    const resolvers: Array<() => void> = [];
+    fetchMock.mockImplementation(
+      (url: string) =>
+        new Promise<Response>((resolve) => {
+          resolvers.push(() =>
+            resolve(
+              new Response(null, {
+                status: url.endsWith("/par-b") ? 404 : 200,
+              }),
+            ),
+          );
+        }),
+    );
+
+    const pending = POST(
+      postRequest({ projects: ["par-c", "par-b", "par-a"] }),
+    );
+    await vi.waitFor(() => expect(resolvers).toHaveLength(3));
+    resolvers.reverse().forEach((resolve) => resolve());
+    const body = await (await pending).json();
+
+    expect(body.projects).toEqual(["par-c", "par-a"]);
+    expect(body.validation.invalidPackages).toEqual(["par-b"]);
   });
 
   test("caches package existence lookups", async () => {

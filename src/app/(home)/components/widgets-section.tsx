@@ -8,21 +8,69 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import usePendingProjectsStatsCount from "@/lib/queries/usePendingProjectsStatsCount";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import { copyAsImage, downloadAsImage } from "@/lib/utils/imageExport";
-import { ChevronDownIcon, CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
-import { memo, useRef, useState } from "react";
-import BarChartWidget, {
+import { ChevronDown, Copy, Download } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ComponentType, memo, ReactNode, useRef, useState } from "react";
+import { useWatch } from "react-hook-form";
+import { ProjectsSearchFormValues } from "./projects-form/schema";
+import type {
   BarChartMode,
   BarChartWidgetProps,
 } from "./widgets/bar-chart-widget";
-import PieChartWidget from "./widgets/pie-chart-widget";
-import StatsCardsWidget, {
-  StatsCardsWidgetRef,
-} from "./widgets/stats-cards-widget";
-import TrendWidget, { TrendWidgetRef } from "./widgets/trend-widget";
+import type { StatsCardsWidgetRef } from "./widgets/stats-cards-widget";
+import type { TrendWidgetRef } from "./widgets/trend-widget";
+
+const SKELETON_ITEMS = [0, 1] as const;
+
+const BarChartSkeleton = () => (
+  <Skeleton aria-hidden="true" className="h-[370px] w-full" />
+);
+
+const PieChartSkeleton = () => (
+  <Skeleton aria-hidden="true" className="h-100 w-full" />
+);
+
+const StatsCardsSkeleton = () => (
+  <div aria-hidden="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {SKELETON_ITEMS.map((item) => (
+      <Skeleton key={item} className="h-44" />
+    ))}
+  </div>
+);
+
+const TrendSkeleton = () => (
+  <div aria-hidden="true" className="space-y-3">
+    {SKELETON_ITEMS.map((item) => (
+      <Skeleton key={item} className="h-17" />
+    ))}
+  </div>
+);
+
+const BarChartWidget = dynamic(() => import("./widgets/bar-chart-widget"), {
+  ssr: false,
+  loading: BarChartSkeleton,
+});
+
+const PieChartWidget = dynamic(() => import("./widgets/pie-chart-widget"), {
+  ssr: false,
+  loading: PieChartSkeleton,
+});
+
+const StatsCardsWidget = dynamic(() => import("./widgets/stats-cards-widget"), {
+  ssr: false,
+  loading: StatsCardsSkeleton,
+});
+
+const TrendWidget = dynamic(() => import("./widgets/trend-widget"), {
+  ssr: false,
+  loading: TrendSkeleton,
+});
 
 type WidgetsSectionProps = {
   projectsStats: ProjectStatsQuery[];
@@ -34,11 +82,12 @@ type Widget = {
   id: WidgetType;
   title: string;
   description: string;
-  component: React.ComponentType<
+  component: ComponentType<
     {
       projectsStats: WidgetsSectionProps["projectsStats"];
     } & BarChartWidgetProps
   >;
+  Skeleton: ComponentType;
 };
 
 const widgets: Widget[] = [
@@ -47,26 +96,65 @@ const widgets: Widget[] = [
     title: "Stats Cards",
     description: "Key metrics in card format",
     component: StatsCardsWidget,
+    Skeleton: StatsCardsSkeleton,
   },
   {
     id: "bar-chart",
     title: "Bar Chart",
     description: "Compare projects with bars",
     component: BarChartWidget,
+    Skeleton: BarChartSkeleton,
   },
   {
     id: "pie-chart",
     title: "Pie Chart",
     description: "Project distribution",
     component: PieChartWidget,
+    Skeleton: PieChartSkeleton,
   },
   {
     id: "trend",
     title: "Trend Indicators",
     description: "Growth trends overview",
     component: TrendWidget,
+    Skeleton: TrendSkeleton,
   },
 ];
+
+const WidgetExportSpinner = ({ widget }: { widget: Widget }) => (
+  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/50">
+    <div
+      role="status"
+      aria-label={`Exporting ${widget.title} widget`}
+      data-testid={`widget-export-loader-${widget.id}`}
+      className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent motion-reduce:animate-none"
+    />
+  </div>
+);
+
+const WidgetCardHeading = ({ widget }: { widget: Widget }) => (
+  <div>
+    <CardTitle className="text-lg">{widget.title}</CardTitle>
+    <p className="text-sm text-muted-foreground">{widget.description}</p>
+  </div>
+);
+
+const WIDGET_HEADER_CLASS_NAME =
+  "flex flex-col flex-wrap items-center justify-between gap-2 text-center sm:flex-row sm:text-left";
+
+const WidgetCardSkeleton = ({ widget }: { widget: Widget }) => (
+  <Card data-testid={`widget-skeleton-${widget.id}`}>
+    <CardHeader className="pb-2">
+      <div className={WIDGET_HEADER_CLASS_NAME}>
+        <WidgetCardHeading widget={widget} />
+        <Skeleton aria-hidden="true" className="h-8 w-20" />
+      </div>
+    </CardHeader>
+    <CardContent className="pt-2">
+      <widget.Skeleton />
+    </CardContent>
+  </Card>
+);
 
 const WidgetCard = memo(
   ({
@@ -146,13 +234,8 @@ const WidgetCard = memo(
     return (
       <Card className="relative">
         <CardHeader className="pb-2">
-          <div className="flex flex-col flex-wrap items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
-            <div>
-              <CardTitle className="text-lg">{widget.title}</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {widget.description}
-              </p>
-            </div>
+          <div className={WIDGET_HEADER_CLASS_NAME}>
+            <WidgetCardHeading widget={widget} />
             <div className="flex gap-1">
               {widget.id === "bar-chart" && (
                 <ToggleGroup
@@ -179,7 +262,7 @@ const WidgetCard = memo(
                       className="rounded-r-none border-r border-border/50"
                       aria-label="Download widget as PNG"
                     >
-                      <DownloadIcon className="size-4" />
+                      <Download className="size-4" />
                     </Button>
                   </SimpleTooltip>
                   <DropdownMenu>
@@ -191,7 +274,7 @@ const WidgetCard = memo(
                         className="rounded-l-none px-1"
                         aria-label="Download a single project card"
                       >
-                        <ChevronDownIcon className="size-3" />
+                        <ChevronDown className="size-3" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -218,7 +301,7 @@ const WidgetCard = memo(
                     disabled={isLoading}
                     aria-label="Download widget as PNG"
                   >
-                    <DownloadIcon className="size-4" />
+                    <Download className="size-4" />
                   </Button>
                 </SimpleTooltip>
               )}
@@ -234,7 +317,7 @@ const WidgetCard = memo(
                       className="rounded-r-none border-r border-border/50"
                       aria-label="Copy widget as image"
                     >
-                      <CopyIcon className="size-4" />
+                      <Copy className="size-4" />
                     </Button>
                   </SimpleTooltip>
                   <DropdownMenu>
@@ -246,7 +329,7 @@ const WidgetCard = memo(
                         className="rounded-l-none px-1"
                         aria-label="Copy a single project card"
                       >
-                        <ChevronDownIcon className="size-3" />
+                        <ChevronDown className="size-3" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -273,7 +356,7 @@ const WidgetCard = memo(
                     disabled={isLoading}
                     aria-label="Copy widget as image"
                   >
-                    <CopyIcon className="size-4" />
+                    <Copy className="size-4" />
                   </Button>
                 </SimpleTooltip>
               )}
@@ -295,11 +378,7 @@ const WidgetCard = memo(
             />
           )}
         </CardContent>
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/50">
-            <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        )}
+        {isLoading && <WidgetExportSpinner widget={widget} />}
       </Card>
     );
   },
@@ -307,33 +386,57 @@ const WidgetCard = memo(
 
 WidgetCard.displayName = "WidgetCard";
 
+const WidgetsLayout = ({
+  children,
+  isBusy,
+}: {
+  children: ReactNode;
+  isBusy: boolean;
+}) => (
+  <div
+    data-testid="widgets-section"
+    aria-busy={isBusy || undefined}
+    className={cn("mt-8 w-full lg:mt-16")}
+  >
+    <div className="mb-6">
+      <h2 className="mb-2 text-center text-2xl font-bold">Widgets</h2>
+      <p className="text-center text-muted-foreground">
+        Interactive widgets you can download or copy
+      </p>
+    </div>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{children}</div>
+  </div>
+);
+
 const WidgetsSection = memo(({ projectsStats }: WidgetsSectionProps) => {
-  const isLoading = projectsStats.some((project) => project.isLoading);
+  const selectedProjects = useWatch<ProjectsSearchFormValues, "projects">({
+    name: "projects",
+  });
+  const pendingCount = usePendingProjectsStatsCount(selectedProjects);
   const hasData = projectsStats.some((project) => project.data);
 
-  if (isLoading || !hasData) {
-    return null;
+  if (pendingCount > 0) {
+    return (
+      <WidgetsLayout isBusy>
+        {widgets.map((widget) => (
+          <WidgetCardSkeleton key={widget.id} widget={widget} />
+        ))}
+      </WidgetsLayout>
+    );
   }
 
-  return (
-    <div className={cn("mt-8 w-full lg:mt-16")}>
-      <div className="mb-6">
-        <h2 className="mb-2 text-center text-2xl font-bold">Widgets</h2>
-        <p className="text-center text-muted-foreground">
-          Interactive widgets you can download or copy
-        </p>
-      </div>
+  if (!hasData) return null;
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {widgets.map((widget) => (
-          <WidgetCard
-            key={widget.id}
-            widget={widget}
-            projectsStats={projectsStats}
-          />
-        ))}
-      </div>
-    </div>
+  return (
+    <WidgetsLayout isBusy={false}>
+      {widgets.map((widget) => (
+        <WidgetCard
+          key={widget.id}
+          widget={widget}
+          projectsStats={projectsStats}
+        />
+      ))}
+    </WidgetsLayout>
   );
 });
 

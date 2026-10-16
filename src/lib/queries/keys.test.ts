@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { getProjectStatsQueryKey, getSearchNPMRegistryQueryKey } from "./keys";
+import {
+  getProjectStatsQueryKey,
+  getSearchNPMRegistryQueryKey,
+  normalizeSearchTerm,
+} from "./keys";
 
 describe("query keys", () => {
   beforeEach(() => {
@@ -11,12 +15,12 @@ describe("query keys", () => {
     vi.useRealTimers();
   });
 
-  test("project stats key includes name and UTC date", () => {
-    expect(getProjectStatsQueryKey("react")).toEqual([
-      "project-stats",
-      "react",
-      "2024-03-05",
-    ]);
+  test("project stats key holds only the name so it survives UTC midnight", () => {
+    const beforeMidnight = getProjectStatsQueryKey("react");
+    vi.setSystemTime(new Date("2024-03-06T00:30:00Z"));
+
+    expect(beforeMidnight).toEqual(["project-stats", "react"]);
+    expect(getProjectStatsQueryKey("react")).toEqual(beforeMidnight);
   });
 
   test("search key includes the search term", () => {
@@ -24,5 +28,19 @@ describe("query keys", () => {
       "projects-suggestions",
       "vue",
     ]);
+  });
+
+  test.each(["  React ", "REACT", "react"])(
+    "search key normalizes %j to one entry",
+    (term) => {
+      expect(getSearchNPMRegistryQueryKey(term)).toEqual([
+        "projects-suggestions",
+        "react",
+      ]);
+    },
+  );
+
+  test("normalizeSearchTerm trims and lowercases", () => {
+    expect(normalizeSearchTerm("  Vue Router ")).toBe("vue router");
   });
 });

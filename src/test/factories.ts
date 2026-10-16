@@ -1,7 +1,9 @@
 import { formatDate, parseDate } from "@/app/(home)/utils/date-utils";
 import type { ProjectStats } from "@/lib/queries/useProjectsStats";
+import { buildProjectStats as computeProjectStats } from "@/lib/stats/buildProjectStats";
 import type { GlobalComparison } from "@/lib/types/global-comparison";
-import { DownloadStat, groupByWeeks } from "@/lib/utils/groupByPeriod";
+import { toCompactSeries } from "@/lib/utils/compactSeries";
+import { DownloadStat } from "@/lib/utils/groupByPeriod";
 import type { QueryObserverSuccessResult } from "@tanstack/react-query";
 import { addDays } from "date-fns";
 import { vi } from "vitest";
@@ -34,7 +36,8 @@ export type BuildProjectStatsOptions = {
   days?: number;
   start?: string;
   countAt?: (index: number) => number;
-  rawSortedData?: DownloadStat[];
+  downloads?: DownloadStat[];
+  now?: Date;
 };
 
 export function buildProjectStats(
@@ -43,14 +46,11 @@ export function buildProjectStats(
     days = 28,
     start,
     countAt,
-    rawSortedData = buildDownloadStats(days, start, countAt),
+    downloads = buildDownloadStats(days, start, countAt),
+    now,
   }: BuildProjectStatsOptions = {},
 ): ProjectStats {
-  return {
-    projectName,
-    groupedByWeekData: groupByWeeks(rawSortedData).slice(0, -1),
-    rawSortedData,
-  };
+  return computeProjectStats(projectName, toCompactSeries(downloads), now);
 }
 
 export function buildSuccessQuery<TData>(

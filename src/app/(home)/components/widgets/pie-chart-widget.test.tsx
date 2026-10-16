@@ -1,3 +1,4 @@
+import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import { buildProjectStats, buildSuccessQuery } from "@/test/factories";
 import { renderWithProviders } from "@/test/render";
 import { render, screen } from "@testing-library/react";
@@ -32,6 +33,7 @@ type ContentProps = { active?: boolean; payload?: ContentPayload };
 type PieStubProps = {
   data: PieDatum[];
   label: (input: LabelInput) => ReactNode;
+  isAnimationActive?: boolean;
 };
 
 type ContentStubProps = { content: ReactElement<ContentProps> };
@@ -40,6 +42,10 @@ const spies = vi.hoisted(() => ({
   pie: vi.fn<(props: PieStubProps) => void>(),
   tooltip: vi.fn<(props: ContentStubProps) => void>(),
   legend: vi.fn<(props: ContentStubProps) => void>(),
+}));
+
+vi.mock("@/lib/hooks/usePrefersReducedMotion", () => ({
+  usePrefersReducedMotion: vi.fn(() => false),
 }));
 
 vi.mock("recharts", async (importOriginal) => {
@@ -73,7 +79,7 @@ const buildQuery = (projectName: string, latest: number, days = 28) =>
 const VUE_QUERY = buildQuery("vue", 1000);
 const REACT_QUERY = buildQuery("@scope/react.js", 3000);
 const EMPTY_QUERY = buildSuccessQuery(
-  buildProjectStats("empty", { rawSortedData: [] }),
+  buildProjectStats("empty", { downloads: [] }),
 );
 
 const LABEL_GEOMETRY = {
@@ -122,6 +128,21 @@ describe("PieChartWidget", () => {
     spies.pie.mockClear();
     spies.tooltip.mockClear();
     spies.legend.mockClear();
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
+  });
+
+  it("animates slices when motion is allowed", () => {
+    renderWidget();
+
+    expect(lastProps(spies.pie).isAnimationActive).toBe(true);
+  });
+
+  it("disables slice animation under prefers-reduced-motion", () => {
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true);
+
+    renderWidget();
+
+    expect(lastProps(spies.pie).isAnimationActive).toBe(false);
   });
 
   it("shows an empty state when no project has data", () => {

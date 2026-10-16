@@ -1,11 +1,13 @@
 import safeParse from "@/lib/utils/safeParse";
-import { z } from "zod";
+import * as z from "zod/mini";
 
 const NormalizedProjectNameSchema = z
-  .string()
-  .transform((projectName) => {
-    return projectName.replace(/[\s\/@\.]/g, "_x_").toLowerCase();
-  })
+  .pipe(
+    z.string(),
+    z.transform((projectName: string) =>
+      projectName.replace(/[\s\/@\.]/g, "_x_").toLowerCase(),
+    ),
+  )
   .brand("NormalizedChartKey");
 
 export type NormalizedProjectName = z.infer<typeof NormalizedProjectNameSchema>;

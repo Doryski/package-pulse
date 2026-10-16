@@ -1,29 +1,42 @@
+import type { BundleSize, DepsDevInfo, PackageInfo } from "@/api/packageData";
+import { StatsRow } from "@/app/(home)/utils/getStatsMatrix";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SortColumn, SortDirection } from "@/components/ui/table-head-sortable";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import useBooleanState from "@/lib/hooks/useBooleanState";
 import useStatsMatrix from "@/lib/hooks/useStatsMatrix";
 import useTableSort from "@/lib/hooks/useTableSort";
-import useBundleSize from "@/lib/queries/useBundleSize";
-import useDepsDev from "@/lib/queries/useDepsDev";
-import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import { bundleSizeQueryOptions } from "@/lib/queries/useBundleSize";
+import { depsDevQueryOptions } from "@/lib/queries/useDepsDev";
+import { packageInfoQueryOptions } from "@/lib/queries/usePackagesInfo";
+import usePendingProjectsStatsCount from "@/lib/queries/usePendingProjectsStatsCount";
 import {
   ProjectStatsQuery,
   sortStatsMatrix,
 } from "@/lib/queries/useProjectsStats";
 import { cn } from "@/lib/utils/cn";
 import { exportCsv, exportJson } from "@/lib/utils/exportUtils";
-import {
-  BarChartIcon,
-  DownloadIcon,
-  FileTextIcon,
-  InfoCircledIcon,
-} from "@radix-ui/react-icons";
+import { ChartColumn, Download, FileText, Info } from "lucide-react";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { memo, useMemo } from "react";
-import { useFormContext } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
+import { STICKY_NAME_CELL_CLASS_NAME } from "./project-name-cell";
 import ProjectsInfoTable from "./projects-info-table";
 import ProjectsStatsTable from "./projects-stats-table";
+import {
+  STICKY_HEAD_CLASS_NAME,
+  statsTableColumns,
+} from "./stats-table-columns";
 
 type TableSectionProps = {
   projectsStats: ProjectStatsQuery[];
@@ -34,145 +47,194 @@ type ExportSort = {
   sortDirection: SortDirection;
 };
 
+type ExportSources = {
+  projectInfo: PackageInfo | null;
+  bundleSize: BundleSize | null;
+  depsDevInfo: DepsDevInfo | null;
+};
+
+const toExportFilename = () => `package-pulse-${new Date().getTime()}`;
+
+const fetchOrNull = <T,>(promise: Promise<T>) => promise.catch(() => null);
+
+const fetchBundleSize = (
+  queryClient: QueryClient,
+  projectName: string,
+  version: string | null | undefined,
+) => {
+  if (!version) return Promise.resolve(null);
+  return fetchOrNull(
+    queryClient.fetchQuery(bundleSizeQueryOptions(projectName, version)),
+  );
+};
+
+const fetchExportSources = async (
+  queryClient: QueryClient,
+  projectName: string,
+): Promise<ExportSources> => {
+  const [projectInfo, depsDevInfo] = await Promise.all([
+    fetchOrNull(queryClient.fetchQuery(packageInfoQueryOptions(projectName))),
+    fetchOrNull(queryClient.fetchQuery(depsDevQueryOptions(projectName))),
+  ]);
+  const bundleSize = await fetchBundleSize(
+    queryClient,
+    projectName,
+    projectInfo?.latestVersion,
+  );
+  return { projectInfo, bundleSize, depsDevInfo };
+};
+
+const toDepsDevLicenses = (depsDevInfo: DepsDevInfo | null) => {
+  if (!Array.isArray(depsDevInfo?.licenses)) return null;
+  return depsDevInfo.licenses.join(", ");
+};
+
+const toExportRow = (
+  project: StatsRow,
+  { projectInfo, bundleSize, depsDevInfo }: ExportSources,
+) => ({
+  projectName: project.projectName,
+  weeklyChange_nominal: project.weeklyChange?.nominal ?? null,
+  weeklyChange_percentage: project.weeklyChange?.percentage ?? null,
+  monthlyChange_nominal: project.monthlyChange?.nominal ?? null,
+  monthlyChange_percentage: project.monthlyChange?.percentage ?? null,
+  yearlyChange_nominal: project.yearlyChange?.nominal ?? null,
+  yearlyChange_percentage: project.yearlyChange?.percentage ?? null,
+  yoyWeekChange_nominal: project.yoyWeekChange?.nominal ?? null,
+  yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
+  yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
+  yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
+  breakDropPercentage:
+    project.breakDropIndicator.christmasDropPercentage ?? null,
+  weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
+  corporateUsageScore: project.breakDropIndicator.corporateUsageScore ?? null,
+  corporateUsageLevel: project.breakDropIndicator.corporateUsageLevel ?? null,
+  repoName: projectInfo?.repoName ?? null,
+  latestVersion: projectInfo?.latestVersion ?? null,
+  lastReleaseDate: projectInfo?.lastReleaseDate ?? null,
+  contributorsCount: projectInfo?.contributorsCount ?? null,
+  dependenciesCount: projectInfo?.dependenciesCount ?? null,
+  devDependenciesCount: projectInfo?.devDependenciesCount ?? null,
+  homepage: projectInfo?.homepage ?? null,
+  license: projectInfo?.license ?? null,
+  repositoryUrl: projectInfo?.repositoryUrl ?? null,
+  description: projectInfo?.description ?? null,
+  createdAt: projectInfo?.createdAt ?? null,
+  bundleSizeMin: bundleSize?.size ?? null,
+  bundleSizeGzip: bundleSize?.gzip ?? null,
+  treeShakeable: bundleSize?.treeShakeable ?? null,
+  dependencyCount: bundleSize?.dependencyCount ?? null,
+  vulnerabilityCount: depsDevInfo?.vulnerabilityCount ?? null,
+  healthScore: depsDevInfo?.healthScore ?? null,
+  depsDevLicenses: toDepsDevLicenses(depsDevInfo),
+});
+
+const buildExportData = async (queryClient: QueryClient, rows: StatsRow[]) => {
+  const sources = await Promise.all(
+    rows.map((row) => fetchExportSources(queryClient, row.projectName)),
+  );
+  return rows.map((row, index) => toExportRow(row, sources[index]!));
+};
+
 function useExportData(
   projectsStats: ProjectStatsQuery[],
   { sortColumn, sortDirection }: ExportSort,
 ) {
-  const form = useFormContext<ProjectsSearchFormValues>();
-  const selectedProjects = form.watch("projects");
+  const queryClient = useQueryClient();
   const statsMatrix = useStatsMatrix(projectsStats);
   const sortedStatsMatrix = useMemo(
     () => sortStatsMatrix(statsMatrix, sortColumn, sortDirection),
     [sortColumn, sortDirection, statsMatrix],
   );
-  const projectsInfo = usePackagesInfo(selectedProjects);
-  const bundleSizes = useBundleSize(selectedProjects);
-  const depsDev = useDepsDev(selectedProjects);
 
-  const bundleSizeByName = new Map(
-    selectedProjects.map((name, index) => [name, bundleSizes[index]?.data]),
-  );
-  const depsDevByName = new Map(
-    selectedProjects.map((name, index) => [name, depsDev[index]?.data]),
-  );
-
-  type StatsRow = {
-    projectName: string;
-    weeklyChange_nominal: number | null;
-    weeklyChange_percentage: number | null;
-    monthlyChange_nominal: number | null;
-    monthlyChange_percentage: number | null;
-    yearlyChange_nominal: number | null;
-    yearlyChange_percentage: number | null;
-    yoyWeekChange_nominal: number | null;
-    yoyWeekChange_percentage: number | null;
-    yoyMonthChange_nominal: number | null;
-    yoyMonthChange_percentage: number | null;
-    breakDropPercentage: number | null;
-    weekendDropPercentage: number | null;
-    corporateUsageScore: number | null;
-    corporateUsageLevel: string | null;
-    repoName: string | null;
-    latestVersion: string | null;
-    lastReleaseDate: string | null;
-    contributorsCount: number | null;
-    dependenciesCount: number | null;
-    devDependenciesCount: number | null;
-    homepage: string | null;
-    license: string | null;
-    repositoryUrl: string | null;
-    description: string | null;
-    createdAt: string | null;
-    bundleSizeMin: number | null;
-    bundleSizeGzip: number | null;
-    treeShakeable: boolean | null;
-    dependencyCount: number | null;
-    vulnerabilityCount: number | null;
-    healthScore: number | null;
-    depsDevLicenses: string | null;
-  };
-  const buildExportData = (): StatsRow[] =>
-    sortedStatsMatrix.map((project) => {
-      const foundProjectInfo = projectsInfo.find(
-        (p) => p.data?.projectName === project.projectName,
-      );
-      const projectInfo = foundProjectInfo?.isSuccess
-        ? foundProjectInfo.data
-        : null;
-
-      const bundleSize = bundleSizeByName.get(project.projectName) ?? null;
-      const depsDevInfo = depsDevByName.get(project.projectName) ?? null;
-
-      return {
-        projectName: project.projectName,
-        weeklyChange_nominal: project.weeklyChange?.nominal ?? null,
-        weeklyChange_percentage: project.weeklyChange?.percentage ?? null,
-        monthlyChange_nominal: project.monthlyChange?.nominal ?? null,
-        monthlyChange_percentage: project.monthlyChange?.percentage ?? null,
-        yearlyChange_nominal: project.yearlyChange?.nominal ?? null,
-        yearlyChange_percentage: project.yearlyChange?.percentage ?? null,
-        yoyWeekChange_nominal: project.yoyWeekChange?.nominal ?? null,
-        yoyWeekChange_percentage: project.yoyWeekChange?.percentage ?? null,
-        yoyMonthChange_nominal: project.yoyMonthChange?.nominal ?? null,
-        yoyMonthChange_percentage: project.yoyMonthChange?.percentage ?? null,
-        breakDropPercentage:
-          project.breakDropIndicator.christmasDropPercentage ?? null,
-        weekendDropPercentage: project.breakDropIndicator.weekendDropPercentage,
-        corporateUsageScore:
-          project.breakDropIndicator.corporateUsageScore ?? null,
-        corporateUsageLevel:
-          project.breakDropIndicator.corporateUsageLevel ?? null,
-        repoName: projectInfo?.repoName ?? null,
-        latestVersion: projectInfo?.latestVersion?.version ?? null,
-        lastReleaseDate: projectInfo?.lastReleaseDate ?? null,
-        contributorsCount: projectInfo?.contributorsCount ?? null,
-        dependenciesCount: projectInfo?.dependenciesCount ?? null,
-        devDependenciesCount: projectInfo?.devDependenciesCount ?? null,
-        homepage: projectInfo?.homepage ?? null,
-        license: Array.isArray(projectInfo?.license)
-          ? projectInfo.license.join(", ")
-          : (projectInfo?.license ?? null),
-        repositoryUrl: projectInfo?.repositoryUrl ?? null,
-        description: projectInfo?.description ?? null,
-        createdAt: projectInfo?.createdAt ?? null,
-        bundleSizeMin: bundleSize?.size ?? null,
-        bundleSizeGzip: bundleSize?.gzip ?? null,
-        treeShakeable: bundleSize?.treeShakeable ?? null,
-        dependencyCount: bundleSize?.dependencyCount ?? null,
-        vulnerabilityCount: depsDevInfo?.vulnerabilityCount ?? null,
-        healthScore: depsDevInfo?.healthScore ?? null,
-        depsDevLicenses: Array.isArray(depsDevInfo?.licenses)
-          ? depsDevInfo.licenses.join(", ")
-          : null,
-      };
-    });
-
-  const exportToCsv = () => {
-    const timestamp = new Date().getTime();
-    const filename = `package-pulse-${timestamp}`;
-
-    return exportCsv(filename, buildExportData());
+  const exportToCsv = async () => {
+    const filename = toExportFilename();
+    await exportCsv(
+      filename,
+      await buildExportData(queryClient, sortedStatsMatrix),
+    );
   };
 
-  const exportToJson = () => {
-    const timestamp = new Date().getTime();
-    const filename = `package-pulse-${timestamp}`;
-
-    return exportJson(filename, buildExportData());
+  const exportToJson = async () => {
+    const filename = toExportFilename();
+    await exportJson(
+      filename,
+      await buildExportData(queryClient, sortedStatsMatrix),
+    );
   };
 
   return { exportToCsv, exportToJson };
 }
 
+const StatsTableSkeleton = ({ rowCount }: { rowCount: number }) => (
+  <div className="relative overflow-x-auto" data-testid="stats-table-skeleton">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {statsTableColumns.map(({ column, label, isSticky }) => (
+            <TableHead
+              key={column}
+              className={cn(
+                "text-center",
+                isSticky && cn(STICKY_HEAD_CLASS_NAME, "text-left"),
+              )}
+            >
+              {label}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {Array.from({ length: rowCount }, (_, rowIndex) => (
+          <TableRow key={rowIndex}>
+            {statsTableColumns.map(({ column, isSticky }) => (
+              <TableCell
+                key={column}
+                className={cn(isSticky && STICKY_NAME_CELL_CLASS_NAME)}
+              >
+                <Skeleton aria-hidden className="h-4 w-full" />
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
+
+type StatsViewProps = {
+  projectsStats: ProjectStatsQuery[];
+  pendingCount: number;
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  onSort: (column: SortColumn) => void;
+};
+
+const StatsView = ({
+  projectsStats,
+  pendingCount,
+  ...sort
+}: StatsViewProps) => {
+  if (projectsStats.length === 0 && pendingCount > 0) {
+    return <StatsTableSkeleton rowCount={pendingCount} />;
+  }
+  return <ProjectsStatsTable projectsStats={projectsStats} {...sort} />;
+};
+
 const TableSection = memo(({ projectsStats }: TableSectionProps) => {
+  const selectedProjects = useWatch<ProjectsSearchFormValues, "projects">({
+    name: "projects",
+  });
+  const pendingCount = usePendingProjectsStatsCount(selectedProjects);
   const { sortColumn, sortDirection, handleSort } = useTableSort();
   const { exportToCsv, exportToJson } = useExportData(projectsStats, {
     sortColumn,
     sortDirection,
   });
-  const isLoading = projectsStats.some((project) => project.isLoading);
   const [isInfoTableVisible, showInfoTable, hideInfoTable] =
     useBooleanState(false);
+  const hasStats = projectsStats.length > 0;
+  const isSkeletonVisible = !hasStats && pendingCount > 0;
 
   const handleToggleChange = (value: string) => {
     if (!value) return;
@@ -183,16 +245,13 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
     }
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <div
       className={cn(
         "mt-4 size-full md:mt-8 lg:mt-16",
-        projectsStats.length === 0 && "hidden",
+        !hasStats && !isSkeletonVisible && "hidden",
       )}
+      aria-busy={isSkeletonVisible || undefined}
     >
       <div className="relative flex w-full flex-wrap items-center justify-between gap-2 lg:justify-end">
         <h3 className="text-center text-sm sm:text-lg lg:absolute lg:top-0 lg:left-1/2 lg:-translate-x-1/2">
@@ -202,18 +261,20 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
           <Button
             variant="outline"
             className="flex items-center gap-2"
-            onClick={exportToCsv}
+            disabled={!hasStats}
+            onClick={() => void exportToCsv()}
           >
             CSV
-            <DownloadIcon className="size-4" />
+            <Download className="size-4" />
           </Button>
           <Button
             variant="outline"
             className="flex items-center gap-2"
-            onClick={exportToJson}
+            disabled={!hasStats}
+            onClick={() => void exportToJson()}
           >
             JSON
-            <FileTextIcon className="size-4" />
+            <FileText className="size-4" />
           </Button>
           <ToggleGroup
             type="single"
@@ -222,10 +283,10 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
             value={isInfoTableVisible ? "info" : "stats"}
           >
             <ToggleGroupItem value="stats" aria-label="Toggle stats">
-              <BarChartIcon />
+              <ChartColumn className="size-4" />
             </ToggleGroupItem>
             <ToggleGroupItem value="info" aria-label="Toggle info">
-              <InfoCircledIcon />
+              <Info className="size-4" />
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -234,8 +295,9 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
         {isInfoTableVisible ? (
           <ProjectsInfoTable />
         ) : (
-          <ProjectsStatsTable
+          <StatsView
             projectsStats={projectsStats}
+            pendingCount={pendingCount}
             sortColumn={sortColumn}
             sortDirection={sortDirection}
             onSort={handleSort}

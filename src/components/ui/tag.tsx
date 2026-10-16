@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils/cn";
-import { Cross1Icon } from "@radix-ui/react-icons";
+import { X } from "lucide-react";
 import { Button } from "./button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
@@ -34,7 +34,7 @@ const Tag = ({
             onClick={onRemove}
             aria-label={removeLabel}
           >
-            <Cross1Icon aria-hidden />
+            <X className="size-4" aria-hidden />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{tooltipContent ?? removeLabel}</TooltipContent>

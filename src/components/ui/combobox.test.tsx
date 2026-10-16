@@ -16,6 +16,7 @@ const OPTIONS: Option[] = [
 type HarnessProps = {
   options?: Option[];
   isLoadingOptions?: boolean;
+  hasOptionsError?: boolean;
   disabled?: boolean;
   fullwidth?: boolean;
   onSelectItem?: (item: string) => void;
@@ -24,6 +25,7 @@ type HarnessProps = {
 function Harness({
   options = OPTIONS,
   isLoadingOptions = false,
+  hasOptionsError,
   disabled = false,
   fullwidth,
   onSelectItem = () => {},
@@ -35,6 +37,7 @@ function Harness({
       disabled={disabled}
       options={options}
       isLoadingOptions={isLoadingOptions}
+      hasOptionsError={hasOptionsError}
       fullwidth={fullwidth}
       onSelectItem={onSelectItem}
       optionValuePredicate={(option: Option) => option.name}
@@ -94,6 +97,17 @@ describe("Combobox", () => {
     const { user } = setup({ options: [] });
     await user.type(getInput(), "zzzz");
     expect(await screen.findByText("No project found.")).toBeInTheDocument();
+  });
+
+  test("tells the user to add by exact name when the registry search fails", async () => {
+    const { user } = setup({ options: [], hasOptionsError: true });
+    await user.type(getInput(), "react");
+    expect(
+      await screen.findByText(
+        "Search unavailable, press Enter to add by exact name",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText("No project found.")).not.toBeInTheDocument();
   });
 
   test("loading state toggles the loading placeholder visibility", async () => {
@@ -247,5 +261,67 @@ describe("Combobox", () => {
     expect(
       screen.getByText("Search projects...", { selector: "label" }),
     ).toHaveClass("opacity-0");
+  });
+
+  test("exposes the popup state through aria-expanded and aria-controls", async () => {
+    const { user } = setup();
+    expect(getInput()).toHaveAttribute("aria-expanded", "false");
+
+    await user.type(getInput(), "re");
+    const listbox = await screen.findByRole("listbox");
+
+    expect(getInput()).toHaveAttribute("aria-expanded", "true");
+    expect(getInput()).toHaveAttribute("aria-controls", listbox.id);
+    expect(listbox.id).not.toBe("");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(getInput()).toHaveAttribute("aria-expanded", "false"),
+    );
+  });
+
+  test("reports a collapsed popup while the search holds the delimiter", async () => {
+    const { user } = setup();
+    await user.type(getInput(), "re,");
+    expect(getInput()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("does not steal focus from an element focused before mount", () => {
+    const button = document.createElement("button");
+    document.body.append(button);
+    button.focus();
+
+    setup();
+
+    expect(button).toHaveFocus();
+    expect(getInput()).not.toHaveFocus();
+    button.remove();
+  });
+
+  test("auto-focuses only once, not on later re-renders", async () => {
+    const { user, form } = setup();
+    expect(getInput()).toHaveFocus();
+    await user.tab();
+    const { activeElement } = document;
+    if (activeElement instanceof HTMLElement) act(() => activeElement.blur());
+    expect(document.activeElement).toBe(document.body);
+
+    act(() => form.setValue("search", "rx"));
+
+    expect(getInput()).not.toHaveFocus();
+  });
+
+  test("check icons follow the selected projects", async () => {
+    const { user, form } = setup({}, { projects: ["react"] });
+    await user.type(getInput(), "re");
+    await screen.findAllByRole("option");
+
+    act(() => form.setValue("projects", ["redux", "rxjs"]));
+
+    const iconOpacity = (name: string) =>
+      screen.getByRole("option", { name }).querySelector("svg")?.classList;
+    expect(iconOpacity("react")).toContain("opacity-0");
+    expect(iconOpacity("redux")).toContain("opacity-100");
+    expect(iconOpacity("rxjs")).toContain("opacity-100");
   });
 });

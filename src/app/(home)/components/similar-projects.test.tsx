@@ -55,8 +55,39 @@ describe("SimilarProjects", () => {
     const { container } = renderWithProviders(
       <SimilarProjects selectedProjects={["react"]} onAddProject={vi.fn()} />,
     );
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(5);
+    const skeletonList = screen.getByTestId("similar-projects-skeleton");
+    expect(skeletonList.tagName).toBe("UL");
+    expect(skeletonList).toHaveAttribute("aria-hidden", "true");
+    const items = [...skeletonList.children];
+    expect(items).toHaveLength(5);
+    items.forEach((item) => {
+      expect(item.tagName).toBe("LI");
+      expect(item.firstElementChild).toHaveClass(
+        "h-8",
+        "motion-safe:animate-pulse",
+      );
+    });
+    expect(container.querySelector("section")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Similar projects" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("No similar projects found.")).toBeNull();
+  });
+
+  it("reserves the button row height and clears busy state once loaded", () => {
+    mockQuery({ isLoading: false, data: ["vue"] });
+    const { container } = renderWithProviders(
+      <SimilarProjects selectedProjects={["react"]} onAddProject={vi.fn()} />,
+    );
+    const section = container.querySelector("section");
+    expect(section).not.toHaveAttribute("aria-busy");
+    expect(section?.querySelector("h2")?.nextElementSibling).toHaveClass(
+      "min-h-8",
+    );
+    expect(screen.queryByTestId("similar-projects-skeleton")).toBeNull();
   });
 
   it("shows the empty message when nothing is left", () => {

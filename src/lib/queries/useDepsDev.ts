@@ -1,25 +1,17 @@
-import { fetchDepsDev } from "@/api/fetchPackageInfo";
-import { formatDate } from "@/app/(home)/utils/date-utils";
-import { useQueries } from "@tanstack/react-query";
-import { toZonedTime } from "date-fns-tz";
-import usePackagesInfo from "./usePackagesInfo";
+import { loadDepsDev } from "@/api/packageData";
+import { getDepsDevQueryKey } from "@/lib/queries/keys";
+import { queryOptions, skipToken, useQueries } from "@tanstack/react-query";
+
+export const depsDevQueryOptions = (projectName: string) =>
+  queryOptions({
+    queryKey: getDepsDevQueryKey(projectName),
+    queryFn: projectName
+      ? ({ signal }) => loadDepsDev(projectName, signal)
+      : skipToken,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
 
 export default function useDepsDev(selectedProjects: string[]) {
-  const todaysUtcDateString = formatDate(toZonedTime(new Date(), "UTC"));
-  const packagesInfo = usePackagesInfo(selectedProjects);
-
-  return useQueries({
-    queries: selectedProjects.map((project, index) => {
-      const version = packagesInfo[index]?.data?.latestVersion?.version;
-
-      return {
-        queryKey: ["depsDev", project, todaysUtcDateString],
-        queryFn: () =>
-          version ? fetchDepsDev(project, version) : Promise.resolve(null),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        enabled: !!project && !!version,
-      };
-    }),
-  });
+  return useQueries({ queries: selectedProjects.map(depsDevQueryOptions) });
 }

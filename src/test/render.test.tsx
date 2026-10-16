@@ -110,7 +110,7 @@ describe("factories", () => {
 
     expect(stats[0]).toEqual({ date: "2024-01-01", count: 1000 });
     expect(stats.at(-1)?.date).toBe("2024-01-14");
-    expect(buildProjectStats("react", { rawSortedData: stats })).toEqual(
+    expect(buildProjectStats("react", { downloads: stats })).toEqual(
       buildProjectStats("react", { days: 14 }),
     );
   });

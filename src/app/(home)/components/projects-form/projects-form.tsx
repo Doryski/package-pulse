@@ -1,13 +1,15 @@
 "use client";
-import searchNPMRegistry from "@/api/searchNpmRegistry";
 import { Button } from "@/components/ui/button";
 import ClientOnly from "@/components/ui/client-only";
 import useFavorites from "@/lib/hooks/useFavorites";
+import { packageInfoQueryOptions } from "@/lib/queries/usePackagesInfo";
 import { CreateGlobalComparisonRequest } from "@/lib/types/global-comparison";
 import { cn } from "@/lib/utils/cn";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Star } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { useFormContext } from "react-hook-form";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { isSingleItemArray } from "../../utils/array-utils";
 import { useUpdateSearchParamsProjects } from "../../utils/search-params";
@@ -15,10 +17,14 @@ import ComboboxForm from "../combobox-form";
 import LatestComparisons from "../latest-comparisons";
 import PopularComparisons from "../popular-comparisons";
 import QuickComparisons from "../quick-comparisons";
+import ChartSkeleton from "../chart-skeleton";
 import SavedComparisons from "../saved-comparisons";
 import SimilarProjects from "../similar-projects";
-import StatsSection from "../stats-section";
 import { ProjectsSearchFormValues } from "./schema";
+
+const StatsSection = dynamic(() => import("../stats-section"), {
+  loading: ChartSkeleton,
+});
 
 const PROJECTS_URL_DELIMITER = ",";
 
@@ -57,11 +63,27 @@ async function trackComparison(projects: string[]) {
   }
 }
 
+const TRACK_COMPARISON_DELAY_MS = 2000;
+
 const haveProjectsChanged = (current: string[], previous: string[]) => {
   if (current.length !== previous.length) return true;
   const previousSet = new Set(previous);
   return current.some((project) => !previousSet.has(project));
 };
+
+function useTrackComparison(projects: string[]) {
+  const trackedProjectsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!haveProjectsChanged(projects, trackedProjectsRef.current)) return;
+      trackedProjectsRef.current = projects;
+      void trackComparison(projects);
+    }, TRACK_COMPARISON_DELAY_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [projects]);
+}
 
 function parseSearchValue(searchValue: string): string[] {
   return searchValue
@@ -70,153 +92,181 @@ function parseSearchValue(searchValue: string): string[] {
     .filter((value) => value.length > 0);
 }
 
+const partitionProjectNames = (
+  projectNames: string[],
+  currentProjects: string[],
+) => {
+  const seen = new Set(currentProjects);
+  const candidates: string[] = [];
+  const duplicates: string[] = [];
+  projectNames.forEach((projectName) => {
+    if (seen.has(projectName)) {
+      duplicates.push(projectName);
+      return;
+    }
+    seen.add(projectName);
+    candidates.push(projectName);
+  });
+  return { candidates, duplicates };
+};
+
+const packageExists = (queryClient: QueryClient, projectName: string) =>
+  queryClient.fetchQuery(packageInfoQueryOptions(projectName)).then(
+    () => true,
+    () => false,
+  );
+
+const findExistingProjects = async (
+  queryClient: QueryClient,
+  projectNames: string[],
+) => {
+  const exists = await Promise.all(
+    projectNames.map((projectName) => packageExists(queryClient, projectName)),
+  );
+  return {
+    found: projectNames.filter((_, index) => exists[index]),
+    missing: projectNames.filter((_, index) => !exists[index]),
+  };
+};
+
+const formatNames = (names: string[]) => names.join(", ");
+
+const SAVE_BUTTON_ROW_CLASS_NAME = "mt-3 flex justify-end";
+
+type SaveComparisonButtonProps = {
+  projects: string[];
+};
+
+const SaveComparisonButton = ({ projects }: SaveComparisonButtonProps) => {
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const isSaved = isFavorite(projects);
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-pressed={isSaved}
+      onClick={() => toggleFavorite(projects)}
+    >
+      <Star className={cn("mr-2 size-4", isSaved && "fill-current")} />
+      {isSaved ? "Saved" : "Save comparison"}
+    </Button>
+  );
+};
+
+const SaveComparisonButtonFallback = () => (
+  <div
+    aria-hidden="true"
+    data-testid="save-comparison-fallback"
+    className="h-8"
+  />
+);
+
 const ProjectsForm = () => {
   const projectsSearchForm = useFormContext<ProjectsSearchFormValues>();
-  const selectedProjects = projectsSearchForm.watch("projects");
-  const previousProjectsRef = useRef<string[]>([]);
-  const { toggleFavorite, isFavorite } = useFavorites();
-  const isSaved = isFavorite(selectedProjects);
+  const queryClient = useQueryClient();
+  const { control, getValues, setValue, setFocus } = projectsSearchForm;
+  const selectedProjects = useWatch({ control, name: "projects" });
+  const hasSelection = selectedProjects.length > 0;
 
   useUpdateSearchParamsProjects(selectedProjects, PROJECTS_URL_DELIMITER);
+  useTrackComparison(selectedProjects);
 
-  useEffect(() => {
-    const previousProjects = previousProjectsRef.current;
+  const focusSearch = useCallback(() => setFocus("search"), [setFocus]);
 
-    if (
-      selectedProjects.length > 0 &&
-      haveProjectsChanged(selectedProjects, previousProjects)
-    ) {
-      trackComparison(selectedProjects);
-    }
-
-    previousProjectsRef.current = selectedProjects;
-  }, [selectedProjects]);
-
-  const focusSearch = () => projectsSearchForm.setFocus("search");
-
-  const handleAddProject = (projectName: string) => {
-    if (!selectedProjects.includes(projectName)) {
-      projectsSearchForm.setValue("projects", [
-        ...selectedProjects,
-        projectName,
-      ]);
-    }
-    focusSearch();
-  };
-
-  const handleAddMultipleProjects = (projectNames: string[]) => {
-    const newProjects = projectNames
-      .filter((project, index, all) => all.indexOf(project) === index)
-      .filter((project) => !selectedProjects.includes(project));
-
-    if (newProjects.length > 0) {
-      const updatedProjects = [...selectedProjects, ...newProjects];
-      projectsSearchForm.setValue("projects", updatedProjects);
-    }
-    focusSearch();
-  };
-
-  const handleSearch = async (query: string) => {
-    const valuesToSearch = parseSearchValue(query);
-
-    if (isSingleItemArray(valuesToSearch)) {
-      const firstValue = valuesToSearch[0];
-      if (firstValue) {
-        await searchProject(firstValue);
+  const handleAddProject = useCallback(
+    (projectName: string) => {
+      const currentProjects = getValues("projects");
+      if (!currentProjects.includes(projectName)) {
+        setValue("projects", [...currentProjects, projectName]);
       }
-    } else {
-      await searchMultipleProjects(valuesToSearch);
-    }
-  };
+      focusSearch();
+    },
+    [getValues, setValue, focusSearch],
+  );
 
-  const searchProject = async (projectName: string) => {
-    if (!selectedProjects.includes(projectName)) {
-      const registryProjects = await searchNPMRegistry(projectName);
-      const foundProject = registryProjects?.find(
-        (project) => project.package.name === projectName,
-      );
-      if (foundProject) {
-        projectsSearchForm.setValue("projects", [
-          ...selectedProjects,
-          projectName,
-        ]);
-      } else {
-        toast.error(`Project "${projectName}" not found`);
+  const handleAddMultipleProjects = useCallback(
+    (projectNames: string[]) => {
+      const currentProjects = getValues("projects");
+      const newProjects = projectNames
+        .filter((project, index, all) => all.indexOf(project) === index)
+        .filter((project) => !currentProjects.includes(project));
+
+      if (newProjects.length > 0) {
+        setValue("projects", [...currentProjects, ...newProjects]);
       }
-    }
-    projectsSearchForm.setValue("search", "");
-  };
+      focusSearch();
+    },
+    [getValues, setValue, focusSearch],
+  );
 
-  const searchMultipleProjects = async (projectNames: string[]) => {
-    const currentProjects = [...selectedProjects];
-    const newProjects: string[] = [];
-    const notFoundProjects: string[] = [];
-    const duplicateProjects: string[] = [];
-
-    for (const projectName of projectNames) {
-      if (!projectName) continue;
-
-      if (
-        currentProjects.includes(projectName) ||
-        newProjects.includes(projectName)
-      ) {
-        duplicateProjects.push(projectName);
-        continue;
-      }
-
-      try {
-        const registryProjects = await searchNPMRegistry(projectName);
-        const foundProject = registryProjects?.find(
-          (project) => project.package.name === projectName,
-        );
-
-        if (foundProject) {
-          newProjects.push(projectName);
+  const searchProject = useCallback(
+    async (projectName: string) => {
+      if (!getValues("projects").includes(projectName)) {
+        const isFound = await packageExists(queryClient, projectName);
+        if (isFound) {
+          setValue("projects", [...getValues("projects"), projectName]);
         } else {
-          notFoundProjects.push(projectName);
+          toast.error(`Project "${projectName}" not found`);
         }
-      } catch (_error) {
-        notFoundProjects.push(projectName);
       }
-    }
+      setValue("search", "");
+    },
+    [getValues, setValue, queryClient],
+  );
 
-    if (newProjects.length > 0) {
-      projectsSearchForm.setValue("projects", [
-        ...currentProjects,
-        ...newProjects,
-      ]);
-    }
-
-    if (notFoundProjects.length > 0) {
-      toast.error(`Projects not found: ${notFoundProjects.join(", ")}`);
-    }
-
-    if (duplicateProjects.length > 0) {
-      toast.warning(
-        `Projects already selected: ${duplicateProjects.join(", ")}`,
+  const searchMultipleProjects = useCallback(
+    async (projectNames: string[]) => {
+      const { candidates, duplicates } = partitionProjectNames(
+        projectNames,
+        getValues("projects"),
       );
-    }
+      const { found, missing } = await findExistingProjects(
+        queryClient,
+        candidates,
+      );
 
-    projectsSearchForm.setValue("search", "");
-  };
+      if (found.length > 0) {
+        setValue("projects", [...getValues("projects"), ...found]);
+      }
+
+      if (missing.length > 0) {
+        toast.error(`Projects not found: ${formatNames(missing)}`);
+      }
+
+      if (duplicates.length > 0) {
+        toast.warning(`Projects already selected: ${formatNames(duplicates)}`);
+      }
+
+      setValue("search", "");
+    },
+    [getValues, setValue, queryClient],
+  );
+
+  const handleSearch = useCallback(
+    async (query: string) => {
+      const valuesToSearch = parseSearchValue(query);
+
+      if (!isSingleItemArray(valuesToSearch)) {
+        await searchMultipleProjects(valuesToSearch);
+        return;
+      }
+
+      const [firstValue] = valuesToSearch;
+      if (firstValue) await searchProject(firstValue);
+    },
+    [searchMultipleProjects, searchProject],
+  );
 
   return (
     <div className="flex h-full flex-col justify-center py-4">
       <ComboboxForm form={projectsSearchForm} onFormSubmit={handleSearch} />
-      {selectedProjects.length > 0 && (
-        <ClientOnly>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-pressed={isSaved}
-              onClick={() => toggleFavorite(selectedProjects)}
-            >
-              <Star className={cn("mr-2 size-4", isSaved && "fill-current")} />
-              {isSaved ? "Saved" : "Save comparison"}
-            </Button>
-          </div>
-        </ClientOnly>
+      {hasSelection && (
+        <div className={SAVE_BUTTON_ROW_CLASS_NAME}>
+          <ClientOnly fallback={<SaveComparisonButtonFallback />}>
+            <SaveComparisonButton projects={selectedProjects} />
+          </ClientOnly>
+        </div>
       )}
       <SavedComparisons
         selectedProjects={selectedProjects}
@@ -239,10 +289,12 @@ const ProjectsForm = () => {
         selectedProjects={selectedProjects}
         onAddProject={handleAddProject}
       />
-      <StatsSection
-        form={projectsSearchForm}
-        selectedProjects={selectedProjects}
-      />
+      {hasSelection && (
+        <StatsSection
+          form={projectsSearchForm}
+          selectedProjects={selectedProjects}
+        />
+      )}
     </div>
   );
 };

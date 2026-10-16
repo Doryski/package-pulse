@@ -1,6 +1,11 @@
 import AppError from "./AppError";
 import { round } from "./math";
 
+const INTEGER_FORMAT = new Intl.NumberFormat("pl-PL", {
+  useGrouping: true,
+  maximumFractionDigits: 0,
+});
+
 export function formatPercentage(value: number, precision = 2): string {
   return round(value, precision) + "%";
 }
@@ -31,10 +36,7 @@ export function formatInteger(
   thousandSeparator?: string,
 ): string {
   const roundedValue = round(value, 0);
-  const formattedValue = new Intl.NumberFormat("pl-PL", {
-    useGrouping: true,
-    maximumFractionDigits: 0,
-  }).format(roundedValue);
+  const formattedValue = INTEGER_FORMAT.format(roundedValue);
 
   if (thousandSeparator) {
     if (thousandSeparator === ".") {

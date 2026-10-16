@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import ClientOnly from "@/components/ui/client-only";
 import useFavorites from "@/lib/hooks/useFavorites";
 import { X } from "lucide-react";
+import { memo } from "react";
 import ComparisonCard from "./comparison-card";
 
 type SavedComparisonsProps = {
@@ -35,7 +36,7 @@ const SavedComparisonsContent = ({
           <ComparisonCard
             key={projects.join(",")}
             projects={projects}
-            onProjectsClick={() => onAddMultipleProjects(projects)}
+            onProjectsClick={onAddMultipleProjects}
             title={projects.join(", ")}
             headerExtra={
               <Button
@@ -66,4 +67,4 @@ const SavedComparisons = (props: SavedComparisonsProps) => {
   );
 };
 
-export default SavedComparisons;
+export default memo(SavedComparisons);

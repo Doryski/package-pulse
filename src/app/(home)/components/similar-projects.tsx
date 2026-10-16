@@ -7,6 +7,22 @@ import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+const SKELETON_ITEMS = [0, 1, 2, 3, 4] as const;
+
+const SimilarProjectsSkeleton = () => (
+  <ul
+    aria-hidden="true"
+    data-testid="similar-projects-skeleton"
+    className="flex flex-wrap gap-2"
+  >
+    {SKELETON_ITEMS.map((item) => (
+      <li key={item}>
+        <Skeleton className="h-8 w-20" />
+      </li>
+    ))}
+  </ul>
+);
+
 type SimilarProjectsProps = {
   selectedProjects: string[];
   onAddProject: (projectName: string) => void;
@@ -64,16 +80,10 @@ const SimilarProjects = ({
     !similarProjectsQuery.isLoading && filteredSimilarProjects.length === 0;
 
   return (
-    <section className="mt-4">
+    <section className="mt-4" aria-busy={showLoading || undefined}>
       <h2 className="text-lg">Similar projects</h2>
-      <div className="mt-2">
-        {showLoading && (
-          <ul className="flex flex-wrap gap-2">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <Skeleton key={index} className="h-8 w-20" />
-            ))}
-          </ul>
-        )}
+      <div className="mt-2 min-h-8">
+        {showLoading && <SimilarProjectsSkeleton />}
         {filteredSimilarProjects.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {filteredSimilarProjects.map((similarProject) => (

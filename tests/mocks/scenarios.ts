@@ -1,6 +1,7 @@
 import { NPM_API_FIRST_DAY } from "@/lib/config/constants";
 import type { NextFixture } from "next/experimental/testmode/playwright.js";
 import {
+  depsDevVersionBatchResponse,
   emptyResponse,
   jsonResponse,
   MOCK_HOSTS,
@@ -26,8 +27,8 @@ const touchesPackage = (target: MockTarget, pkg: string) =>
 
 const forTarget =
   (respond: (target: MockTarget) => Response | undefined): MockHandler =>
-  (request) => {
-    const target = parseMockTarget(request);
+  async (request) => {
+    const target = await parseMockTarget(request);
     if (!target) return undefined;
     return respond(target);
   };
@@ -52,6 +53,9 @@ const notFoundFor = (missing: ReadonlySet<string>) => (target: MockTarget) => {
   }
   if (target.kind === "range") {
     return rangeResponse(target, isMissingIn(missing));
+  }
+  if (target.kind === "depsDevVersionBatch") {
+    return depsDevVersionBatchResponse(target, isMissingIn(missing));
   }
   if (target.kind === "package" && target.method === "HEAD") {
     return emptyResponse(404);

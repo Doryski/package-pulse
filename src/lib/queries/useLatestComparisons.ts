@@ -2,7 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { GlobalComparisonResponseSchema } from "../types/global-comparison";
 import safeParse from "../utils/safeParse";
 
-export default function useLatestComparisons() {
+type UseLatestComparisonsOptions = {
+  enabled?: boolean;
+};
+
+export default function useLatestComparisons({
+  enabled = true,
+}: UseLatestComparisonsOptions = {}) {
   return useQuery({
     queryKey: ["latest-comparisons"],
     queryFn: async () => {
@@ -13,7 +19,8 @@ export default function useLatestComparisons() {
       const result = await response.json();
       return safeParse(result, GlobalComparisonResponseSchema);
     },
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // 1 minute
+    enabled,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
   });
 }

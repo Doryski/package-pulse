@@ -4,17 +4,11 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  fetchPackageInfo: vi.fn(),
-  fetchDepsDev: vi.fn(),
-}));
+const mocks = vi.hoisted(() => ({ loadDepsDev: vi.fn() }));
 
-vi.mock("@/api/fetchPackageInfo", () => ({
-  fetchPackageInfo: mocks.fetchPackageInfo,
-  fetchDepsDev: mocks.fetchDepsDev,
-}));
+vi.mock("@/api/packageData", () => ({ loadDepsDev: mocks.loadDepsDev }));
 
-import useDepsDev from "./useDepsDev";
+import useDepsDev, { depsDevQueryOptions } from "./useDepsDev";
 
 const wrapper = ({ children }: PropsWithChildren) => (
   <QueryClientProvider client={createTestQueryClient()}>
@@ -24,46 +18,33 @@ const wrapper = ({ children }: PropsWithChildren) => (
 
 describe("useDepsDev", () => {
   beforeEach(() => {
-    mocks.fetchPackageInfo.mockReset();
-    mocks.fetchDepsDev.mockReset();
+    mocks.loadDepsDev.mockReset();
   });
 
-  test("fetches deps.dev data using the latest version", async () => {
-    mocks.fetchPackageInfo.mockResolvedValue({
-      latestVersion: { version: "1.2.3" },
-    });
-    mocks.fetchDepsDev.mockResolvedValue({ advisories: 0 });
+  test("loads deps.dev data by package name without waiting for package info", async () => {
+    mocks.loadDepsDev.mockResolvedValue({ vulnerabilityCount: 0 });
 
     const { result } = renderHook(() => useDepsDev(["react"]), { wrapper });
 
     await waitFor(() => expect(result.current[0]?.isSuccess).toBe(true));
-    expect(mocks.fetchDepsDev).toHaveBeenCalledWith("react", "1.2.3");
-    expect(result.current[0]?.data).toEqual({ advisories: 0 });
-  });
-
-  test("query function resolves null when the version is unknown", async () => {
-    mocks.fetchPackageInfo.mockResolvedValue({ latestVersion: null });
-    const queryClient = createTestQueryClient();
-    const customWrapper = ({ children }: PropsWithChildren) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    expect(mocks.loadDepsDev).toHaveBeenCalledWith(
+      "react",
+      expect.any(AbortSignal),
     );
-
-    renderHook(() => useDepsDev(["react"]), { wrapper: customWrapper });
-
-    await waitFor(() => expect(mocks.fetchPackageInfo).toHaveBeenCalled());
-    const depsQuery = queryClient
-      .getQueryCache()
-      .findAll({ queryKey: ["depsDev"] })[0];
-    await expect(depsQuery?.fetch()).resolves.toBeNull();
+    expect(result.current[0]?.data).toEqual({ vulnerabilityCount: 0 });
   });
 
-  test("stays idle while no version is known", async () => {
-    mocks.fetchPackageInfo.mockResolvedValue({ latestVersion: null });
+  test("stays idle for an empty project name", () => {
+    const { result } = renderHook(() => useDepsDev([""]), { wrapper });
 
-    const { result } = renderHook(() => useDepsDev(["react"]), { wrapper });
-
-    await waitFor(() => expect(mocks.fetchPackageInfo).toHaveBeenCalled());
     expect(result.current[0]?.fetchStatus).toBe("idle");
-    expect(mocks.fetchDepsDev).not.toHaveBeenCalled();
+    expect(mocks.loadDepsDev).not.toHaveBeenCalled();
+  });
+
+  test("query key holds only the package name", () => {
+    expect(depsDevQueryOptions("react").queryKey).toEqual([
+      "deps-dev",
+      "react",
+    ]);
   });
 });

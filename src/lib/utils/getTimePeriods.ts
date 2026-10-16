@@ -1,23 +1,24 @@
-import { DurationUnit, isAfter, isBefore, sub } from "date-fns";
+import { add, DurationUnit, isAfter, isBefore, min } from "date-fns";
 
-type Period = { start: Date; end: Date };
+export type Period = { start: Date; end: Date };
 
 export default function getTimePeriods(
   from: Date,
   to: Date,
   unitsCount: number,
   unit: DurationUnit,
+  anchor: Date = from,
 ): Period[] {
   const periods: Period[] = [];
-  let endTime = to;
+  if (unitsCount <= 0) return periods;
 
-  while (isAfter(endTime, from)) {
-    let startTime = sub(endTime, { [unit]: unitsCount });
-    if (isBefore(startTime, from)) {
-      startTime = from;
-    }
-    periods.push({ start: startTime, end: endTime });
-    endTime = startTime;
+  const boundary = (index: number) =>
+    add(anchor, { [unit]: index * unitsCount });
+
+  for (let index = 0; isBefore(boundary(index), to); index++) {
+    const end = boundary(index + 1);
+    if (!isAfter(end, from)) continue;
+    periods.push({ start: boundary(index), end: min([end, to]) });
   }
   return periods;
 }

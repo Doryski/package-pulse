@@ -7,7 +7,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { renderWithProviders } from "@/test/render";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ProjectsStatsTable, { ProjectNameCell } from "./projects-stats-table";
+import ProjectsStatsTable from "./projects-stats-table";
+import {
+  STICKY_HEAD_CLASS_NAME,
+  statsTableColumns,
+} from "./stats-table-columns";
 
 vi.mock("@/app/(home)/utils/getStatsMatrix", () => ({ default: vi.fn() }));
 
@@ -342,33 +346,26 @@ describe("ProjectsStatsTable", () => {
   });
 });
 
-describe("ProjectNameCell", () => {
-  const renderCell = (isLoading?: boolean) =>
-    renderWithProviders(
-      <table>
-        <tbody>
-          <tr>
-            <ProjectNameCell
-              projectName="react"
-              index={0}
-              isLoading={isLoading}
-            />
-          </tr>
-        </tbody>
-      </table>,
-    );
+describe("stats table columns config", () => {
+  it("renders headers in the order and with the labels of statsTableColumns", () => {
+    mockMatrix([...ROWS], FULL_DATES);
+    renderTable();
 
-  it("shows the project name with a dot indicator", () => {
-    renderCell();
+    const heads = screen.getAllByRole("columnheader");
 
-    expect(screen.getByRole("cell")).toHaveTextContent("react");
+    expect(heads).toHaveLength(statsTableColumns.length);
+    statsTableColumns.forEach(({ label }, index) => {
+      expect(heads[index]).toHaveTextContent(label);
+    });
   });
 
-  it("shows a skeleton while loading", () => {
-    renderCell(true);
+  it("gives the project name header the shared sticky classes", () => {
+    mockMatrix([...ROWS], FULL_DATES);
+    renderTable();
 
-    const cell = screen.getByRole("cell");
-    expect(cell).not.toHaveTextContent("react");
-    expect(cell.querySelector(".animate-pulse")).not.toBeNull();
+    expect(header("Project name")).toHaveClass(
+      ...STICKY_HEAD_CLASS_NAME.split(" "),
+      "cursor-pointer",
+    );
   });
 });

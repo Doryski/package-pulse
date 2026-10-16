@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 export const ProjectsSearchFormSchema = z.object({
   search: z.string({

@@ -57,6 +57,17 @@ describe("GET /api/comparisons/popular", () => {
     expect(body.comparisons).toHaveLength(expected);
   });
 
+  test("sets CDN cache headers on success and no-store on errors", async () => {
+    const ok = await GET(buildRequest());
+    expect(ok.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=3600",
+    );
+
+    getComparisonsMock.mockRejectedValue(new Error("boom"));
+    const failed = await GET(buildRequest());
+    expect(failed.headers.get("Cache-Control")).toBe("no-store");
+  });
+
   test("rate limits reads per client IP at 60 per minute", async () => {
     await GET(buildRequest("", "4.4.4.4"));
 

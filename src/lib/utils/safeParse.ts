@@ -1,28 +1,35 @@
 import * as Sentry from "@sentry/nextjs";
-import { z } from "zod";
+import * as z from "zod/mini";
 
-function reportValidationError(error: z.ZodError, schema: z.ZodType): void {
+const readSchemaName = (schema: z.core.$ZodType) =>
+  z.globalRegistry.get(schema)?.description || "Unknown schema";
+
+function reportValidationError(
+  error: z.core.$ZodError,
+  schema: z.core.$ZodType,
+): void {
+  const schemaName = readSchemaName(schema);
   setTimeout(() => {
     console.error(error);
     Sentry.captureException(error, {
       level: "warning",
       extra: {
-        schemaName: schema.description || "Unknown schema",
+        schemaName,
         errorPath: z.flattenError(error),
       },
       tags: {
         errorType: "schema_validation_error",
-        schemaType: schema.description || "Unknown schema",
+        schemaType: schemaName,
       },
     });
   }, 0);
 }
 
-export default function safeParse<T extends z.ZodType>(
+export default function safeParse<T extends z.core.$ZodType>(
   data: unknown,
   schema: T,
 ): z.output<T> {
-  const parsed = schema.safeParse(data);
+  const parsed = z.safeParse(schema, data);
   if (parsed.success) return parsed.data;
 
   reportValidationError(parsed.error, schema);

@@ -51,7 +51,7 @@ describe("PopularComparisons", () => {
   });
 
   it("renders skeletons while loading", () => {
-    mockQuery({ isLoading: true, data: { comparisons } });
+    mockQuery({ isLoading: true, data: undefined });
     renderWithProviders(
       <PopularComparisons
         selectedProjects={[]}
@@ -59,7 +59,41 @@ describe("PopularComparisons", () => {
       />,
     );
     expect(screen.queryAllByRole("button")).toHaveLength(0);
-    expect(document.querySelectorAll(".animate-pulse")).toHaveLength(6);
+    expect(
+      screen.getByRole("heading", { name: "Popular Searches or Comparisons" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector("section")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    const skeletons = document.querySelectorAll(".motion-safe\\:animate-pulse");
+    expect(skeletons).toHaveLength(6);
+    expect(skeletons[0]?.parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("renders nothing while loading when projects are selected", () => {
+    mockQuery({ isLoading: true, data: undefined });
+    const { container } = renderWithProviders(
+      <PopularComparisons
+        selectedProjects={["react"]}
+        onAddMultipleProjects={vi.fn()}
+      />,
+    );
+    expect(container.querySelector("section")).toBeNull();
+  });
+
+  it.each([
+    ["nothing is selected", [], true],
+    ["projects are selected", ["react"], false],
+  ])("enables the feed query only when %s", (_, selectedProjects, enabled) => {
+    mockQuery({ data: undefined });
+    renderWithProviders(
+      <PopularComparisons
+        selectedProjects={selectedProjects}
+        onAddMultipleProjects={vi.fn()}
+      />,
+    );
+    expect(usePopularComparisons).toHaveBeenLastCalledWith({ enabled });
   });
 
   it("adds projects on click", async () => {

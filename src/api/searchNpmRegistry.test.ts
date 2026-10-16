@@ -1,7 +1,10 @@
 /**
  * @vitest-environment node
  */
-import searchNPMRegistry from "@/api/searchNpmRegistry";
+import searchNPMRegistry, {
+  SEARCH_NPM_REGISTRY_ERROR_MESSAGE,
+} from "@/api/searchNpmRegistry";
+import AppError from "@/lib/utils/AppError";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const fetchMock = vi.fn();
@@ -21,7 +24,6 @@ const item = {
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
-  vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
 afterEach(() => {
@@ -49,18 +51,35 @@ describe("searchNPMRegistry", () => {
     expect(result).toEqual([item]);
   });
 
-  test("returns an empty list and logs when the request fails", async () => {
-    fetchMock.mockRejectedValue(new Error("offline"));
+  test("passes the abort signal to fetch", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ objects: [], total: 0, time: "now" }),
+    });
+    const controller = new AbortController();
 
-    expect(await searchNPMRegistry("react")).toEqual([]);
-    expect(console.error).toHaveBeenCalled();
+    await searchNPMRegistry("react", controller.signal);
+
+    expect(fetchMock.mock.calls[0]![1]).toEqual({ signal: controller.signal });
   });
 
-  test("returns an empty list without parsing when the response is not ok", async () => {
+  test("rethrows a failed request instead of returning no results", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+
+    await expect(searchNPMRegistry("react")).rejects.toThrow("offline");
+  });
+
+  test("throws an AppError with the status when the response is not ok", async () => {
     const json = vi.fn();
     fetchMock.mockResolvedValue({ ok: false, status: 503, json });
 
-    expect(await searchNPMRegistry("react")).toEqual([]);
+    const error = await searchNPMRegistry("react").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({
+      message: SEARCH_NPM_REGISTRY_ERROR_MESSAGE,
+      status: 503,
+    });
     expect(json).not.toHaveBeenCalled();
   });
 });

@@ -2,10 +2,7 @@ import { SimpleTooltip } from "@/components/simple-tooltip";
 import { BreakDropIndicator } from "@/lib/utils/calculateBreakDrop";
 import { cn } from "@/lib/utils/cn";
 import { formatPercentage } from "@/lib/utils/formatters";
-import {
-  ExclamationTriangleIcon,
-  InfoCircledIcon,
-} from "@radix-ui/react-icons";
+import { TriangleAlert, Info } from "lucide-react";
 
 type BreakDropIndicatorProps = {
   indicator: BreakDropIndicator;
@@ -69,7 +66,7 @@ export default function BreakDropIndicatorComponent({
             </div>
           }
         >
-          <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
+          <Info className="size-4 cursor-help text-muted-foreground" />
         </SimpleTooltip>
       </div>
     );
@@ -126,7 +123,7 @@ export default function BreakDropIndicatorComponent({
                   hours and holiday periods when development teams are offline.
                 </p>
                 <div className="text-orange-500 dark:text-orange-500">
-                  <ExclamationTriangleIcon className="size-4 min-h-4 min-w-4" />
+                  <TriangleAlert className="size-4 min-h-4 min-w-4" />
                   <p className="flex items-center gap-1 text-xs font-medium">
                     Use as a general indicator only. Individual projects may
                     have different usage patterns regardless of their target
@@ -136,7 +133,7 @@ export default function BreakDropIndicatorComponent({
               </div>
             }
           >
-            <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
+            <Info className="size-4 cursor-help text-muted-foreground" />
           </SimpleTooltip>
         </div>
       )}

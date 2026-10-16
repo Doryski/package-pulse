@@ -2,7 +2,8 @@ import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import { renderWithProviders } from "@/test/render";
 import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import QuickComparisons from "./quick-comparisons";
+import { projectsToComparePath } from "@/lib/utils/slug";
+import QuickComparisons, { QuickComparisonLinks } from "./quick-comparisons";
 
 describe("QuickComparisons", () => {
   it("renders nothing when projects are selected", () => {
@@ -47,5 +48,23 @@ describe("QuickComparisons", () => {
     expect(onAddMultipleProjects).toHaveBeenCalledExactlyOnceWith([
       ...first.projects,
     ]);
+  });
+});
+
+describe("QuickComparisonLinks", () => {
+  it("renders a compare link per preset without buttons", () => {
+    renderWithProviders(<QuickComparisonLinks />);
+
+    expect(
+      screen.getByRole("heading", { name: "Quick Comparisons" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    QUICK_COMPARISONS.forEach(({ title, projects }) => {
+      expect(
+        screen.getByRole("link", {
+          name: `Compare ${title}: ${projects.join(", ")}`,
+        }),
+      ).toHaveAttribute("href", projectsToComparePath([...projects]));
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { ZodError } from "zod";
+import { $ZodError } from "zod/v4/core";
 import { isAppError } from "./AppError";
 
 export default function getRequestErrorMessage(
@@ -11,7 +11,7 @@ export default function getRequestErrorMessage(
 
   if (isAppError(error)) return error.message;
 
-  if (error instanceof ZodError) return defaultMessage;
+  if (error instanceof $ZodError) return defaultMessage;
   if (error instanceof TypeError) return defaultMessage;
   if (error instanceof Error) return error.message;
   return defaultMessage;

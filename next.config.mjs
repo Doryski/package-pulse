@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://registry.npmjs.org https://api.npmjs.org https://api.github.com https://bundlephobia.com https://api.deps.dev",
+  "connect-src 'self' https://registry.npmjs.org https://api.npmjs.org https://api.github.com",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
@@ -81,5 +81,8 @@ export default withSentryConfig(nextConfig, {
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   bundleSizeOptimizations: {
     excludeDebugStatements: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+    excludeReplayWorker: true,
   },
 });

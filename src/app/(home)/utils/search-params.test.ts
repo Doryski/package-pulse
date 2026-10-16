@@ -304,34 +304,13 @@ describe("getInitialProjects", () => {
     expect(result).toEqual([]);
   });
 
-  it("should return projects from local storage when projectsParam is null and local storage has projects", () => {
-    const localStorageProjects = ["localProject1", "localProject2"];
-    vi.mocked(getLocalStorageValue).mockReturnValue(localStorageProjects);
+  it("should ignore local storage when projectsParam is null", () => {
+    vi.mocked(getLocalStorageValue).mockReturnValue(["localProject1"]);
 
     const result = getInitialProjects(null, delimiter);
-    expect(result).toEqual(localStorageProjects);
-  });
 
-  it("should return an empty array when projectsParam is null and local storage is empty", () => {
-    vi.mocked(getLocalStorageValue).mockReturnValue(null);
-
-    const result = getInitialProjects(null, delimiter);
     expect(result).toEqual([]);
-  });
-
-  it("should return projects from local storage when projectsParam is null", () => {
-    const localStorageProjects = ["localProject1", "localProject2"];
-    vi.mocked(getLocalStorageValue).mockReturnValue(localStorageProjects);
-
-    const result = getInitialProjects(null, delimiter);
-    expect(result).toEqual(localStorageProjects);
-  });
-
-  it("should return an empty array when projectsParam is null and local storage is empty", () => {
-    vi.mocked(getLocalStorageValue).mockReturnValue(null);
-
-    const result = getInitialProjects(null, delimiter);
-    expect(result).toEqual([]);
+    expect(getLocalStorageValue).not.toHaveBeenCalled();
   });
 
   it(`should limit the number of projects to ${SELECTED_PROJECTS_LIMIT} when more than ${SELECTED_PROJECTS_LIMIT} are provided`, () => {

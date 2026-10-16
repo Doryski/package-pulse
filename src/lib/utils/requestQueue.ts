@@ -2,7 +2,12 @@ type QueuedRequest<T> = {
   fn: () => Promise<T>;
   resolve: (value: T) => void;
   reject: (error: Error) => void;
+  signal?: AbortSignal;
+  onAbort: () => void;
 };
+
+const createAbortError = () =>
+  new DOMException("The operation was aborted.", "AbortError");
 
 export class RequestQueue {
   private queue: QueuedRequest<any>[] = [];
@@ -15,11 +20,28 @@ export class RequestQueue {
     this.delay = delay;
   }
 
-  async add<T>(fn: () => Promise<T>): Promise<T> {
+  async add<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      this.queue.push({ fn, resolve, reject });
+      if (signal?.aborted) {
+        reject(createAbortError());
+        return;
+      }
+      const job: QueuedRequest<T> = {
+        fn,
+        resolve,
+        reject,
+        signal,
+        onAbort: () => this.cancel(job),
+      };
+      signal?.addEventListener("abort", job.onAbort, { once: true });
+      this.queue.push(job);
       this.process();
     });
+  }
+
+  private cancel<T>(job: QueuedRequest<T>) {
+    this.queue = this.queue.filter((queued) => queued !== job);
+    job.reject(createAbortError());
   }
 
   private async process() {
@@ -28,7 +50,8 @@ export class RequestQueue {
     }
 
     this.running++;
-    const { fn, resolve, reject } = this.queue.shift()!;
+    const { fn, resolve, reject, signal, onAbort } = this.queue.shift()!;
+    signal?.removeEventListener("abort", onAbort);
 
     try {
       const result = await fn();

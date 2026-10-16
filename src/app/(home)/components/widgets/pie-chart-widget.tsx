@@ -1,7 +1,8 @@
 "use client";
-import { getLatestDownloads } from "@/app/(home)/utils/getPeakAndLatestStats";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
+import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import { ProjectStatsQuery } from "@/lib/queries/useProjectsStats";
+import { getChartColorVar } from "@/lib/utils/getChartColor";
 import { formatInteger, formatPercentage } from "@/lib/utils/formatters";
 import { memo, useId, useMemo } from "react";
 import {
@@ -21,6 +22,7 @@ type PieChartWidgetProps = {
 
 const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
   const uniqueId = useId();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const chartId = `pie-chart-${uniqueId.replace(/:/g, "")}`;
 
   const data = useMemo(
@@ -29,14 +31,12 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
         .filter((project) => project.data)
         .map((project, index) => {
           const projectData = project.data!;
-          const latestDownloads = getLatestDownloads(projectData.rawSortedData);
-
           const normalizedName = normalizeProjectName(projectData.projectName);
 
           return {
             name: projectData.projectName,
             normalizedName: normalizedName,
-            value: latestDownloads,
+            value: projectData.summary.latestDownloads,
             fill: `var(--color-${normalizedName})`,
             index: index,
           };
@@ -50,7 +50,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
       data
         .map(
           (item) =>
-            `[data-chart="${chartId}"] { --color-${item.normalizedName}: hsl(var(--chart-${(item.index % 10) + 1})); }`,
+            `[data-chart="${chartId}"] { --color-${item.normalizedName}: ${getChartColorVar(item.index)}; }`,
         )
         .join("\n"),
     [data, chartId],
@@ -139,6 +139,7 @@ const PieChartWidget = memo(({ projectsStats }: PieChartWidgetProps) => {
               outerRadius={120}
               innerRadius={30}
               dataKey="value"
+              isAnimationActive={!prefersReducedMotion}
               animationBegin={0}
               animationDuration={800}
               animationEasing="ease-out"

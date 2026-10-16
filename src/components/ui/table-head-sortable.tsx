@@ -1,9 +1,9 @@
 import { SimpleTooltip } from "@/components/simple-tooltip";
 import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils/cn";
-import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { Info } from "lucide-react";
 import { memo, PropsWithChildren } from "react";
-import { z } from "zod";
+import * as z from "zod/mini";
 
 const sortColumnOptions = [
   "projectName",
@@ -84,7 +84,7 @@ const TableHeadSortable = memo(
           {children}
           {tooltip && (
             <SimpleTooltip content={tooltip}>
-              <InfoCircledIcon className="size-4 cursor-help text-muted-foreground" />
+              <Info className="size-4 cursor-help text-muted-foreground" />
             </SimpleTooltip>
           )}
           <span className="text-[10px] md:text-xs" aria-hidden>

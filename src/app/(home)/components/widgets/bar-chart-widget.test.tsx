@@ -11,7 +11,9 @@ type BarDatum = { name: string; downloads?: number; growth?: number };
 const spies = vi.hoisted(() => ({
   tooltip: vi.fn<(props: TooltipProps) => void>(),
   yAxis: vi.fn<(props: YAxisProps) => void>(),
-  bar: vi.fn<(props: { dataKey: string }) => void>(),
+  bar: vi.fn<
+    (props: { dataKey: string; isAnimationActive?: boolean }) => void
+  >(),
 }));
 
 vi.mock("recharts", async (importOriginal) => {
@@ -37,7 +39,7 @@ vi.mock("recharts", async (importOriginal) => {
         {children}
       </div>
     ),
-    Bar: (props: { dataKey: string }) => {
+    Bar: (props: { dataKey: string; isAnimationActive?: boolean }) => {
       spies.bar(props);
       return null;
     },
@@ -123,6 +125,23 @@ describe("BarChartWidget", () => {
     expect(
       screen.getByText(/^bar-small\|1450\|\d+(\.\d+)?$/),
     ).toBeInTheDocument();
+  });
+
+  it("renders bars without animation", () => {
+    renderWidget();
+
+    expect(lastProps(spies.bar).isAnimationActive).toBe(false);
+  });
+
+  it("re-sorts when the comparison mode changes", () => {
+    const view = renderWidget("growth");
+
+    view.rerender(
+      <BarChartWidget projectsStats={ALL_QUERIES} comparisonMode="downloads" />,
+    );
+
+    expect(getRenderedNames()).toEqual(["bar-big", "bar-small", "bar-short"]);
+    expect(lastProps(spies.bar).dataKey).toBe("downloads");
   });
 
   it("sorts by latest downloads in downloads mode", () => {

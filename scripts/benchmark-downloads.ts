@@ -1,5 +1,5 @@
 import fetchNpmDownloadsAdaptive from "@/api/fetchNpmDownloadsAdaptive";
-import fetchNPMDownloads from "@/api/fetchNPMDownloads";
+import fetchNPMDownloads from "./lib/fetchNPMDownloads";
 import { formatDate, parseDate } from "@/app/(home)/utils/date-utils";
 import type { NPMDownloadCount } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import { eachDayOfInterval } from "date-fns";

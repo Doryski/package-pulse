@@ -12,11 +12,8 @@ import {
   projectsToComparePath,
   slugToProjects,
 } from "@/lib/utils/slug";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import LocalStorageKey from "../../../lib/enums/LocalStorageKey";
-import getLocalStorageValue from "../../../lib/utils/getLocalStorageValue";
-import { ProjectsSearchFormSchema } from "../components/projects-form/schema";
 
 export {
   decodeProjectName,
@@ -32,23 +29,12 @@ export function getInitialProjects(
   projectsParam: string | null,
   delimiter: string,
 ): string[] {
-  if (projectsParam === "") return [];
-  if (projectsParam === null)
-    return (
-      getLocalStorageValue(
-        LocalStorageKey.SELECTED_PROJECTS,
-        ProjectsSearchFormSchema.shape.projects,
-      ) ?? []
-    );
+  if (!projectsParam) return [];
 
-  const decodedProjectsParam = projectsParam
+  return projectsParam
     .split(delimiter)
-    .map(decodeProjectName);
-
-  if (decodedProjectsParam.length > SELECTED_PROJECTS_LIMIT)
-    return decodedProjectsParam.slice(0, SELECTED_PROJECTS_LIMIT);
-  if (decodedProjectsParam.length > 0) return decodedProjectsParam;
-  return [];
+    .map(decodeProjectName)
+    .slice(0, SELECTED_PROJECTS_LIMIT);
 }
 
 export function getInitialTimePeriod(
@@ -304,15 +290,23 @@ export function getProjectsUrlUpdate(
   return current === target ? null : target;
 }
 
+function readCurrentLocation() {
+  return {
+    pathname: window.location.pathname,
+    searchParams: new URLSearchParams(window.location.search),
+  };
+}
+
+function replaceUrl(url: string) {
+  window.history.replaceState(null, "", url);
+}
+
 export function useUpdateSearchParamsProjects(
   selectedProjects: string[],
   delimiter: string,
 ) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   useEffect(() => {
+    const { pathname, searchParams } = readCurrentLocation();
     const newUrl = getProjectsUrlUpdate(
       pathname,
       searchParams,
@@ -320,8 +314,8 @@ export function useUpdateSearchParamsProjects(
       delimiter,
     );
 
-    if (newUrl) router.replace(newUrl, { scroll: false });
-  }, [selectedProjects, router, searchParams, delimiter, pathname]);
+    if (newUrl) replaceUrl(newUrl);
+  }, [selectedProjects, delimiter]);
 }
 
 export function useUpdateSearchParams(
@@ -331,32 +325,21 @@ export function useUpdateSearchParams(
   delimiter: string,
   chartMode: ChartMode = "absolute",
 ) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   useEffect(() => {
+    const { pathname, searchParams } = readCurrentLocation();
     const otherParams = getOtherParamsString(searchParams, MANAGED_PARAM_KEYS);
-    const newUrl = constructNewUrl(
-      pathname,
-      selectedProjects,
-      timePeriod,
-      chartScale,
-      otherParams,
-      delimiter,
-      chartMode,
+    replaceUrl(
+      constructNewUrl(
+        pathname,
+        selectedProjects,
+        timePeriod,
+        chartScale,
+        otherParams,
+        delimiter,
+        chartMode,
+      ),
     );
-    router.replace(newUrl, { scroll: false });
-  }, [
-    selectedProjects,
-    timePeriod,
-    chartScale,
-    router,
-    searchParams,
-    delimiter,
-    pathname,
-    chartMode,
-  ]);
+  }, [selectedProjects, timePeriod, chartScale, delimiter, chartMode]);
 }
 
 export function useUpdateSearchParamsChart(
@@ -364,11 +347,8 @@ export function useUpdateSearchParamsChart(
   chartScale: ChartScale,
   chartMode: ChartMode = "absolute",
 ) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   useEffect(() => {
+    const { pathname, searchParams } = readCurrentLocation();
     const otherParams = getOtherParamsString(searchParams, MANAGED_PARAM_KEYS);
     const newUrl = constructNewUrl(
       pathname,
@@ -385,9 +365,10 @@ export function useUpdateSearchParamsChart(
         pathname,
         searchParams,
         MULTI_SEARCH_DELIMITER,
-      ) !== newUrl
-    ) {
-      router.replace(newUrl, { scroll: false });
-    }
-  }, [timePeriod, chartScale, chartMode, router, searchParams, pathname]);
+      ) === newUrl
+    )
+      return;
+
+    replaceUrl(newUrl);
+  }, [timePeriod, chartScale, chartMode]);
 }

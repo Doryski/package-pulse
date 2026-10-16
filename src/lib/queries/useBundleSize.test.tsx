@@ -4,13 +4,17 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ fetchBundleSize: vi.fn() }));
-
-vi.mock("@/api/fetchPackageInfo", () => ({
-  fetchBundleSize: mocks.fetchBundleSize,
+const mocks = vi.hoisted(() => ({
+  loadPackageInfo: vi.fn(),
+  loadBundleSize: vi.fn(),
 }));
 
-import useBundleSize from "./useBundleSize";
+vi.mock("@/api/packageData", () => ({
+  loadPackageInfo: mocks.loadPackageInfo,
+  loadBundleSize: mocks.loadBundleSize,
+}));
+
+import useBundleSize, { bundleSizeQueryOptions } from "./useBundleSize";
 
 const wrapper = ({ children }: PropsWithChildren) => (
   <QueryClientProvider client={createTestQueryClient()}>
@@ -20,13 +24,17 @@ const wrapper = ({ children }: PropsWithChildren) => (
 
 describe("useBundleSize", () => {
   beforeEach(() => {
-    mocks.fetchBundleSize.mockReset();
+    mocks.loadPackageInfo.mockReset();
+    mocks.loadBundleSize.mockReset();
   });
 
-  test("fetches a bundle size per project", async () => {
-    mocks.fetchBundleSize.mockImplementation(async (name: string) => ({
-      name,
+  test("loads the bundle size of the latest version per project", async () => {
+    mocks.loadPackageInfo.mockImplementation(async (name: string) => ({
+      latestVersion: `${name.length}.0.0`,
     }));
+    mocks.loadBundleSize.mockImplementation(
+      async (name: string, version: string) => ({ name, version }),
+    );
 
     const { result } = renderHook(() => useBundleSize(["react", "vue"]), {
       wrapper,
@@ -36,21 +44,51 @@ describe("useBundleSize", () => {
       expect(result.current.every((query) => query.isSuccess)).toBe(true),
     );
     expect(result.current.map((query) => query.data)).toEqual([
-      { name: "react" },
-      { name: "vue" },
+      { name: "react", version: "5.0.0" },
+      { name: "vue", version: "3.0.0" },
     ]);
+    expect(mocks.loadBundleSize).toHaveBeenCalledWith(
+      "react",
+      "5.0.0",
+      expect.any(AbortSignal),
+    );
   });
 
-  test("does not fetch for an empty project name", () => {
+  test("stays idle until the latest version is known", async () => {
+    mocks.loadPackageInfo.mockResolvedValue({ latestVersion: null });
+
+    const { result } = renderHook(() => useBundleSize(["react"]), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(mocks.loadPackageInfo).toHaveBeenCalled());
+    expect(result.current[0]?.fetchStatus).toBe("idle");
+    expect(mocks.loadBundleSize).not.toHaveBeenCalled();
+  });
+
+  test("does not load for an empty project name", () => {
     const { result } = renderHook(() => useBundleSize([""]), { wrapper });
 
     expect(result.current[0]?.fetchStatus).toBe("idle");
-    expect(mocks.fetchBundleSize).not.toHaveBeenCalled();
+    expect(mocks.loadPackageInfo).not.toHaveBeenCalled();
+    expect(mocks.loadBundleSize).not.toHaveBeenCalled();
   });
 
   test("returns no queries for no projects", () => {
     const { result } = renderHook(() => useBundleSize([]), { wrapper });
 
     expect(result.current).toEqual([]);
+  });
+
+  test("query options are keyed by name and version and never go stale", () => {
+    const options = bundleSizeQueryOptions("react", "1.0.0");
+
+    expect(options.queryKey).toEqual(["bundle-size", "react", "1.0.0"]);
+    expect(options.staleTime).toBe(Infinity);
+    expect(bundleSizeQueryOptions("react", undefined).queryKey).toEqual([
+      "bundle-size",
+      "react",
+      null,
+    ]);
   });
 });

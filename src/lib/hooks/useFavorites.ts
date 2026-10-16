@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";

@@ -70,4 +70,40 @@ describe("sortByDate", () => {
     const result = sortByDate(input, (item) => new Date(item.customDate));
     expect(result).toEqual(expected);
   });
+
+  it("should sort by ISO date strings without creating dates", () => {
+    const input = [
+      { date: "2024-03-01", value: "C" },
+      { date: "2023-12-31", value: "A" },
+      { date: "2024-02-29", value: "B" },
+    ];
+
+    const result = sortByDate(input, (item) => item.date);
+
+    expect(result.map((item) => item.value)).toEqual(["A", "B", "C"]);
+  });
+
+  it("should keep the original order for equal dates", () => {
+    const input = [
+      { date: "2024-01-02", value: "first" },
+      { date: "2024-01-01", value: "earlier" },
+      { date: "2024-01-02", value: "second" },
+    ];
+
+    const result = sortByDate(input, (item) => item.date);
+
+    expect(result.map((item) => item.value)).toEqual([
+      "earlier",
+      "first",
+      "second",
+    ]);
+  });
+
+  it("should not mutate the input array", () => {
+    const input = [{ date: "2024-01-02" }, { date: "2024-01-01" }];
+
+    sortByDate(input, (item) => item.date);
+
+    expect(input).toEqual([{ date: "2024-01-02" }, { date: "2024-01-01" }]);
+  });
 });

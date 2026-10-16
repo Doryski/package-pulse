@@ -1,12 +1,6 @@
-import {
-  addBusinessDays,
-  endOfYear,
-  isBefore,
-  isWithinInterval,
-  parseISO,
-  startOfYear,
-  subBusinessDays,
-} from "date-fns";
+import { formatDate } from "@/app/(home)/utils/date-utils";
+import { isWeekend, isWithinIsoRange, weekdayOf } from "@/lib/stats/isoDay";
+import { addBusinessDays, isBefore, subBusinessDays } from "date-fns";
 import { DownloadStat } from "./groupByPeriod";
 import { average, sum } from "./math";
 
@@ -21,8 +15,7 @@ export type BreakDropIndicator = {
   hasEnoughData: boolean;
 };
 
-export const getLast5ChristmasYears = () => {
-  const today = new Date();
+export const getLast5ChristmasYears = (today = new Date()) => {
   const currentYear = today.getFullYear();
   const christmasEveThisYear = new Date(currentYear, 11, 24);
 
@@ -36,56 +29,170 @@ export const getLast5ChristmasYears = () => {
   });
 };
 
-export function calculateBreakDrop(
-  rawData: DownloadStat[],
-): BreakDropIndicator {
-  const last365Days = rawData.slice(-365);
-  const last365DaysAverage = average(last365Days, (item) => item.count);
+const LAST_DAYS_WINDOW = 365;
+const BASELINE_BUSINESS_DAYS = 30;
+const CHRISTMAS_START_MONTH_DAY = "12-21";
+const CHRISTMAS_END_MONTH_DAY = "12-29";
 
-  if (
-    last365Days.length < 365 ||
-    last365DaysAverage < INSUFFICIENT_DATA_THRESHOLD
-  ) {
-    return {
-      christmasDropPercentage: 0,
-      weekendDropPercentage: 0,
-      corporateUsageScore: 0,
-      corporateUsageLevel: "very_low",
-      hasEnoughData: false,
-    };
+const INSUFFICIENT_BREAK_DROP = {
+  christmasDropPercentage: 0,
+  weekendDropPercentage: 0,
+  corporateUsageScore: 0,
+  corporateUsageLevel: "very_low",
+  hasEnoughData: false,
+} as const satisfies BreakDropIndicator;
+
+const isChristmasMonthDay = (isoDate: string) =>
+  isWithinIsoRange(
+    isoDate.slice(5, 10),
+    CHRISTMAS_START_MONTH_DAY,
+    CHRISTMAS_END_MONTH_DAY,
+  );
+
+const createYearAccumulator = (year: number) => ({
+  year,
+  sum: 0,
+  count: 0,
+  christmasMin: Infinity,
+  christmasCount: 0,
+  baselineSum: 0,
+  baselineCount: 0,
+  baselineBeforeStart: formatDate(
+    subBusinessDays(new Date(year, 11, 21), BASELINE_BUSINESS_DAYS),
+  ),
+  baselineBeforeEnd: `${year}-12-20`,
+  baselineAfterStart: `${year}-12-30`,
+  baselineAfterEnd: formatDate(
+    addBusinessDays(new Date(year, 11, 29), BASELINE_BUSINESS_DAYS),
+  ),
+});
+
+type YearAccumulator = ReturnType<typeof createYearAccumulator>;
+
+const createWindowAccumulator = () => ({
+  sum: 0,
+  count: 0,
+  weekdaySum: 0,
+  weekdayCount: 0,
+  weekendSum: 0,
+  weekendCount: 0,
+});
+
+type WindowAccumulator = ReturnType<typeof createWindowAccumulator>;
+
+const isInBaseline = (accumulator: YearAccumulator, isoDate: string) =>
+  isWithinIsoRange(
+    isoDate,
+    accumulator.baselineBeforeStart,
+    accumulator.baselineBeforeEnd,
+  ) ||
+  isWithinIsoRange(
+    isoDate,
+    accumulator.baselineAfterStart,
+    accumulator.baselineAfterEnd,
+  );
+
+const addToYear = (
+  accumulator: YearAccumulator,
+  isoDate: string,
+  count: number,
+  weekday: number,
+) => {
+  accumulator.sum += count;
+  accumulator.count += 1;
+  if (isChristmasMonthDay(isoDate)) {
+    accumulator.christmasMin = Math.min(accumulator.christmasMin, count);
+    accumulator.christmasCount += 1;
+    return;
+  }
+  if (isWeekend(weekday) || !isInBaseline(accumulator, isoDate)) {
+    return;
+  }
+  accumulator.baselineSum += count;
+  accumulator.baselineCount += 1;
+};
+
+const addToWindow = (
+  accumulator: WindowAccumulator,
+  isoDate: string,
+  count: number,
+  weekday: number,
+) => {
+  accumulator.sum += count;
+  accumulator.count += 1;
+  if (isChristmasMonthDay(isoDate)) {
+    return;
+  }
+  if (isWeekend(weekday)) {
+    accumulator.weekendSum += count;
+    accumulator.weekendCount += 1;
+    return;
+  }
+  accumulator.weekdaySum += count;
+  accumulator.weekdayCount += 1;
+};
+
+const calculateChristmasDropForYear = ({
+  christmasMin,
+  christmasCount,
+  baselineSum,
+  baselineCount,
+}: YearAccumulator) => {
+  if (christmasMin === 0) return 0;
+  if (christmasCount === 0 || baselineCount === 0) return 0;
+
+  const baselineAverage = baselineSum / baselineCount;
+  if (baselineAverage === 0) return 0;
+
+  const dropPercentage =
+    ((baselineAverage - christmasMin) / baselineAverage) * 100;
+
+  return Math.max(0, dropPercentage);
+};
+
+const calculateWeekendDrop = ({
+  weekdaySum,
+  weekdayCount,
+  weekendSum,
+  weekendCount,
+}: WindowAccumulator) => {
+  if (weekdayCount === 0 || weekendCount === 0) {
+    return 0;
   }
 
-  const last5Years = getLast5ChristmasYears();
-  const dataPerYear = last5Years.map((year) => {
-    const data = rawData.filter((item) => {
-      const date = parseISO(item.date);
-      return isWithinInterval(date, {
-        start: startOfYear(new Date(year, 0, 1)),
-        end: endOfYear(new Date(year, 0, 1)),
-      });
-    });
-    const yearAverage = average(data, (item) => item.count);
-    return { year, data, average: yearAverage };
-  });
+  const weekdayAverage = weekdaySum / weekdayCount;
+  const weekendAverage = weekendSum / weekendCount;
 
-  const onlySufficientFromLast5Years = dataPerYear.filter(
-    (item) => item.average > INSUFFICIENT_DATA_THRESHOLD,
+  if (weekdayAverage === 0) {
+    return 0;
+  }
+
+  const dropPercentage =
+    ((weekdayAverage - weekendAverage) / weekdayAverage) * 100;
+
+  return Math.max(0, dropPercentage);
+};
+
+const summarizeBreakDrop = (
+  window: WindowAccumulator,
+  years: YearAccumulator[],
+): BreakDropIndicator => {
+  if (
+    window.count < LAST_DAYS_WINDOW ||
+    window.sum / window.count < INSUFFICIENT_DATA_THRESHOLD
+  ) {
+    return { ...INSUFFICIENT_BREAK_DROP };
+  }
+
+  const onlySufficientFromLast5Years = years.filter(
+    (item) => item.sum / item.count > INSUFFICIENT_DATA_THRESHOLD,
   );
   const last5YearsAverageChristmasDrop = average(
     onlySufficientFromLast5Years,
-    (item) => calculateChristmasDropForYear(item.data, item.year),
+    calculateChristmasDropForYear,
   );
 
-  const last365DaysDataExcludingChristmas = last365Days.filter((item) => {
-    const date = parseISO(item.date);
-    return !isWithinInterval(date, {
-      start: new Date(date.getFullYear(), 11, 21),
-      end: new Date(date.getFullYear(), 11, 29),
-    });
-  });
-  const weekendDropPercentage = calculateWeekendDrop(
-    last365DaysDataExcludingChristmas,
-  );
+  const weekendDropPercentage = calculateWeekendDrop(window);
 
   const isChristmasInsufficient = isNaN(last5YearsAverageChristmasDrop);
 
@@ -110,94 +217,45 @@ export function calculateBreakDrop(
     corporateUsageLevel,
     hasEnoughData: true,
   };
-}
+};
 
-function calculateChristmasDropForYear(
-  rawData: DownloadStat[],
-  year: number,
-): number {
-  // Christmas period: December 21-29
-  const christmasStart = new Date(year, 11, 21);
-  const christmasEnd = new Date(year, 11, 29);
-
-  const baselineBeforeChristmasEnd = new Date(year, 11, 20);
-  const baselineAfterChristmasStart = new Date(year, 11, 30);
-  const baselineBeforeChristmasStart = subBusinessDays(christmasStart, 30);
-  const baselineAfterChristmasEnd = addBusinessDays(christmasEnd, 30);
-
-  const christmasData = rawData.filter((item) => {
-    const date = parseISO(item.date);
-    return isWithinInterval(date, {
-      start: christmasStart,
-      end: christmasEnd,
-    });
-  });
-  const christmasMinValue = Math.min(
-    ...christmasData.map((item) => item.count),
+export function createBreakDropAccumulator(length: number, today = new Date()) {
+  const windowStart = Math.max(0, length - LAST_DAYS_WINDOW);
+  const window = createWindowAccumulator();
+  const years = getLast5ChristmasYears(today).map(createYearAccumulator);
+  const yearsByKey = new Map(
+    years.map((accumulator) => [String(accumulator.year), accumulator]),
   );
-  if (christmasMinValue === 0) return 0;
 
-  const baselineData = rawData.filter((item) => {
-    const date = parseISO(item.date);
-    const isInBaselineBeforeChristmas = isWithinInterval(date, {
-      start: baselineBeforeChristmasStart,
-      end: baselineBeforeChristmasEnd,
-    });
-    const isInBaselineAfterChristmas = isWithinInterval(date, {
-      start: baselineAfterChristmasStart,
-      end: baselineAfterChristmasEnd,
-    });
-    // Exclude weekends from baseline (Saturday = 6, Sunday = 0)
-    const dayOfWeek = date.getDay();
-    const isWeekday = dayOfWeek !== 0 && dayOfWeek !== 6;
-    return (
-      (isInBaselineBeforeChristmas || isInBaselineAfterChristmas) && isWeekday
-    );
-  });
+  const add = (
+    index: number,
+    isoDate: string,
+    count: number,
+    weekday = weekdayOf(isoDate),
+  ) => {
+    if (index >= windowStart) {
+      addToWindow(window, isoDate, count, weekday);
+    }
+    const yearAccumulator = yearsByKey.get(isoDate.slice(0, 4));
+    if (yearAccumulator) {
+      addToYear(yearAccumulator, isoDate, count, weekday);
+    }
+  };
 
-  if (christmasData.length === 0 || baselineData.length === 0) return 0;
+  const result = () => summarizeBreakDrop(window, years);
 
-  const baselineAverage = average(baselineData, (item) => item.count);
-  if (baselineAverage === 0) return 0;
-
-  const dropPercentage =
-    ((baselineAverage - christmasMinValue) / baselineAverage) * 100;
-
-  return Math.max(0, dropPercentage);
+  return { add, result };
 }
 
-function calculateWeekendDrop(rawData: DownloadStat[]): number {
-  const weekdayData: number[] = [];
-  const weekendData: number[] = [];
-
-  rawData.forEach((item) => {
-    const date = parseISO(item.date);
-    const dayOfWeek = date.getDay();
-
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // Weekend (Sunday = 0, Saturday = 6)
-      weekendData.push(item.count);
-    } else {
-      // Weekday
-      weekdayData.push(item.count);
-    }
-  });
-
-  if (weekdayData.length === 0 || weekendData.length === 0) {
-    return 0;
-  }
-
-  const weekdayAverage = average(weekdayData, (item) => item);
-  const weekendAverage = average(weekendData, (item) => item);
-
-  if (weekdayAverage === 0) {
-    return 0;
-  }
-
-  const dropPercentage =
-    ((weekdayAverage - weekendAverage) / weekdayAverage) * 100;
-
-  return Math.max(0, dropPercentage);
+export function calculateBreakDrop(
+  rawData: DownloadStat[],
+  today = new Date(),
+): BreakDropIndicator {
+  const accumulator = createBreakDropAccumulator(rawData.length, today);
+  rawData.forEach(({ date, count }, index) =>
+    accumulator.add(index, date, count),
+  );
+  return accumulator.result();
 }
 
 function determineCorporateUsageLevel(

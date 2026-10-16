@@ -1,8 +1,9 @@
 /**
  * @vitest-environment node
  */
-import { formatDate } from "@/app/(home)/utils/date-utils";
+import { formatDate, parseDate } from "@/app/(home)/utils/date-utils";
 import fetchNpmDownloadsAdaptive, {
+  CLOSED_WINDOW_REVALIDATE_SECONDS,
   hasTransientErrors,
   parsePackageList,
 } from "@/api/fetchNpmDownloadsAdaptive";
@@ -18,6 +19,7 @@ import { startOfDay, sub } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+const FIRST_DAY = parseDate(NPM_API_FIRST_DAY);
 const SYSTEM_TIME = new Date("2024-03-15T10:30:00.000Z");
 const RANGE_BASE_URL = "https://api.npmjs.org/downloads/range";
 
@@ -108,12 +110,14 @@ describe("fetchNpmDownloadsAdaptive - window building", () => {
       today,
       NPM_BULK_RANGE_API_PERIOD_DAYS,
       "days",
+      FIRST_DAY,
     );
     const monthWindows = getTimePeriods(
       startDate,
       today,
       NPM_RANGE_API_PERIOD_MONTHS,
       "months",
+      FIRST_DAY,
     );
 
     const expectedUrls = [
@@ -124,18 +128,42 @@ describe("fetchNpmDownloadsAdaptive - window building", () => {
     const calledUrls = fetchImpl.mock.calls.map((call) => call[0]!);
 
     expect(dayWindows).toHaveLength(2);
-    expect(monthWindows).toHaveLength(1);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(monthWindows).toHaveLength(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect([...calledUrls].sort()).toEqual([...expectedUrls].sort());
-    expect(result.stats.requestCount).toBe(3);
+    expect(result.stats.requestCount).toBe(4);
 
     const joinedRequests = calledUrls.filter((url) =>
       url.includes("react,vue"),
     );
     const scopedRequests = calledUrls.filter((url) => url.includes("@scope/a"));
     expect(joinedRequests).toHaveLength(2);
-    expect(scopedRequests).toHaveLength(1);
+    expect(scopedRequests).toHaveLength(2);
     expect(scopedRequests[0]!.includes(",")).toBe(false);
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - dispatch order", () => {
+  test("requests the newest windows first so rate limits cost the oldest history", async () => {
+    const fetchImpl = vi.fn((_url: string) =>
+      Promise.resolve(
+        makeResponse(
+          200,
+          bulkBody({ react: [{ day: "2024-01-01", downloads: 1 }] }),
+        ),
+      ),
+    );
+
+    await fetchNpmDownloadsAdaptive(["react"], {
+      startDate: daysAgo(800),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+      concurrency: { initial: 1, min: 1, max: 1 },
+    });
+
+    const starts = fetchImpl.mock.calls.map((call) => startOf(call[0]!));
+    expect(starts.length).toBeGreaterThan(1);
+    expect(starts).toEqual([...starts].sort().reverse());
   });
 });
 
@@ -177,9 +205,10 @@ describe("fetchNpmDownloadsAdaptive - merge & happy path", () => {
       today,
       NPM_BULK_RANGE_API_PERIOD_DAYS,
       "days",
+      FIRST_DAY,
     );
-    const recent = windows[0]!;
-    const older = windows[1]!;
+    const recent = windows.at(-1)!;
+    const older = windows.at(-2)!;
     const boundary = formatDate(recent.start);
     const oldest = formatDate(older.start);
     const newest = formatDate(recent.end);
@@ -271,8 +300,9 @@ describe("fetchNpmDownloadsAdaptive - partial-failure isolation", () => {
       today,
       NPM_BULK_RANGE_API_PERIOD_DAYS,
       "days",
+      FIRST_DAY,
     );
-    const recent = windows[0]!;
+    const recent = windows.at(-1)!;
 
     const fetchImpl = vi.fn((url: string) => {
       const isRecent = startOf(url) === formatDate(recent.start);
@@ -308,9 +338,10 @@ describe("fetchNpmDownloadsAdaptive - multi-window scoped packages", () => {
       getToday(),
       NPM_RANGE_API_PERIOD_MONTHS,
       "months",
+      FIRST_DAY,
     );
   const isNewestWindow = (url: string) =>
-    startOf(url) === formatDate(monthWindows()[0]!.start);
+    startOf(url) === formatDate(monthWindows().at(-1)!.start);
   const successResponse = () =>
     makeResponse(200, flatBody(SCOPED, [{ day: "2024-02-01", downloads: 9 }]));
   const noStatsResponse = () =>
@@ -542,6 +573,7 @@ describe("fetchNpmDownloadsAdaptive - upstream bounds", () => {
       getToday(),
       NPM_RANGE_API_PERIOD_MONTHS,
       "months",
+      FIRST_DAY,
     );
 
     const result = await fetchNpmDownloadsAdaptive(packages, {
@@ -568,6 +600,92 @@ describe("fetchNpmDownloadsAdaptive - upstream bounds", () => {
       }),
     ).rejects.toThrow("Too many packages requested");
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - anchored window caching", () => {
+  const emptyBulk = (_url: string, _init?: RequestInit) =>
+    Promise.resolve(makeResponse(200, bulkBody({})));
+
+  const fetchCalls = async (systemTime: string) => {
+    vi.setSystemTime(new Date(systemTime));
+    const fetchImpl = vi.fn(emptyBulk);
+    await fetchNpmDownloadsAdaptive(["react"], {
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+    return fetchImpl.mock.calls.map(([url, init]) => ({
+      url,
+      revalidate: init?.next?.revalidate,
+    }));
+  };
+
+  test("only the open window URL changes after UTC midnight", async () => {
+    const today = await fetchCalls("2024-03-15T23:59:00.000Z");
+    const tomorrow = await fetchCalls("2024-03-16T00:01:00.000Z");
+    const urlsToday = today.map(({ url }) => url).toSorted();
+    const urlsTomorrow = tomorrow.map(({ url }) => url).toSorted();
+
+    expect(urlsTomorrow).toHaveLength(urlsToday.length);
+    expect(urlsTomorrow.slice(0, -1)).toEqual(urlsToday.slice(0, -1));
+    expect(urlsToday.at(-1)).toMatch(/:2024-03-15\/react$/);
+    expect(urlsTomorrow.at(-1)).toMatch(/:2024-03-16\/react$/);
+  });
+
+  test("caches closed windows for 30 days and the open window for an hour", async () => {
+    const calls = (await fetchCalls("2024-03-15T10:30:00.000Z")).toSorted(
+      (a, b) => a.url.localeCompare(b.url),
+    );
+
+    expect(calls.length).toBeGreaterThan(1);
+    expect(calls.slice(0, -1).map(({ revalidate }) => revalidate)).toEqual(
+      calls.slice(0, -1).map(() => CLOSED_WINDOW_REVALIDATE_SECONDS),
+    );
+    expect(calls.at(-1)?.revalidate).toBe(3600);
+  });
+
+  test("keeps a window ending inside the npm lag period on the short cache", async () => {
+    const calls = (await fetchCalls("2023-11-28T10:30:00.000Z")).toSorted(
+      (a, b) => a.url.localeCompare(b.url),
+    );
+    const lagWindow = calls.find(({ url }) => url.includes(":2023-11-24/"));
+
+    expect(lagWindow?.revalidate).toBe(3600);
+    expect(calls.at(-1)?.revalidate).toBe(3600);
+    expect(calls.at(-3)?.revalidate).toBe(CLOSED_WINDOW_REVALIDATE_SECONDS);
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - abort", () => {
+  test("rejects with the abort reason when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchImpl = vi.fn();
+
+    await expect(
+      fetchNpmDownloadsAdaptive(["react"], {
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("rejects with a timeout reason when the signal times out mid-flight", async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {
+      controller.abort(new DOMException("timed out", "TimeoutError"));
+      return Promise.reject(init?.signal?.reason ?? new Error("aborted"));
+    });
+
+    await expect(
+      fetchNpmDownloadsAdaptive(["react"], {
+        fetchImpl: asFetch(fetchImpl),
+        retry: FAST_RETRY,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
   });
 });
 

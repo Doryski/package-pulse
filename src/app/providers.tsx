@@ -2,6 +2,7 @@
 "use client";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { isClientError } from "@/lib/utils/AppError";
 // Since QueryClientProvider relies on useContext under the hood, we have to put 'use client' on top
 import {
   isServer,
@@ -21,6 +22,7 @@ function makeQueryClient() {
         gcTime: 10 * 60 * 1000, // 10 minutes
         retry: (failureCount, error) => {
           // Don't retry on 404s or rate limit errors
+          if (isClientError(error)) return false;
           if (error instanceof Error && error.message.includes("404")) {
             return false;
           }
@@ -28,7 +30,7 @@ function makeQueryClient() {
         },
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
         refetchOnWindowFocus: false,
-        refetchOnReconnect: "always",
+        refetchOnReconnect: true,
       },
     },
   });

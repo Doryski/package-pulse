@@ -1,17 +1,11 @@
-import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
+import { formatDate } from "@/app/(home)/utils/date-utils";
 import {
-  addDays,
-  addMonths,
-  addWeeks,
-  addYears,
-  differenceInCalendarDays,
-  differenceInCalendarMonths,
-  differenceInCalendarWeeks,
-  differenceInCalendarYears,
-  startOfMonth,
-  startOfYear,
-  subDays,
-} from "date-fns";
+  daysInMonth,
+  fromDayNumber,
+  toDayNumber,
+  weekdayOfDayNumber,
+} from "@/lib/stats/isoDay";
+import { subDays } from "date-fns";
 import AppError from "./AppError";
 import { getPeriodStartByDays } from "./getPeriodStartByDays";
 
@@ -29,49 +23,85 @@ export type DownloadStat = {
   count: number;
 };
 
-export function groupByDays<T extends DownloadStat>(
-  stats: T[],
-  periodLength: number,
+type PeriodBucketing<K> = {
+  keyOf: (isoDate: string) => K;
+  boundsOf: (key: K) => Period;
+};
+
+const weekStartDayNumber = (isoDate: string) => {
+  const dayNumber = toDayNumber(isoDate);
+  return dayNumber - weekdayOfDayNumber(dayNumber) + 1;
+};
+
+export const WEEK_BUCKETING: PeriodBucketing<number> = {
+  keyOf: weekStartDayNumber,
+  boundsOf: (startDayNumber) => ({
+    start: fromDayNumber(startDayNumber),
+    end: fromDayNumber(startDayNumber + 6),
+  }),
+};
+
+export const MONTH_BUCKETING: PeriodBucketing<string> = {
+  keyOf: (isoDate) => isoDate.slice(0, 7),
+  boundsOf: (isoMonth) => ({
+    start: `${isoMonth}-01`,
+    end: `${isoMonth}-${daysInMonth(isoMonth)}`,
+  }),
+};
+
+export const YEAR_BUCKETING: PeriodBucketing<string> = {
+  keyOf: (isoDate) => isoDate.slice(0, 4),
+  boundsOf: (isoYear) => ({
+    start: `${isoYear}-01-01`,
+    end: `${isoYear}-12-31`,
+  }),
+};
+
+export function createPeriodAccumulator<K>(
+  { keyOf, boundsOf }: PeriodBucketing<K>,
+  today = formatDate(new Date()),
 ) {
-  return groupByPeriod(
-    stats,
-    periodLength,
-    addDays,
-    differenceInCalendarDays,
-    (date) => getPeriodStartByDays(date, periodLength),
-  );
+  const grouped = new Map<K, PeriodStat>();
+
+  const add = (isoDate: string, count: number) => {
+    const key = keyOf(isoDate);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.count += count;
+      return;
+    }
+    const bounds = boundsOf(key);
+    if (bounds.start > today) {
+      return;
+    }
+    grouped.set(key, { ...bounds, count: 0 + count });
+  };
+
+  const values = () => [...grouped.values()];
+
+  return { add, values };
 }
 
-export function groupByWeeks<T extends DownloadStat[]>(stats: T) {
-  return groupByPeriod(stats, 1, addWeeks, differenceInCalendarWeeks, (date) =>
-    startOfWeek(date),
-  );
-}
+const groupByBucketing = <K>(
+  stats: DownloadStat[],
+  bucketing: PeriodBucketing<K>,
+) => {
+  const accumulator = createPeriodAccumulator(bucketing);
+  stats.forEach(({ date, count }) => accumulator.add(date, count));
+  return accumulator.values();
+};
 
-export function groupByMonths<T extends DownloadStat>(stats: T[]) {
-  return groupByPeriod(
-    stats,
-    1,
-    addMonths,
-    differenceInCalendarMonths,
-    startOfMonth,
-  );
-}
+export const groupByWeeks = (stats: DownloadStat[]) =>
+  groupByBucketing(stats, WEEK_BUCKETING);
 
-export function groupByYears<T extends DownloadStat>(stats: T[]) {
-  return groupByPeriod(
-    stats,
-    1,
-    addYears,
-    differenceInCalendarYears,
-    startOfYear,
-  );
-}
+export const groupByMonths = (stats: DownloadStat[]) =>
+  groupByBucketing(stats, MONTH_BUCKETING);
 
-export function groupStats<T extends DownloadStat>(stats: T[]) {
+export const groupByYears = (stats: DownloadStat[]) =>
+  groupByBucketing(stats, YEAR_BUCKETING);
+
+export function groupStats(stats: DownloadStat[]) {
   return {
-    byDays: groupByDays(stats, 1),
-    byThreeDays: groupByDays(stats, 3),
     byWeeks: groupByWeeks(stats),
     byMonths: groupByMonths(stats),
     byYears: groupByYears(stats),

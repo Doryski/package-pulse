@@ -5,6 +5,7 @@ import useGithubContributorsCount from "@/lib/queries/useGithubContributorsCount
 import useGithubPullRequestsCount from "@/lib/queries/useGithubPullRequestsCount";
 import useGithubRepoInfo from "@/lib/queries/useGithubRepoInfo";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import AppError from "@/lib/utils/AppError";
 import { renderWithForm } from "@/test/render";
 import { screen, within } from "@testing-library/react";
 import { subDays } from "date-fns";
@@ -67,7 +68,7 @@ const daysAgo = (days: number) => subDays(new Date(), days).toISOString();
 const buildPackageInfo = (projectName: string, overrides: object = {}) => ({
   projectName,
   repoName: `${projectName}/${projectName}`,
-  latestVersion: { version: "18.2.0" },
+  latestVersion: "18.2.0",
   lastReleaseDate: daysAgo(10),
   createdAt: "2013-05-29T00:00:00.000Z",
   contributorsCount: 42,
@@ -76,13 +77,20 @@ const buildPackageInfo = (projectName: string, overrides: object = {}) => ({
   homepage: `https://${projectName}.dev`,
   license: "MIT",
   repositoryUrl: `git+https://github.com/${projectName}/${projectName}.git`,
-  versions: [],
+  latestRelease: null,
   ...overrides,
 });
 
 const success = <T,>(data: T) => ({ data, isLoading: false, isSuccess: true });
 const loading = { data: undefined, isLoading: true, isSuccess: false };
 const idle = { data: undefined, isLoading: false, isSuccess: false };
+const failed = (status: number) => ({
+  data: undefined,
+  isLoading: false,
+  isSuccess: false,
+  isError: true,
+  error: new AppError("failed", { status }),
+});
 
 type HookState = {
   packages: object[];
@@ -97,9 +105,9 @@ const mockHooks = ({
   packages,
   bundles = [],
   depsDev = [],
-  repo = success({ info: { stargazers_count: 1200, open_issues_count: 34 } }),
-  pullRequests = success({ count: 12 }),
-  contributors = success({ count: 99 }),
+  repo = success({ starsCount: 1200, openIssuesCount: 34 }),
+  pullRequests = success(12),
+  contributors = success(99),
 }: HookState) => {
   vi.mocked(usePackagesInfo).mockReturnValue(packages as never);
   vi.mocked(useBundleSize).mockReturnValue(bundles as never);
@@ -164,36 +172,23 @@ describe("ProjectsInfoTable", () => {
     expect(usePackagesInfo).toHaveBeenCalledWith(["react"]);
     expect(useBundleSize).toHaveBeenCalledWith(["react"]);
     expect(useDepsDev).toHaveBeenCalledWith(["react"]);
-    expect(useGithubRepoInfo).toHaveBeenCalledWith("react/react", "react");
-    expect(useGithubPullRequestsCount).toHaveBeenCalledWith(
-      "react/react",
-      "react",
-      true,
-    );
-    expect(useGithubContributorsCount).toHaveBeenCalledWith(
-      "react/react",
-      "react",
-      true,
-    );
+    expect(useGithubRepoInfo).toHaveBeenCalledWith("react/react", undefined);
+    expect(useGithubPullRequestsCount).toHaveBeenCalledWith("react/react");
+    expect(useGithubContributorsCount).toHaveBeenCalledWith("react/react");
   });
 
-  it("disables GitHub counters until repo info is available", () => {
+  it("prefers deps.dev stars and issues over the GitHub fallback", () => {
+    const depsDev = success({ starsCount: 5, openIssuesCount: 6 });
     mockHooks({
       packages: [success(buildPackageInfo("react"))],
+      depsDev: [depsDev],
       repo: idle,
     });
     renderTable(["react"]);
 
-    expect(useGithubPullRequestsCount).toHaveBeenCalledWith(
-      "react/react",
-      "react",
-      false,
-    );
-    expect(useGithubContributorsCount).toHaveBeenCalledWith(
-      "react/react",
-      "react",
-      false,
-    );
+    expect(useGithubRepoInfo).toHaveBeenCalledWith("react/react", depsDev);
+    expect(cell("stars")).toHaveTextContent("5");
+    expect(cell("issues")).toHaveTextContent("6");
   });
 
   it("renders a full row of package info", () => {
@@ -266,12 +261,12 @@ describe("ProjectsInfoTable", () => {
         success(
           buildPackageInfo("bare", {
             repoName: null,
-            lastReleaseDate: undefined,
-            createdAt: undefined,
+            lastReleaseDate: null,
+            createdAt: null,
             dependenciesCount: null,
             devDependenciesCount: null,
             homepage: "javascript:alert(1)",
-            repositoryUrl: undefined,
+            repositoryUrl: null,
           }),
         ),
       ],
@@ -300,17 +295,13 @@ describe("ProjectsInfoTable", () => {
       screen.queryByRole("link", { name: "bare GitHub repository" }),
     ).toBeNull();
     expect(screen.getByRole("link", { name: "bare on npm" })).toBeVisible();
-    expect(useGithubPullRequestsCount).toHaveBeenCalledWith(
-      null,
-      "bare",
-      false,
-    );
+    expect(useGithubPullRequestsCount).toHaveBeenCalledWith(null);
   });
 
   it("renders dashes for bundle sizes that are unknown", () => {
     mockHooks({
       packages: [success(buildPackageInfo("react"))],
-      bundles: [success({ treeShakeable: false })],
+      bundles: [success({ size: null, gzip: null, treeShakeable: false })],
     });
     renderTable();
 
@@ -331,7 +322,10 @@ describe("ProjectsInfoTable", () => {
     renderTable();
 
     cellsOf().forEach((tableCell) => {
-      expect(tableCell.querySelector(".animate-pulse")).not.toBeNull();
+      expect(tableCell.querySelector('[aria-hidden="true"]')).toHaveClass(
+        "h-4",
+        "w-full",
+      );
     });
     expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
@@ -345,12 +339,108 @@ describe("ProjectsInfoTable", () => {
     expect(cell("health")).toHaveTextContent(/^-$/);
   });
 
-  it("renders an empty project name when package data is missing", () => {
+  it("renders the selected name and dashes when package data is missing", () => {
     mockHooks({ packages: [idle], repo: idle });
     renderTable(["ghost"]);
 
-    expect(cell("name")).toHaveTextContent(/^$/);
+    expect(cell("name")).toHaveTextContent(/^ghost$/);
+    expect(cell("contributors")).toHaveTextContent(/^-$/);
+    expect(cell("version")).toHaveTextContent(/^-$/);
+    expect(cell("license")).toHaveTextContent(/^-$/);
     expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("renders a not-found row for packages missing on npm", () => {
+    mockHooks({
+      packages: [failed(404), success(buildPackageInfo("vue"))],
+      repo: idle,
+    });
+    renderTable(["missing-pkg", "vue"]);
+
+    const cells = cellsOf(0);
+    expect(cells).toHaveLength(2);
+    expect(cells[0]).toHaveTextContent(/^missing-pkg$/);
+    expect(cells[1]).toHaveTextContent(/^Not found on npm$/);
+    expect(cells[1]).toHaveAttribute("colspan", String(HEADERS.length - 1));
+    expect(cell("name", 1)).toHaveTextContent(/^vue$/);
+  });
+
+  it.each([
+    [502, "Unavailable"],
+    [500, "Unavailable"],
+    [429, "Unavailable (rate limited)"],
+  ])(
+    "renders dashes with a %i status note in the name cell",
+    (status, note) => {
+      mockHooks({
+        packages: [failed(status)],
+        repo: idle,
+        pullRequests: idle,
+        contributors: idle,
+      });
+      renderTable(["react"]);
+
+      const nameCell = cell("name");
+      expect(within(nameCell).getByText(note)).toHaveClass("sr-only");
+      expect(nameCell).toHaveAttribute("title", note);
+      expect(cell("lastRelease")).toHaveTextContent(/^-$/);
+      expect(cell("version")).toHaveTextContent(/^-$/);
+      expect(cell("deps")).toHaveTextContent("- ( - )");
+      expect(screen.queryByText("Not found on npm")).toBeNull();
+    },
+  );
+
+  it("treats a non-AppError failure as unavailable", () => {
+    mockHooks({
+      packages: [{ ...failed(500), error: new Error("boom") }],
+      repo: idle,
+    });
+    renderTable(["react"]);
+
+    expect(within(cell("name")).getByText("Unavailable")).toHaveClass(
+      "sr-only",
+    );
+  });
+
+  it("gives the sticky name header an opaque background in both themes", () => {
+    mockHooks({ packages: [] });
+    renderTable([]);
+
+    expect(
+      screen.getByRole("columnheader", { name: "Project name" }),
+    ).toHaveClass("sticky", "bg-slate-100", "dark:bg-slate-900");
+  });
+
+  it("requests GitHub counts as soon as the repo name is known", () => {
+    mockHooks({
+      packages: [success(buildPackageInfo("react"))],
+      depsDev: [loading],
+      repo: idle,
+      pullRequests: loading,
+      contributors: loading,
+    });
+    renderTable(["react"]);
+
+    expect(useGithubPullRequestsCount).toHaveBeenCalledWith("react/react");
+    expect(useGithubContributorsCount).toHaveBeenCalledWith("react/react");
+    expect(cell("stars").querySelector('[aria-hidden="true"]')).toHaveClass(
+      "h-4",
+      "w-full",
+    );
+  });
+
+  it("marks the table busy while package info loads", () => {
+    mockHooks({ packages: [loading] });
+    renderTable(["react"]);
+
+    expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("drops aria-busy once package info has loaded", () => {
+    mockHooks({ packages: [success(buildPackageInfo("react"))] });
+    renderTable(["react"]);
+
+    expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy");
   });
 
   it.each([

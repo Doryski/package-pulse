@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
+import * as zm from "zod/mini";
 import AppError from "./AppError";
 import getRequestErrorMessage from "./getRequestErrorMessage";
 
@@ -19,6 +20,13 @@ describe("getRequestErrorMessage", () => {
 
   test("returns default for ZodError", () => {
     const result = z.string().safeParse(1);
+    if (result.success) throw new Error("expected failure");
+
+    expect(getRequestErrorMessage(result.error, fallback)).toBe(fallback);
+  });
+
+  test("returns default for a zod/mini error", () => {
+    const result = zm.safeParse(zm.string(), 1);
     if (result.success) throw new Error("expected failure");
 
     expect(getRequestErrorMessage(result.error, fallback)).toBe(fallback);

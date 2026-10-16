@@ -1,9 +1,12 @@
 import searchNPMRegistry from "@/api/searchNpmRegistry";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import type { NPMPackageSearch } from "@/lib/schemas/npmPackageSearch.schema";
-import { renderWithForm } from "@/test/render";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { createTestQueryClient, renderWithForm } from "@/test/render";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, screen } from "@testing-library/react";
-import { useFormContext } from "react-hook-form";
+import { renderToString } from "react-dom/server";
+import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ComboboxForm from "./combobox-form";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
@@ -48,6 +51,29 @@ const renderComboboxForm = (projects: string[] = []) => {
     { projects },
   );
   return { ...result, onFormSubmit };
+};
+
+function ServerComboboxForm({ projects }: { projects: string[] }) {
+  const form = useForm<ProjectsSearchFormValues>({
+    defaultValues: { search: "", projects },
+  });
+  return (
+    <FormProvider {...form}>
+      <ComboboxForm form={form} onFormSubmit={vi.fn()} />
+    </FormProvider>
+  );
+}
+
+const renderComboboxFormOnServer = (projects: string[]) => {
+  const container = document.createElement("div");
+  container.innerHTML = renderToString(
+    <QueryClientProvider client={createTestQueryClient()}>
+      <TooltipProvider>
+        <ServerComboboxForm projects={projects} />
+      </TooltipProvider>
+    </QueryClientProvider>,
+  );
+  return container;
 };
 
 const getSearchInput = () => screen.getByRole("combobox");
@@ -97,6 +123,21 @@ describe("ComboboxForm", { timeout: 15_000 }, () => {
     expect(form.getValues("projects")).toEqual([]);
   });
 
+  it("tells the user the search is unavailable when the registry fails", async () => {
+    vi.mocked(searchNPMRegistry).mockRejectedValue(new Error("down"));
+    const { user } = renderComboboxForm();
+
+    await user.type(getSearchInput(), "rea");
+
+    expect(
+      await screen.findByText(
+        "Search unavailable, press Enter to add by exact name",
+        undefined,
+        { timeout: 2000 },
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("hides the tag list when nothing is selected", () => {
     renderComboboxForm();
 
@@ -112,6 +153,16 @@ describe("ComboboxForm", { timeout: 15_000 }, () => {
     expect(
       screen.getByRole("button", { name: "Clear All" }),
     ).toBeInTheDocument();
+  });
+
+  it("server-renders the project tags with CSS-variable colours and Clear All", () => {
+    const container = renderComboboxFormOnServer(["react", "vue"]);
+
+    const tags = [...container.querySelectorAll("[role='listitem']")];
+    expect(tags.map((tag) => tag.textContent)).toEqual(["react", "vue"]);
+    expect(tags[0]?.getAttribute("style")).toContain("hsl(var(--chart-1))");
+    expect(tags[1]?.getAttribute("style")).toContain("hsl(var(--chart-2))");
+    expect(container.textContent).toContain("Clear All");
   });
 
   it("removes a single tag", async () => {
@@ -182,5 +233,30 @@ describe("ComboboxForm", { timeout: 15_000 }, () => {
 
     expect(screen.queryByText(/You cannot select more than/)).toBeNull();
     expect(getSearchInput()).toBeEnabled();
+  });
+
+  it("marks selected options and links the input to the listbox", async () => {
+    vi.mocked(searchNPMRegistry).mockResolvedValue([
+      buildSearchItem("react"),
+      buildSearchItem("react-dom"),
+    ]);
+    const { user } = renderComboboxForm(["react"]);
+
+    await user.type(getSearchInput(), "rea");
+    const reactOption = await screen.findByRole(
+      "option",
+      { name: "react" },
+      { timeout: 2000 },
+    );
+
+    expect(reactOption.querySelector("svg")).toHaveClass("opacity-100");
+    expect(
+      screen.getByRole("option", { name: "react-dom" }).querySelector("svg"),
+    ).toHaveClass("opacity-0");
+    expect(getSearchInput()).toHaveAttribute("aria-expanded", "true");
+    expect(getSearchInput()).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("listbox").id,
+    );
   });
 });

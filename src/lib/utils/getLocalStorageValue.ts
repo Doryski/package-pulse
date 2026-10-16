@@ -1,19 +1,22 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
-export default function getLocalStorageValue<T>(
-  key: string,
-  schema: z.ZodType<T>,
-) {
-  if (typeof window === "undefined") {
-    return schema.safeParse(null).data;
-  }
-  const value = localStorage.getItem(key);
-  if (!value) {
-    return schema.safeParse(null).data;
-  }
+const parseValue = <T extends z.core.$ZodType>(schema: T, value: unknown) =>
+  z.safeParse(schema, value).data;
+
+const readJson = (value: string) => {
   try {
-    return schema.safeParse(JSON.parse(value)).data;
+    return JSON.parse(value);
   } catch {
-    return schema.safeParse(null).data;
+    return null;
   }
+};
+
+export default function getLocalStorageValue<T extends z.core.$ZodType>(
+  key: string,
+  schema: T,
+) {
+  if (typeof window === "undefined") return parseValue(schema, null);
+  const value = localStorage.getItem(key);
+  if (!value) return parseValue(schema, null);
+  return parseValue(schema, readJson(value));
 }

@@ -19,7 +19,7 @@ const baseBreakDrop: BreakDropIndicator = {
 function makeRow(overrides: RowOverrides): StatsRow {
   return {
     projectName: overrides.projectName,
-    color: overrides.color,
+    color: overrides.color ?? "hsl(var(--chart-1))",
     weeklyChange: overrides.weeklyChange ?? null,
     monthlyChange: overrides.monthlyChange ?? null,
     yearlyChange: overrides.yearlyChange ?? null,

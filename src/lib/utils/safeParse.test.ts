@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import * as zm from "zod/mini";
 import safeParse from "./safeParse";
 
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -36,5 +37,22 @@ describe("safeParse", () => {
       extra: { schemaName: "TestSchema" },
     });
     expect(JSON.stringify(context)).not.toContain("203.0.113.7");
+  });
+
+  it("parses zod/mini schemas", () => {
+    const mini = zm.object({ n: zm.pipe(zm.string(), zm.transform(Number)) });
+    expect(safeParse({ n: "5" }, mini)).toEqual({ n: 5 });
+  });
+
+  it("reports mini schemas without a description as unknown", () => {
+    const raw = { n: 1 };
+
+    expect(safeParse(raw, zm.object({ n: zm.string() }))).toBe(raw);
+    vi.runAllTimers();
+
+    const [, context] = vi.mocked(Sentry.captureException).mock.calls[0] ?? [];
+    expect(context).toMatchObject({
+      extra: { schemaName: "Unknown schema" },
+    });
   });
 });

@@ -2,7 +2,11 @@ import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import { projectsToComparePath, slugifyTitle } from "@/lib/utils/slug";
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import CategoryPage, { generateMetadata, generateStaticParams } from "./page";
+import CategoryPage, {
+  dynamicParams,
+  generateMetadata,
+  generateStaticParams,
+} from "./page";
 
 const navigationMock = await vi.hoisted(async () => {
   const { createNavigationMock } = await import("@/test/next-navigation");
@@ -31,6 +35,12 @@ describe("generateStaticParams", () => {
       { category: "ui-components" },
       { category: "date-time" },
     ]);
+  });
+});
+
+describe("dynamicParams", () => {
+  it("disables rendering of categories outside generateStaticParams", () => {
+    expect(dynamicParams).toBe(false);
   });
 });
 

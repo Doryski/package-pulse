@@ -5,26 +5,20 @@ import { UseQueryResult } from "@tanstack/react-query";
 export default function prepareChartData(
   stats: UseQueryResult<ProjectStats>[],
 ) {
-  return stats.reduce<ChartData[]>((acc, project) => {
-    if (project.data) {
-      const projectData = project.data.groupedByWeekData;
-      const projectName = project.data.projectName;
+  const rowsByTime = new Map<string, ChartData>();
 
-      projectData.forEach((data) => {
-        const existingData = acc.find((d) => d.time === data.end);
-        if (existingData) {
-          existingData[projectName] = data.count;
-        } else {
-          const newData = {
-            time: data.end,
-            [projectName]: data.count,
-          } as ChartData;
-          acc.push(newData);
-        }
-      });
-    }
-    return acc;
-  }, []);
+  stats.forEach(({ data }) => {
+    if (!data) return;
+    const { groupedByWeekData, projectName } = data;
+
+    groupedByWeekData.forEach(({ end, count }) => {
+      const row = rowsByTime.get(end) ?? ({ time: end } as ChartData);
+      row[projectName] = count;
+      rowsByTime.set(end, row);
+    });
+  });
+
+  return [...rowsByTime.values()];
 }
 
 export function prepareNormalizedChartData(

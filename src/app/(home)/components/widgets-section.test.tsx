@@ -1,7 +1,11 @@
-import type { ProjectStats } from "@/lib/queries/useProjectsStats";
+import { getProjectStatsQueryKey } from "@/lib/queries/keys";
+import type {
+  ProjectStats,
+  ProjectStatsQuery,
+} from "@/lib/queries/useProjectsStats";
 import { copyAsImage, downloadAsImage } from "@/lib/utils/imageExport";
 import { buildProjectStats, buildSuccessQuery } from "@/test/factories";
-import { renderWithProviders } from "@/test/render";
+import { createTestQueryClient, renderWithForm } from "@/test/render";
 import type { QueryObserverPendingResult } from "@tanstack/react-query";
 import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -122,10 +126,40 @@ const createDeferred = () => {
   return { promise, resolve };
 };
 
-const renderSection = (names: string[] = ["react", "vue"]) =>
-  renderWithProviders(
-    <WidgetsSection projectsStats={buildQueries(...names)} />,
+const waitForWidgets = () =>
+  vi.waitFor(() =>
+    expect(
+      document.querySelector(".motion-safe\\:animate-pulse"),
+    ).not.toBeInTheDocument(),
   );
+
+const createSettledQueryClient = (names: string[]) => {
+  const queryClient = createTestQueryClient();
+  names.forEach((name) =>
+    queryClient.setQueryData(
+      getProjectStatsQueryKey(name),
+      buildProjectStats(name),
+    ),
+  );
+  return queryClient;
+};
+
+const renderWidgets = (
+  projectsStats: ProjectStatsQuery[],
+  selectedProjects: string[],
+  settledProjects: string[] = selectedProjects,
+) =>
+  renderWithForm(
+    <WidgetsSection projectsStats={projectsStats} />,
+    { projects: selectedProjects },
+    { queryClient: createSettledQueryClient(settledProjects) },
+  );
+
+const renderSection = async (names: string[] = ["react", "vue"]) => {
+  const result = renderWidgets(buildQueries(...names), names);
+  await waitForWidgets();
+  return result;
+};
 
 describe("WidgetsSection", () => {
   beforeEach(() => {
@@ -133,28 +167,80 @@ describe("WidgetsSection", () => {
     vi.mocked(copyAsImage).mockClear();
   });
 
-  it("renders nothing while any project is loading", () => {
-    renderWithProviders(
-      <WidgetsSection
-        projectsStats={[...buildQueries("react"), buildPendingQuery(true)]}
-      />,
-    );
+  it("renders size-matched skeletons until the widget chunks load", async () => {
+    renderWidgets(buildQueries("react", "vue"), ["react", "vue"]);
 
-    expect(screen.queryByText("Widgets")).not.toBeInTheDocument();
-    expect(screen.queryByText("Stats Cards")).not.toBeInTheDocument();
+    const skeletons = document.querySelectorAll<HTMLElement>(
+      '[aria-hidden="true"]',
+    );
+    const skeletonClasses = Array.from(skeletons, (el) => el.className);
+    expect(skeletonClasses).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("grid-cols-1 gap-4 sm:grid-cols-2"),
+        expect.stringContaining("h-[370px]"),
+        expect.stringContaining("h-100"),
+        expect.stringContaining("space-y-3"),
+      ]),
+    );
+    expect(screen.queryByTestId("pie-chart-stub")).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("pie-chart-stub")).toBeInTheDocument();
+    await waitForWidgets();
+  });
+
+  it("renders busy card skeletons while any selected project is pending", () => {
+    renderWidgets(buildQueries("react"), ["react", "vue"], ["react"]);
+
+    const section = screen.getByTestId("widgets-section");
+    expect(section).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByRole("heading", { name: "Widgets" }),
+    ).toBeInTheDocument();
+    const skeletonCards = screen.getAllByTestId(/^widget-skeleton-/);
+    expect(skeletonCards.map((card) => card.dataset.testid)).toEqual([
+      "widget-skeleton-stats-cards",
+      "widget-skeleton-bar-chart",
+      "widget-skeleton-pie-chart",
+      "widget-skeleton-trend",
+    ]);
+    WIDGET_TITLES.forEach((title) =>
+      expect(screen.getByText(title)).toBeInTheDocument(),
+    );
+    expect(
+      within(screen.getByTestId("widget-skeleton-bar-chart")).getByText(
+        "Bar Chart",
+      ).parentElement?.parentElement?.lastElementChild,
+    ).toHaveClass("h-8", "motion-safe:animate-pulse");
+    const contentClasses = skeletonCards.map(
+      (card) => card.lastElementChild?.firstElementChild?.className,
+    );
+    expect(contentClasses).toEqual([
+      expect.stringContaining("grid-cols-1 gap-4 sm:grid-cols-2"),
+      expect.stringContaining("h-[370px]"),
+      expect.stringContaining("h-100"),
+      expect.stringContaining("space-y-3"),
+    ]);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("drops the busy state once every selected project settled", async () => {
+    await renderSection();
+
+    expect(screen.getByTestId("widgets-section")).not.toHaveAttribute(
+      "aria-busy",
+    );
+    expect(screen.queryAllByTestId(/^widget-skeleton-/)).toHaveLength(0);
   });
 
   it("renders nothing when no project has data", () => {
-    renderWithProviders(
-      <WidgetsSection projectsStats={[buildPendingQuery(false)]} />,
-    );
+    renderWidgets([buildPendingQuery(false)], []);
 
     expect(screen.queryByText("Widgets")).not.toBeInTheDocument();
     expect(screen.queryByText("Stats Cards")).not.toBeInTheDocument();
   });
 
-  it("renders the heading and all four widgets", () => {
-    renderSection();
+  it("renders the heading and all four widgets", async () => {
+    await renderSection();
 
     expect(
       screen.getByRole("heading", { name: "Widgets" }),
@@ -169,7 +255,7 @@ describe("WidgetsSection", () => {
   });
 
   it("toggles the bar chart between growth and downloads", async () => {
-    const { user } = renderSection();
+    const { user } = await renderSection();
     const barCard = within(getWidgetCard("Bar Chart"));
     const downloadsToggle = barCard.getByRole("radio", { name: "Downloads" });
 
@@ -186,7 +272,7 @@ describe("WidgetsSection", () => {
   it("downloads a whole widget and shows a spinner until it finishes", async () => {
     const deferred = createDeferred();
     vi.mocked(downloadAsImage).mockReturnValueOnce(deferred.promise);
-    const { user } = renderSection();
+    const { user } = await renderSection();
     const barCard = getWidgetCard("Bar Chart");
     const downloadButton = within(barCard).getByRole("button", {
       name: "Download widget as PNG",
@@ -199,16 +285,22 @@ describe("WidgetsSection", () => {
       "bar-chart-widget",
     );
     expect(downloadButton).toBeDisabled();
-    expect(barCard.querySelector(".animate-spin")).toBeInTheDocument();
+    const spinner = within(barCard).getByRole("status", {
+      name: "Exporting Bar Chart widget",
+    });
+    expect(spinner).toBe(screen.getByTestId("widget-export-loader-bar-chart"));
+    expect(spinner).toHaveClass("animate-spin", "motion-reduce:animate-none");
 
     deferred.resolve();
 
     await vi.waitFor(() => expect(downloadButton).toBeEnabled());
-    expect(barCard.querySelector(".animate-spin")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("widget-export-loader-bar-chart"),
+    ).not.toBeInTheDocument();
   });
 
   it("copies a whole widget without individual cards", async () => {
-    const { user } = renderSection();
+    const { user } = await renderSection();
 
     await user.click(
       within(getWidgetCard("Pie Chart")).getByRole("button", {
@@ -227,7 +319,7 @@ describe("WidgetsSection", () => {
   ] as const)(
     "downloads and copies the whole %s widget",
     async (title, widgetId) => {
-      const { user } = renderSection();
+      const { user } = await renderSection();
       const card = within(getWidgetCard(title));
 
       await user.click(
@@ -251,7 +343,7 @@ describe("WidgetsSection", () => {
   ] as const)(
     "downloads a single project card from the %s widget",
     async (title, widgetId, testIdPrefix) => {
-      const { user } = renderSection();
+      const { user } = await renderSection();
 
       await user.click(
         within(getWidgetCard(title)).getByRole("button", {
@@ -274,7 +366,7 @@ describe("WidgetsSection", () => {
   ] as const)(
     "copies a single project card from the %s widget",
     async (title, testIdPrefix) => {
-      const { user } = renderSection();
+      const { user } = await renderSection();
 
       await user.click(
         within(getWidgetCard(title)).getByRole("button", {
@@ -290,7 +382,7 @@ describe("WidgetsSection", () => {
   );
 
   it("skips the export when the project card element cannot be found", async () => {
-    const { user } = renderSection(["react", MISSING_CARD_PROJECT]);
+    const { user } = await renderSection(["react", MISSING_CARD_PROJECT]);
     const statsCard = within(getWidgetCard("Stats Cards"));
 
     await user.click(
@@ -307,11 +399,11 @@ describe("WidgetsSection", () => {
   });
 
   it("lists only projects with data in the per-project dropdown", async () => {
-    const { user } = renderWithProviders(
-      <WidgetsSection
-        projectsStats={[...buildQueries("react"), buildPendingQuery(false)]}
-      />,
+    const { user } = renderWidgets(
+      [...buildQueries("react"), buildPendingQuery(false)],
+      ["react"],
     );
+    await waitForWidgets();
 
     await user.click(
       within(getWidgetCard("Trend Indicators")).getByRole("button", {

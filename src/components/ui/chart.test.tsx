@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ComponentProps } from "react";
+import { ComponentProps, ReactElement } from "react";
 import { Line, LineChart } from "recharts";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -9,9 +9,9 @@ import {
   ChartLegendContent,
   ChartStyle,
   ChartTooltipContent,
-  useLineChart as getLineChartStore,
 } from "./chart";
-import type { ChartConfig } from "./line-chart";
+import { getLineChartStore } from "./line-chart-store";
+import type { ChartConfig } from "./line-chart-utils";
 
 vi.mock("recharts", async (importOriginal) => {
   const { mockRecharts } = await import("@/test/recharts");
@@ -37,12 +37,15 @@ const CONFIG = {
 
 let keyCounter = 0;
 
-const setupStore = (config: ChartConfig = CONFIG) => {
+const setupStore = () => {
   keyCounter += 1;
   const chartKey = `chart-test-${keyCounter}`;
-  const store = getLineChartStore(chartKey);
-  act(() => store.getState().setConfig(config));
-  return { chartKey, store };
+  return { chartKey, store: getLineChartStore(chartKey) };
+};
+
+const renderInChart = (ui: ReactElement, config: ChartConfig = CONFIG) => {
+  const result = render(<ChartContainer config={config}>{ui}</ChartContainer>);
+  return { ...result, content: screen.getByTestId("responsive-container") };
 };
 
 const tooltipItem = (overrides: Partial<TooltipPayload[number]> = {}) =>
@@ -57,7 +60,7 @@ const tooltipItem = (overrides: Partial<TooltipPayload[number]> = {}) =>
 
 const renderTooltip = (props: Partial<TooltipProps> = {}) => {
   const { chartKey, store } = setupStore();
-  const result = render(
+  const result = renderInChart(
     <ChartTooltipContent
       chartKey={chartKey}
       active
@@ -132,13 +135,13 @@ describe("ChartContainer", () => {
 
 describe("ChartTooltipContent", () => {
   it("renders nothing when inactive", () => {
-    const { container } = renderTooltip({ active: false });
-    expect(container).toBeEmptyDOMElement();
+    const { content } = renderTooltip({ active: false });
+    expect(content).toBeEmptyDOMElement();
   });
 
   it("renders nothing without payload", () => {
-    const { container } = renderTooltip({ payload: [] });
-    expect(container).toBeEmptyDOMElement();
+    const { content } = renderTooltip({ payload: [] });
+    expect(content).toBeEmptyDOMElement();
   });
 
   it("uses config label for a string label and formats numbers", () => {
@@ -313,16 +316,16 @@ const legendItem = (overrides: Partial<LegendPayload[number]> = {}) =>
 describe("ChartLegendContent", () => {
   it("renders nothing without payload", () => {
     const { chartKey } = setupStore();
-    const { container } = render(
+    const { content } = renderInChart(
       <ChartLegendContent chartKey={chartKey} payload={[]} />,
     );
-    expect(container).toBeEmptyDOMElement();
+    expect(content).toBeEmptyDOMElement();
   });
 
   it("toggles series visibility via aria-pressed buttons", async () => {
     const user = userEvent.setup();
     const { chartKey, store } = setupStore();
-    render(
+    renderInChart(
       <ChartLegendContent
         chartKey={chartKey}
         payload={[legendItem(), legendItem({ dataKey: "vue", value: "vue" })]}
@@ -340,17 +343,17 @@ describe("ChartLegendContent", () => {
 
     await user.click(reactButton);
     expect(reactButton).toHaveAttribute("aria-pressed", "false");
-    expect(store.getState().isHiddenElement("react")).toBe(true);
+    expect(store.getState().hiddenElements.has("react")).toBe(true);
     expect(screen.getByText("React")).toHaveClass("line-through");
 
     await user.click(reactButton);
     expect(reactButton).toHaveAttribute("aria-pressed", "true");
-    expect(store.getState().isHiddenElement("react")).toBe(false);
+    expect(store.getState().hiddenElements.has("react")).toBe(false);
   });
 
   it("uses bottom padding, icons and nameKey", () => {
     const { chartKey } = setupStore();
-    render(
+    renderInChart(
       <ChartLegendContent
         chartKey={chartKey}
         nameKey="value"
@@ -364,7 +367,7 @@ describe("ChartLegendContent", () => {
 
   it("renders a color dot with hideIcon and falls back to the raw value", () => {
     const { chartKey } = setupStore();
-    const { container } = render(
+    const { content } = renderInChart(
       <ChartLegendContent
         chartKey={chartKey}
         hideIcon
@@ -375,19 +378,20 @@ describe("ChartLegendContent", () => {
       />,
     );
     expect(screen.queryByTestId("config-icon")).not.toBeInTheDocument();
-    expect(container.querySelectorAll(".rounded-full")).toHaveLength(2);
+    expect(content.querySelectorAll(".rounded-full")).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: "Toggle unknown series" }),
     ).toBeInTheDocument();
   });
 
   it("omits aria-label for non-string labels", () => {
-    const { chartKey } = setupStore({ node: { label: <em>Node</em> } });
-    render(
+    const { chartKey } = setupStore();
+    renderInChart(
       <ChartLegendContent
         chartKey={chartKey}
         payload={[legendItem({ dataKey: "node", value: undefined })]}
       />,
+      { node: { label: <em>Node</em> } },
     );
     expect(screen.getByRole("button")).not.toHaveAttribute("aria-label");
   });
@@ -416,11 +420,35 @@ describe("ChartDotIndicator", () => {
   });
 });
 
-describe("useLineChart", () => {
-  it("returns the same store for the same key", () => {
-    expect(getLineChartStore("same-key")).toBe(getLineChartStore("same-key"));
-    expect(getLineChartStore("same-key")).not.toBe(
-      getLineChartStore("other-key"),
+describe("chart config context", () => {
+  it("labels tooltip rows and legend items from the ChartContainer config", () => {
+    const { chartKey } = setupStore();
+    renderInChart(
+      <>
+        <ChartTooltipContent
+          chartKey={chartKey}
+          active
+          label="2024-01-01"
+          payload={[tooltipItem({ dataKey: "vue", name: "vue" })]}
+        />
+        <ChartLegendContent chartKey={chartKey} payload={[legendItem()]} />
+      </>,
     );
+    expect(screen.getByText("Vue")).toBeInTheDocument();
+    expect(screen.queryByText("vue")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Toggle React series" }),
+    ).toHaveTextContent("React");
+  });
+
+  it("throws when content is rendered outside ChartContainer", () => {
+    const { chartKey } = setupStore();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      render(
+        <ChartLegendContent chartKey={chartKey} payload={[legendItem()]} />,
+      ),
+    ).toThrow("Chart components must be used within a <ChartContainer />");
+    vi.mocked(console.error).mockRestore();
   });
 });

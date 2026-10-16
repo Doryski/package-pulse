@@ -16,9 +16,14 @@ import { getPeriodStartByDays } from "./getPeriodStartByDays";
 import groupByPeriod, {
   calculatePeriodEndDate,
   calculatePeriodStartDate,
+  createPeriodAccumulator,
   createPeriodKey,
   DownloadStat,
+  groupByMonths,
   groupByWeeks,
+  groupByYears,
+  groupStats,
+  MONTH_BUCKETING,
   PeriodStat,
   updateGroupedStats,
 } from "./groupByPeriod";
@@ -713,5 +718,89 @@ describe("groupByPeriod future period filtering", () => {
     if (result.length > 0) {
       expect(result[0]!.start <= todayString).toBe(true);
     }
+  });
+});
+
+describe("string bucketing", () => {
+  const days = (dates: string[]): DownloadStat[] =>
+    dates.map((date, index) => ({ date, count: index + 1 }));
+
+  it("assigns sundays to the following monday-labelled week", () => {
+    const result = groupByWeeks(
+      days([
+        "2024-01-06",
+        "2024-01-07",
+        "2024-01-08",
+        "2024-01-13",
+        "2024-01-14",
+      ]),
+    );
+
+    expect(result).toEqual([
+      { start: "2024-01-01", end: "2024-01-07", count: 1 },
+      { start: "2024-01-08", end: "2024-01-14", count: 9 },
+      { start: "2024-01-15", end: "2024-01-21", count: 5 },
+    ]);
+  });
+
+  it("buckets months including leap february", () => {
+    expect(
+      groupByMonths(days(["2024-02-01", "2024-02-29", "2024-03-01"])),
+    ).toEqual([
+      { start: "2024-02-01", end: "2024-02-29", count: 3 },
+      { start: "2024-03-01", end: "2024-03-31", count: 3 },
+    ]);
+  });
+
+  it("buckets years", () => {
+    expect(
+      groupByYears(days(["2023-12-31", "2024-01-01", "2024-06-01"])),
+    ).toEqual([
+      { start: "2023-01-01", end: "2023-12-31", count: 1 },
+      { start: "2024-01-01", end: "2024-12-31", count: 5 },
+    ]);
+  });
+
+  it("returns only weekly, monthly and yearly groups from groupStats", () => {
+    expect(Object.keys(groupStats(days(["2024-01-01"])))).toEqual([
+      "byWeeks",
+      "byMonths",
+      "byYears",
+    ]);
+  });
+
+  it("skips buckets starting after the provided today", () => {
+    const accumulator = createPeriodAccumulator(MONTH_BUCKETING, "2024-01-31");
+    accumulator.add("2024-01-31", 2);
+    accumulator.add("2024-02-01", 3);
+
+    expect(accumulator.values()).toEqual([
+      { start: "2024-01-01", end: "2024-01-31", count: 2 },
+    ]);
+  });
+
+  it("matches the date-fns based grouping", () => {
+    const stats = Array.from({ length: 900 }, (_, index) => ({
+      date: formatDate(addDays(new Date(2021, 10, 3), index)),
+      count: (index * 37) % 101,
+    }));
+
+    expect(groupByWeeks(stats)).toEqual(
+      groupByPeriod(stats, 1, addWeeks, differenceInCalendarWeeks, (date) =>
+        startOfWeek(date),
+      ),
+    );
+    expect(groupByMonths(stats)).toEqual(
+      groupByPeriod(
+        stats,
+        1,
+        addMonths,
+        differenceInCalendarMonths,
+        startOfMonth,
+      ),
+    );
+    expect(groupByYears(stats)).toEqual(
+      groupByPeriod(stats, 1, addYears, differenceInCalendarYears, startOfYear),
+    );
   });
 });

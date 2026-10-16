@@ -11,7 +11,7 @@ const SVG_CONTENT_TYPE = "image/svg+xml";
 const BADGE_CACHE_CONTROL =
   "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
 const DOWNLOADS_CACHE_CONTROL =
-  "public, s-maxage=3600, stale-while-revalidate=86400";
+  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
 const INVALID_BODY_ERROR = `Invalid request body. Projects array required (1-${LIMIT} package names).`;
 
 const tooManyPackages = Array.from(
@@ -170,6 +170,26 @@ test.describe("GET /api/downloads", () => {
       finalConcurrency: expect.any(Number),
     });
     expect(body.stats.requestCount).toBeGreaterThan(0);
+  });
+
+  test("returns compact series without stats for v=2", async ({ api }) => {
+    const known = "e2e-api-downloads-v2";
+    const missing = "missing-e2e-api-downloads-v2";
+    const response = await api.get(
+      `/api/downloads?v=2&packages=${packagesQuery([known, missing])}`,
+    );
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toBe(DOWNLOADS_CACHE_CONTROL);
+    const body = await response.json();
+    expect(Object.keys(body).sort()).toEqual(["data", "errors"]);
+    expect(body.data[known]).toEqual({
+      start: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      counts: expect.any(Array),
+    });
+    expect(body.data[known].counts.length).toBeGreaterThan(0);
+    expect(body.data[missing]).toBeNull();
+    expect(body.errors).toEqual({});
   });
 
   test("reports a not found error for a single unknown package", async ({

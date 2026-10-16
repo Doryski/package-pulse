@@ -47,6 +47,16 @@ describe("ClientOnly", () => {
       ),
     ).toBe("");
   });
+
+  test("renders the fallback during server rendering", () => {
+    expect(
+      renderToString(
+        <ClientOnly fallback={<span>placeholder</span>}>
+          <span>mounted</span>
+        </ClientOnly>,
+      ),
+    ).toBe("<span>placeholder</span>");
+  });
 });
 
 describe("Dash", () => {
@@ -61,6 +71,16 @@ describe("PulsatingDotIndicator", () => {
     const { container } = render(<PulsatingDotIndicator color="red" />);
     expect(container.querySelector(".animate-pulse-dot")).toBeInTheDocument();
     expect(container.querySelector(".animate-pulse-ring")).toBeInTheDocument();
+  });
+
+  test("stops pulsing under prefers-reduced-motion", () => {
+    const { container } = render(<PulsatingDotIndicator color="red" />);
+    expect(container.querySelector(".animate-pulse-dot")).toHaveClass(
+      "motion-reduce:animate-none",
+    );
+    expect(container.querySelector(".animate-pulse-ring")).toHaveClass(
+      "motion-reduce:animate-none",
+    );
   });
 
   test("renders static dot when inactive", () => {

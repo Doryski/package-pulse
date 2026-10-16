@@ -1,8 +1,13 @@
 "use client";
 
 import useLatestComparisons from "@/lib/queries/useLatestComparisons";
-import { GlobalComparison } from "@/lib/types/global-comparison";
-import ComparisonCard, { ComparisonCardSkeleton } from "./comparison-card";
+import { memo, useCallback } from "react";
+import ComparisonCard from "./comparison-card";
+import ComparisonsFeedSection, {
+  ComparisonsFeedSkeleton,
+} from "./comparisons-feed-section";
+
+const TITLE = "Latest Searches or Comparisons";
 
 type LatestComparisonsProps = {
   selectedProjects: string[];
@@ -13,43 +18,39 @@ const LatestComparisons = ({
   selectedProjects,
   onAddMultipleProjects,
 }: LatestComparisonsProps) => {
-  const latestComparisons = useLatestComparisons();
+  const hasSelection = selectedProjects.length > 0;
+  const latestComparisons = useLatestComparisons({ enabled: !hasSelection });
 
-  if (selectedProjects.length > 0) {
-    return null;
+  const handleProjectsClick = useCallback(
+    (projects: string[]) => {
+      if (projects.length === 0) return;
+      onAddMultipleProjects(projects);
+    },
+    [onAddMultipleProjects],
+  );
+
+  if (hasSelection) return null;
+
+  if (latestComparisons.isLoading) {
+    return <ComparisonsFeedSkeleton title={TITLE} projectCount={2} />;
   }
 
-  const handleComparisonClick = (comparison: GlobalComparison) => {
-    if (comparison.projects.length > 0) {
-      onAddMultipleProjects(comparison.projects);
-    }
-  };
+  const comparisons = latestComparisons.data?.comparisons;
 
-  if (latestComparisons.error || !latestComparisons.data?.comparisons.length) {
-    return null;
-  }
+  if (latestComparisons.error || !comparisons?.length) return null;
 
   return (
-    <section className="mt-6">
-      <h2 className="mb-4 text-lg font-semibold">
-        Latest Searches or Comparisons
-      </h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {latestComparisons.isLoading
-          ? [...Array(6)].map((_, index) => (
-              <ComparisonCardSkeleton key={index} projectCount={2} />
-            ))
-          : latestComparisons.data?.comparisons.map((comparison) => (
-              <ComparisonCard
-                key={comparison.id}
-                projects={comparison.projects}
-                onProjectsClick={() => handleComparisonClick(comparison)}
-                title={""}
-              />
-            ))}
-      </div>
-    </section>
+    <ComparisonsFeedSection title={TITLE}>
+      {comparisons.map((comparison) => (
+        <ComparisonCard
+          key={comparison.id}
+          projects={comparison.projects}
+          onProjectsClick={handleProjectsClick}
+          title=""
+        />
+      ))}
+    </ComparisonsFeedSection>
   );
 };
 
-export default LatestComparisons;
+export default memo(LatestComparisons);

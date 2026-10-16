@@ -1,6 +1,6 @@
 import { renderWithProviders } from "@/test/render";
 import { act, screen, within } from "@testing-library/react";
-import { cloneElement, isValidElement, ReactNode } from "react";
+import { cloneElement, ComponentProps, isValidElement, ReactNode } from "react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { exportCsv } from "@/lib/utils/exportUtils";
@@ -10,8 +10,8 @@ import MultipleLineChart, {
   ChartData,
   LastReleasesList,
   NormalizedChartData,
-  useLineChart as getLineChartStore,
 } from "./line-chart";
+import { getLineChartStore } from "./line-chart-store";
 import { getSeriesKeys } from "./line-chart-utils";
 
 const navigationMock = await vi.hoisted(async () => {
@@ -38,14 +38,23 @@ function TooltipStub({ content }: ContentProps) {
   return cloneElement(content, {
     active: true,
     payload: TOOLTIP_PAYLOAD,
-    label: "2024-01-08",
+    label: "2024-01-07",
   });
 }
+
+const lineSpy = vi.hoisted(() =>
+  vi.fn<(props: { dataKey?: unknown; isAnimationActive?: unknown }) => void>(),
+);
 
 vi.mock("recharts", async (importOriginal) => {
   const { mockRecharts } = await import("@/test/recharts");
   const mocked = await mockRecharts(importOriginal);
-  return { ...mocked, Tooltip: TooltipStub };
+  const { Line } = mocked;
+  function LineSpy(props: ComponentProps<typeof Line>) {
+    lineSpy(props);
+    return <Line {...props} />;
+  }
+  return { ...mocked, Line: LineSpy, Tooltip: TooltipStub };
 });
 
 vi.mock("sonner", () => ({
@@ -85,8 +94,8 @@ const toChartData = (time: string, series: Record<string, number>) =>
   );
 
 const DATA = [
-  toChartData("2024-01-01", { react: 100, vue: 0 }),
-  toChartData("2024-01-08", { react: 200, vue: 50 }),
+  toChartData("2023-12-31", { react: 100, vue: 0 }),
+  toChartData("2024-01-07", { react: 200, vue: 50 }),
 ];
 
 const NORMALIZED_DATA: NormalizedChartData[] = [
@@ -98,10 +107,7 @@ const CONFIG: ChartConfig = {
   react: {
     label: "React",
     color: "red",
-    versions: [
-      { version: "18.2.0", date: "2024-01-03" },
-      { version: "18.10.0", date: "2024-01-09" },
-    ],
+    latestRelease: { version: "18.10.0", date: "2024-01-05" },
   },
   vue: { label: "Vue", color: "green" },
 };
@@ -114,7 +120,6 @@ const renderChart = (
   keyCounter += 1;
   const chartKey = `line-chart-test-${keyCounter}`;
   const store = getLineChartStore(chartKey);
-  act(() => store.getState().setConfig(CONFIG));
   const result = renderWithProviders(
     <MultipleLineChart
       chartKey={chartKey}
@@ -150,6 +155,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -163,12 +169,55 @@ describe("MultipleLineChart", () => {
       screen.getByRole("button", { name: "Toggle React series" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Last release date")).toBeInTheDocument();
-    expect(screen.getAllByText("2024-01-08").length).toBeGreaterThan(1);
-    expect(screen.getByText("18.10.0 (2024-01-09)")).toBeInTheDocument();
+    expect(screen.getAllByText("2024-01-07").length).toBeGreaterThan(1);
+    expect(screen.getByText("18.10.0 (2024-01-05)")).toBeInTheDocument();
     expect(
       container.querySelector(".recharts-reference-line"),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("main-chart-loader")).not.toBeInTheDocument();
+  });
+
+  it("skips the release line when the release is newer than the plotted weeks", () => {
+    const { container } = renderChart({
+      config: {
+        ...CONFIG,
+        react: {
+          ...CONFIG.react,
+          latestRelease: { version: "19.0.0", date: "2024-02-01" },
+        },
+      },
+    });
+
+    expect(
+      container.querySelector(".recharts-reference-line"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("labels the tooltip rows from the chart config instead of raw keys", () => {
+    renderChart();
+    expect(screen.getAllByText("React").length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText("react")).not.toBeInTheDocument();
+  });
+
+  it("renders lines without animation", () => {
+    renderChart();
+    expect(lineSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ dataKey: "react", isAnimationActive: false }),
+    );
+    expect(lineSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ dataKey: "vue", isAnimationActive: false }),
+    );
+  });
+
+  it("filters the time period against the date captured on mount", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2024-01-20T00:00:00Z"));
+    const { user } = renderChart();
+    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "1 month" }));
+    await clickShareItem(user, "Export CSV");
+    expect(exportCsv).toHaveBeenCalledWith(expect.any(String), DATA);
   });
 
   it("hides the wrapper when there is no data", () => {
@@ -183,9 +232,10 @@ describe("MultipleLineChart", () => {
     await user.click(getToggle("Logarithmic"));
     expect(getToggle("Logarithmic")).toHaveAttribute("aria-checked", "true");
     expect(localStorage.getItem("pp:chart-scale")).toBe('"logarithmic"');
-    expect(navigationMock.router.replace).toHaveBeenLastCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
       "/?scale=logarithmic",
-      { scroll: false },
     );
 
     await user.click(getToggle("Logarithmic"));
@@ -220,9 +270,10 @@ describe("MultipleLineChart", () => {
     await user.click(await screen.findByRole("option", { name: "1 month" }));
     expect(screen.getByRole("combobox")).toHaveTextContent("1 month");
     expect(localStorage.getItem("pp:time-period")).toBe('"months-1"');
-    expect(navigationMock.router.replace).toHaveBeenLastCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
       "/?period=months-1",
-      { scroll: false },
     );
   });
 
@@ -266,7 +317,7 @@ describe("MultipleLineChart", () => {
     await user.click(
       screen.getByRole("button", { name: "Toggle React series" }),
     );
-    expect(store.getState().isHiddenElement("react")).toBe(true);
+    expect(store.getState().hiddenElements.has("react")).toBe(true);
     expect(
       container.querySelector(".recharts-reference-line"),
     ).not.toBeInTheDocument();
@@ -345,9 +396,11 @@ describe("MultipleLineChart", () => {
       resolve = done;
     });
     await user.click(getToggle("Since first release"));
-    expect(await screen.findByTestId("main-chart-loader")).toHaveAttribute(
-      "aria-label",
-      "Updating chart",
+    const loader = await screen.findByTestId("main-chart-loader");
+    expect(loader).toHaveAttribute("aria-label", "Updating chart");
+    expect(loader.firstElementChild).toHaveClass(
+      "animate-spin",
+      "motion-reduce:animate-none",
     );
 
     suspension.promise = null;
@@ -369,7 +422,7 @@ describe("LastReleasesList", () => {
     );
     expect(screen.getByText("Last releases")).toBeInTheDocument();
     expect(screen.getByText("React")).toBeInTheDocument();
-    expect(screen.getByText("18.10.0 (2024-01-09)")).toBeInTheDocument();
+    expect(screen.getByText("18.10.0 (2024-01-05)")).toBeInTheDocument();
     expect(screen.getByText("solid")).toBeInTheDocument();
     expect(screen.getByText("-")).toBeInTheDocument();
   });

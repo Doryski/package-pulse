@@ -2,6 +2,7 @@ import useProjectsStats from "@/lib/queries/useProjectsStats";
 import { buildProjectStats, buildSuccessQuery } from "@/test/factories";
 import { renderWithForm } from "@/test/render";
 import { screen } from "@testing-library/react";
+import { use } from "react";
 import { useFormContext } from "react-hook-form";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ChartSection from "./chart-section";
@@ -62,6 +63,28 @@ describe("StatsSection", () => {
     expect(lastPropsOf(ChartSection)).toEqual({ projectStats: stats });
     expect(lastPropsOf(TableSection)).toEqual({ projectsStats: stats });
     expect(lastPropsOf(WidgetsSection)).toEqual({ projectsStats: stats });
+  });
+
+  it("shows an aria-busy chart skeleton while the chart suspends", () => {
+    const pending = new Promise<never>(() => {});
+    vi.mocked(ChartSection).mockImplementation(() => {
+      use(pending);
+      return null;
+    });
+
+    renderWithForm(<StatsSectionHost />);
+
+    const skeleton = screen.getByTestId("main-chart-skeleton");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(skeleton).toHaveClass("mt-4", "size-full", "md:mt-8", "lg:mt-16");
+    expect(skeleton.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(skeleton.firstElementChild).toHaveClass(
+      "aspect-square",
+      "max-h-[450px]",
+      "w-full",
+      "sm:aspect-video",
+    );
+    expect(screen.getByTestId("table-section")).toBeInTheDocument();
   });
 
   it("exposes a display name for devtools", () => {

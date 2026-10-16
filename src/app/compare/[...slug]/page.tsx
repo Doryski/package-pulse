@@ -1,5 +1,6 @@
 import HomeShell from "@/app/(home)/components/home-shell";
-import Loading from "@/app/(home)/loading";
+import prefetchCompareStats from "@/lib/server/prefetchCompareStats";
+import { formatProjectsList } from "@/lib/utils/projectsLabel";
 import {
   projectsToComparePath,
   projectsToSlug,
@@ -8,20 +9,22 @@ import {
 import StructuredData from "@/components/seo/structured-data";
 import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import type { Metadata } from "next";
+import {
+  dehydrate,
+  HydrationBoundary,
+  QueryClient,
+} from "@tanstack/react-query";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 const baseUrl = "https://www.package-pulse.com";
 
 export const dynamicParams = true;
 
+export const revalidate = 3600;
+
 type ComparePageProps = {
   params: Promise<{ slug: string[] }>;
 };
-
-function formatProjectsList(projects: string[]): string {
-  return projects.join(" vs ");
-}
 
 async function getProjectsFromParams(params: ComparePageProps["params"]) {
   const { slug } = await params;
@@ -86,6 +89,8 @@ export default async function ComparePage({ params }: ComparePageProps) {
   if (projects.length === 0) notFound();
 
   const projectsLabel = formatProjectsList(projects);
+  const queryClient = new QueryClient();
+  await prefetchCompareStats(queryClient, projects);
 
   return (
     <>
@@ -95,9 +100,13 @@ export default async function ComparePage({ params }: ComparePageProps) {
         description={`Compare npm download trends and statistics for ${projectsLabel} with interactive charts on Package Pulse.`}
         url={`${baseUrl}${projectsToComparePath(projects)}`}
       />
-      <Suspense fallback={<Loading />}>
-        <HomeShell initialProjects={projects} persistSelection={false} />
-      </Suspense>
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <HomeShell
+          initialProjects={projects}
+          persistSelection={false}
+          selectionHeading
+        />
+      </HydrationBoundary>
     </>
   );
 }

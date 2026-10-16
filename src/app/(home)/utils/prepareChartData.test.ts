@@ -9,7 +9,6 @@ const makeQuery = (projectName: string, counts: number[]) =>
   ({
     data: {
       projectName,
-      rawSortedData: [],
       groupedByWeekData: counts.map((count, index) => ({
         start: `2024-01-${String(index + 1).padStart(2, "0")}`,
         end: `2024-01-${String(index + 1).padStart(2, "0")}`,
@@ -75,6 +74,26 @@ describe("prepareChartData", () => {
       { time: "2024-01-01", react: 1, vue: 10 },
       { time: "2024-01-02", react: 2, vue: 20 },
       { time: "2024-01-03", vue: 30 },
+    ]);
+  });
+
+  it("keeps first-seen row order when a later series adds new weeks", () => {
+    const late = {
+      data: {
+        projectName: "solid",
+        groupedByWeekData: [
+          { start: "2023-12-25", end: "2023-12-25", count: 7 },
+          { start: "2024-01-01", end: "2024-01-01", count: 8 },
+        ],
+      },
+    } as unknown as UseQueryResult<ProjectStats>;
+
+    const rows = prepareChartData([makeQuery("react", [1, 2]), late]);
+
+    expect(rows).toEqual([
+      { time: "2024-01-01", react: 1, solid: 8 },
+      { time: "2024-01-02", react: 2 },
+      { time: "2023-12-25", solid: 7 },
     ]);
   });
 

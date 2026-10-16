@@ -1,5 +1,5 @@
 import StructuredData from "@/components/seo/structured-data";
-import { Toaster } from "@/components/ui/sonner";
+import LazyToaster from "@/components/ui/lazy-toaster";
 import { cn } from "@/lib/utils/cn";
 import { Analytics } from "@vercel/analytics/next";
 import { Viewport } from "next";
@@ -102,7 +102,7 @@ export default function RootLayout({
             <main className="relative flex grow flex-col">{children}</main>
             <Footer />
           </div>
-          <Toaster />
+          <LazyToaster />
         </Providers>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>

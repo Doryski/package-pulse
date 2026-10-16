@@ -1,6 +1,5 @@
 import Tag from "@/components/ui/tag";
-import getChartColor from "@/lib/utils/getChartColor";
-import { useTheme } from "next-themes";
+import { getChartColorVar } from "@/lib/utils/getChartColor";
 import { FieldError } from "react-hook-form";
 
 type ProjectTagProps = {
@@ -16,8 +15,7 @@ const ProjectTag = ({
   onRemove,
   colorIndex,
 }: ProjectTagProps) => {
-  const { resolvedTheme } = useTheme();
-  const color = getChartColor(resolvedTheme, colorIndex);
+  const color = getChartColorVar(colorIndex);
 
   return (
     <Tag

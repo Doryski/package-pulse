@@ -1,21 +1,22 @@
-import { UseQueryResult } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
 import { ProjectStats } from "@/lib/queries/useProjectsStats";
-import { DownloadStat, groupByWeeks } from "@/lib/utils/groupByPeriod";
+import type { ProjectStatsSummary } from "@/lib/stats/buildProjectStats";
+import { calculateBreakDrop } from "@/lib/utils/calculateBreakDrop";
+import { buildProjectStats, buildSuccessQuery } from "@/test/factories";
+import { UseQueryResult } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 import getStatsMatrix from "./getStatsMatrix";
 
-function makeQuery(
-  projectName: string,
-  rawSortedData: DownloadStat[],
-): UseQueryResult<ProjectStats> {
-  return {
-    data: {
-      projectName,
-      rawSortedData,
-      groupedByWeekData: groupByWeeks(rawSortedData).slice(0, -1),
-    },
-  } as UseQueryResult<ProjectStats>;
-}
+vi.mock("@/lib/utils/calculateBreakDrop", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/utils/calculateBreakDrop")>();
+  return { ...actual, calculateBreakDrop: vi.fn(actual.calculateBreakDrop) };
+});
+
+const period = (start: string, end: string, count: number) => ({
+  start,
+  end,
+  count,
+});
 
 const insufficientBreakDrop = {
   christmasDropPercentage: 0,
@@ -23,21 +24,51 @@ const insufficientBreakDrop = {
   corporateUsageScore: 0,
   corporateUsageLevel: "very_low",
   hasEnoughData: false,
+} as const;
+
+const EMPTY_SUMMARY: ProjectStatsSummary = {
+  recentFullWeek: undefined,
+  previousFullWeek: undefined,
+  recentFullMonth: undefined,
+  previousFullMonth: undefined,
+  recentFullYear: undefined,
+  previousFullYear: undefined,
+  lastYearsReferenceWeek: undefined,
+  lastYearsReferenceMonth: undefined,
+  vibeCodingEraReferenceWeek: undefined,
+  breakDropIndicator: insufficientBreakDrop,
+  latestDownloads: 0,
+  peakDownloads: 0,
 };
 
-const comprehensiveData: DownloadStat[] = [
-  { date: "2024-05-06", count: 10 },
-  { date: "2024-11-04", count: 20 },
-  { date: "2025-03-19", count: 30 },
-  { date: "2025-05-05", count: 40 },
-  { date: "2025-11-03", count: 50 },
-  { date: "2026-05-04", count: 60 },
-  { date: "2026-06-01", count: 70 },
-];
+const FULL_SUMMARY: ProjectStatsSummary = {
+  ...EMPTY_SUMMARY,
+  recentFullWeek: period("2026-05-04", "2026-05-10", 60),
+  previousFullWeek: period("2026-04-27", "2026-05-03", 50),
+  recentFullMonth: period("2026-05-01", "2026-05-31", 60),
+  previousFullMonth: period("2026-04-01", "2026-04-30", 50),
+  recentFullYear: period("2025-01-01", "2025-12-31", 120),
+  previousFullYear: period("2024-01-01", "2024-12-31", 30),
+  lastYearsReferenceWeek: period("2025-05-05", "2025-05-11", 40),
+  lastYearsReferenceMonth: period("2025-05-01", "2025-05-31", 40),
+  vibeCodingEraReferenceWeek: period("2025-03-17", "2025-03-23", 30),
+};
+
+const makeQuery = (
+  projectName: string,
+  summary: ProjectStatsSummary = FULL_SUMMARY,
+) =>
+  buildSuccessQuery<ProjectStats>({
+    projectName,
+    groupedByWeekData: [],
+    summary,
+  });
+
+const pendingQuery = { data: undefined } as UseQueryResult<ProjectStats>;
 
 describe("getStatsMatrix", () => {
   it("returns empty stats and undefined dates for empty input", () => {
-    const result = getStatsMatrix([], undefined);
+    const result = getStatsMatrix([]);
 
     expect(result.stats).toEqual([]);
     expect(result.dates).toEqual({
@@ -53,159 +84,85 @@ describe("getStatsMatrix", () => {
     });
   });
 
-  it("skips queries without data", () => {
-    const result = getStatsMatrix(
-      [
-        { data: undefined } as UseQueryResult<ProjectStats>,
-        makeQuery("skip-single", [{ date: "2026-06-01", count: 5 }]),
-      ],
-      undefined,
-    );
+  it("skips queries without data but keeps their color slot", () => {
+    const result = getStatsMatrix([pendingQuery, makeQuery("second")]);
 
     expect(result.stats).toHaveLength(1);
-    expect(result.stats[0]?.projectName).toBe("skip-single");
+    expect(result.stats[0]).toMatchObject({
+      projectName: "second",
+      color: "hsl(var(--chart-2))",
+    });
   });
 
-  it("computes exact StatChange values for all metrics", () => {
-    const result = getStatsMatrix(
-      [makeQuery("comprehensive", comprehensiveData)],
-      undefined,
-    );
-    const row = result.stats[0]!;
-
-    expect(row.projectName).toBe("comprehensive");
+  it("computes exact StatChange values from the summary", () => {
+    const row = getStatsMatrix([makeQuery("comprehensive")]).stats[0]!;
 
     expect(row.weeklyChange?.nominal).toBe(10);
     expect(row.weeklyChange?.percentage).toBeCloseTo(20, 10);
-
     expect(row.monthlyChange?.nominal).toBe(10);
     expect(row.monthlyChange?.percentage).toBeCloseTo(20, 10);
-
     expect(row.yearlyChange).toEqual({ nominal: 90, percentage: 300 });
-
     expect(row.yoyWeekChange).toEqual({ nominal: 20, percentage: 50 });
     expect(row.yoyMonthChange).toEqual({ nominal: 20, percentage: 50 });
-
     expect(row.vibeCodingEraChange).toEqual({ nominal: 30, percentage: 100 });
+    expect(row.breakDropIndicator).toEqual(insufficientBreakDrop);
+  });
+
+  it("returns null changes when summary periods are missing", () => {
+    const row = getStatsMatrix([makeQuery("insufficient", EMPTY_SUMMARY)])
+      .stats[0]!;
+
+    expect(row).toMatchObject({
+      weeklyChange: null,
+      monthlyChange: null,
+      yearlyChange: null,
+      yoyWeekChange: null,
+      yoyMonthChange: null,
+      vibeCodingEraChange: null,
+    });
   });
 
   it("collects reference dates from the first eligible package", () => {
-    const result = getStatsMatrix(
-      [makeQuery("comprehensive-dates", comprehensiveData)],
-      undefined,
-    );
+    const result = getStatsMatrix([
+      makeQuery("short", {
+        ...EMPTY_SUMMARY,
+        recentFullWeek: period("2026-06-01", "2026-06-07", 1),
+      }),
+      makeQuery("eligible"),
+    ]);
 
-    expect(result.dates.recentFullWeek).toEqual({
-      start: "2026-05-04",
-      end: "2026-05-10",
-      count: 60,
-    });
-    expect(result.dates.previousFullWeek).toEqual({
-      start: "2025-11-03",
-      end: "2025-11-09",
-      count: 50,
-    });
-    expect(result.dates.recentFullMonth).toEqual({
-      start: "2026-05-01",
-      end: "2026-05-31",
-      count: 60,
-    });
-    expect(result.dates.previousFullMonth).toEqual({
-      start: "2025-11-01",
-      end: "2025-11-30",
-      count: 50,
-    });
-    expect(result.dates.recentFullYear).toEqual({
-      start: "2025-01-01",
-      end: "2025-12-31",
-      count: 120,
-    });
-    expect(result.dates.previousFullYear).toEqual({
-      start: "2024-01-01",
-      end: "2024-12-31",
-      count: 30,
-    });
-    expect(result.dates.lastYearsReferenceWeek).toEqual({
-      start: "2025-05-05",
-      end: "2025-05-11",
-      count: 40,
-    });
-    expect(result.dates.lastYearsReferenceMonth).toEqual({
-      start: "2025-05-01",
-      end: "2025-05-31",
-      count: 40,
-    });
-    expect(result.dates.vibeCodingEraReferenceWeek).toEqual({
-      start: "2025-03-17",
-      end: "2025-03-23",
-      count: 30,
+    expect(result.dates).toEqual({
+      recentFullWeek: FULL_SUMMARY.recentFullWeek,
+      previousFullWeek: FULL_SUMMARY.previousFullWeek,
+      recentFullMonth: FULL_SUMMARY.recentFullMonth,
+      previousFullMonth: FULL_SUMMARY.previousFullMonth,
+      recentFullYear: FULL_SUMMARY.recentFullYear,
+      previousFullYear: FULL_SUMMARY.previousFullYear,
+      lastYearsReferenceWeek: FULL_SUMMARY.lastYearsReferenceWeek,
+      lastYearsReferenceMonth: FULL_SUMMARY.lastYearsReferenceMonth,
+      vibeCodingEraReferenceWeek: FULL_SUMMARY.vibeCodingEraReferenceWeek,
     });
   });
 
-  it("returns null changes for a package with insufficient data", () => {
-    const result = getStatsMatrix(
-      [
-        makeQuery("insufficient", [
-          { date: "2026-06-01", count: 10 },
-          { date: "2026-06-02", count: 20 },
-        ]),
-      ],
-      undefined,
-    );
-    const row = result.stats[0]!;
+  it("assigns theme-independent CSS variable colors per index", () => {
+    const result = getStatsMatrix([makeQuery("a"), makeQuery("b")]);
 
-    expect(row.weeklyChange).toBeNull();
-    expect(row.monthlyChange).toBeNull();
-    expect(row.yearlyChange).toBeNull();
-    expect(row.yoyWeekChange).toBeNull();
-    expect(row.yoyMonthChange).toBeNull();
-    expect(row.vibeCodingEraChange).toBeNull();
-
-    expect(result.dates.recentFullWeek).toBeUndefined();
-    expect(result.dates.vibeCodingEraReferenceWeek).toBeUndefined();
+    expect(result.stats.map((row) => row.color)).toEqual([
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+    ]);
   });
 
-  it("wires breakDropIndicator from calculateBreakDrop", () => {
-    const result = getStatsMatrix(
-      [makeQuery("breakdrop-insufficient", comprehensiveData)],
-      undefined,
+  it("never recomputes the break-drop indicator for 10 packages", () => {
+    const queries = Array.from({ length: 10 }, (_, index) =>
+      buildSuccessQuery(buildProjectStats(`pkg-${index}`, { days: 400 })),
     );
+    vi.mocked(calculateBreakDrop).mockClear();
 
-    expect(result.stats[0]?.breakDropIndicator).toEqual(insufficientBreakDrop);
-  });
+    const first = getStatsMatrix(queries);
+    const second = getStatsMatrix(queries);
 
-  it("assigns colors per index for a known theme", () => {
-    const result = getStatsMatrix(
-      [
-        makeQuery("colored-a", comprehensiveData),
-        makeQuery("colored-b", comprehensiveData),
-      ],
-      "light",
-    );
-
-    expect(result.stats).toHaveLength(2);
-    expect(result.stats[0]?.color).not.toBe(result.stats[1]?.color);
-  });
-
-  it("returns the cached row for identical repeated input", () => {
-    const query = makeQuery("cache-hit", comprehensiveData);
-
-    const first = getStatsMatrix([query], "light");
-    const second = getStatsMatrix([query], "light");
-
-    expect(second.stats[0]).toBe(first.stats[0]);
-  });
-
-  it("evicts old cache entries beyond the limit and still computes correctly", () => {
-    const queries = Array.from({ length: 120 }, (_, index) =>
-      makeQuery(`evict-${index}`, comprehensiveData),
-    );
-
-    const first = getStatsMatrix(queries, undefined);
-    const second = getStatsMatrix(queries, undefined);
-
-    expect(second.stats).toHaveLength(120);
-    expect(second.stats[0]).not.toBe(first.stats[0]);
-    expect(second.stats[0]?.yearlyChange).toEqual(first.stats[0]?.yearlyChange);
+    expect(calculateBreakDrop).not.toHaveBeenCalled();
+    expect(second).toEqual(first);
   });
 });

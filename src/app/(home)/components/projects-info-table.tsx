@@ -1,4 +1,4 @@
-import { fetchPackageInfo } from "@/api/fetchPackageInfo";
+import type { PackageInfo } from "@/api/packageData";
 import Loader from "@/components/loader";
 import { SimpleTooltip } from "@/components/simple-tooltip";
 import PulsatingDotIndicator from "@/components/ui/PulsatingDotIndicator";
@@ -18,23 +18,26 @@ import useBundleSize from "@/lib/queries/useBundleSize";
 import useDepsDev from "@/lib/queries/useDepsDev";
 import useGithubRepoInfo from "@/lib/queries/useGithubRepoInfo";
 import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import { isAppError } from "@/lib/utils/AppError";
 import { formatLargeNumber } from "@/lib/utils/formatters";
 import { round } from "@/lib/utils/math";
 import safeExternalUrl from "@/lib/utils/safeExternalUrl";
-import { GitHubLogoIcon, HomeIcon } from "@radix-ui/react-icons";
+import { GithubIcon } from "@/components/icons/brand-icons";
+import { House } from "lucide-react";
 import { UseQueryResult } from "@tanstack/react-query";
 import { differenceInDays, formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import { memo } from "react";
-import { useFormContext } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import { formatDate } from "../utils/date-utils";
+import { ProjectNameCell } from "./project-name-cell";
 import { ProjectsSearchFormValues } from "./projects-form/schema";
-import { ProjectNameCell } from "./projects-stats-table";
+import { STICKY_HEAD_CLASS_NAME } from "./stats-table-columns";
 
 const getNpmLink = (projectName: string) =>
   `https://www.npmjs.com/package/${projectName}`;
 
-const getPulsatingDotIndicatorColor = (lastReleaseDate: string | undefined) => {
+const getPulsatingDotIndicatorColor = (lastReleaseDate: string | null) => {
   if (!lastReleaseDate) return "gray";
   const diff = differenceInDays(new Date(), new Date(lastReleaseDate));
   if (diff < 90) return "green";
@@ -43,16 +46,16 @@ const getPulsatingDotIndicatorColor = (lastReleaseDate: string | undefined) => {
   return "red";
 };
 
-const getVulnSeverityColor = (count: number | undefined) => {
-  if (count === undefined) return "gray";
+const getVulnSeverityColor = (count: number | null | undefined) => {
+  if (count === null || count === undefined) return "gray";
   if (count === 0) return "green";
   if (count <= 2) return "yellow";
   if (count <= 5) return "orange";
   return "red";
 };
 
-const getHealthScoreColor = (score: number | undefined) => {
-  if (score === undefined) return "gray";
+const getHealthScoreColor = (score: number | null | undefined) => {
+  if (score === null || score === undefined) return "gray";
   if (score >= 8) return "green";
   if (score >= 6) return "yellow";
   if (score >= 4) return "orange";
@@ -62,23 +65,76 @@ const getHealthScoreColor = (score: number | undefined) => {
 const getTreeShakeableColor = (treeShakeable: boolean) =>
   treeShakeable ? "green" : "gray";
 
-const formatBundleBytes = (bytes: number | undefined) =>
-  bytes === undefined ? " - " : `${formatLargeNumber(bytes)}B`;
+const formatBundleBytes = (bytes: number | null) =>
+  bytes === null ? " - " : `${formatLargeNumber(bytes)}B`;
+
+const HTTP_STATUS = {
+  notFound: 404,
+  tooManyRequests: 429,
+} as const;
+
+const ROW_STATUS = {
+  loading: "loading",
+  ready: "ready",
+  notFound: "notFound",
+  unavailable: "unavailable",
+  rateLimited: "rateLimited",
+} as const;
+
+type RowStatus = (typeof ROW_STATUS)[keyof typeof ROW_STATUS];
+
+const ROW_STATUS_NOTES = {
+  unavailable: "Unavailable",
+  rateLimited: "Unavailable (rate limited)",
+} as const satisfies Partial<Record<RowStatus, string>>;
+
+const NOT_FOUND_TEXT = "Not found on npm";
+
+const INFO_COLUMN_COUNT = 15;
+
+const STATUS_BY_HTTP_STATUS = new Map<number | undefined, RowStatus>([
+  [HTTP_STATUS.notFound, ROW_STATUS.notFound],
+  [HTTP_STATUS.tooManyRequests, ROW_STATUS.rateLimited],
+]);
+
+type PackageInfoQuery = UseQueryResult<PackageInfo, Error>;
+
+const getErrorStatus = (error: Error | null) =>
+  isAppError(error) ? error.status : undefined;
+
+const getRowStatus = (query: PackageInfoQuery | undefined): RowStatus => {
+  if (query?.isLoading) return ROW_STATUS.loading;
+  if (!query?.isError) return ROW_STATUS.ready;
+  return (
+    STATUS_BY_HTTP_STATUS.get(getErrorStatus(query.error)) ??
+    ROW_STATUS.unavailable
+  );
+};
+
+const getRowStatusNote = (status: RowStatus) => {
+  if (status === ROW_STATUS.unavailable || status === ROW_STATUS.rateLimited) {
+    return ROW_STATUS_NOTES[status];
+  }
+  return undefined;
+};
+
+const CellSkeleton = () => <Skeleton aria-hidden className="h-4 w-full" />;
 
 const ProjectsInfoTable = memo(() => {
-  const form = useFormContext<ProjectsSearchFormValues>();
-  const selectedProjects = form.watch("projects");
+  const selectedProjects = useWatch<ProjectsSearchFormValues, "projects">({
+    name: "projects",
+  });
   const packagesInfo = usePackagesInfo(selectedProjects);
   const bundleSizeResults = useBundleSize(selectedProjects);
   const depsDevResults = useDepsDev(selectedProjects);
 
   return (
-    <Table>
+    <Table
+      aria-busy={packagesInfo.some((query) => query.isLoading) || undefined}
+    >
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky left-0 z-20 w-25 min-w-25 md:w-50 md:min-w-[150px]">
-            Project name
-          </TableHead>
+          <TableHead className={STICKY_HEAD_CLASS_NAME}>Project name</TableHead>
           <TableHead className="text-center">Last Release</TableHead>
           <TableHead className="text-center">Created</TableHead>
           <TableHead className="text-center">Stars</TableHead>
@@ -129,10 +185,11 @@ const ProjectsInfoTable = memo(() => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {packagesInfo.map((npmPackage, index) => (
+        {selectedProjects.map((projectName, index) => (
           <ProjectInfoRow
-            key={`${npmPackage.data?.projectName}-${index}`}
-            npmPackage={npmPackage}
+            key={projectName}
+            projectName={projectName}
+            npmPackage={packagesInfo[index]}
             index={index}
             bundleSize={bundleSizeResults[index]}
             depsDev={depsDevResults[index]}
@@ -151,65 +208,99 @@ type BundleSizeResult = ReturnType<typeof useBundleSize>[number];
 type DepsDevResult = ReturnType<typeof useDepsDev>[number];
 
 type ProjectInfoRowProps = {
-  npmPackage: UseQueryResult<
-    Awaited<ReturnType<typeof fetchPackageInfo>>,
-    Error
-  >;
+  projectName: string;
+  npmPackage?: PackageInfoQuery;
   index: number;
   bundleSize?: BundleSizeResult;
   depsDev?: DepsDevResult;
 };
 
 const ProjectInfoRow = memo(
-  ({ npmPackage, index, bundleSize, depsDev }: ProjectInfoRowProps) => {
-    const githubRepo = useGithubRepoInfo(
-      npmPackage.data?.repoName!,
-      npmPackage.data?.projectName!,
+  ({
+    projectName,
+    npmPackage,
+    index,
+    bundleSize,
+    depsDev,
+  }: ProjectInfoRowProps) => {
+    const status = getRowStatus(npmPackage);
+    if (status === ROW_STATUS.notFound) {
+      return (
+        <TableRow>
+          <ProjectNameCell projectName={projectName} index={index} />
+          <TableCell colSpan={INFO_COLUMN_COUNT - 1}>
+            {NOT_FOUND_TEXT}
+          </TableCell>
+        </TableRow>
+      );
+    }
+    return (
+      <ProjectInfoDataRow
+        projectName={projectName}
+        npmPackage={npmPackage}
+        index={index}
+        bundleSize={bundleSize}
+        depsDev={depsDev}
+        note={getRowStatusNote(status)}
+      />
     );
+  },
+);
 
-    const githubPullRequestsCount = useGithubPullRequestsCount(
-      npmPackage.data?.repoName!,
-      npmPackage.data?.projectName!,
-      !!npmPackage.data?.repoName && !!githubRepo.data,
-    );
+ProjectInfoRow.displayName = "ProjectInfoRow";
 
-    const githubContributorsCount = useGithubContributorsCount(
-      npmPackage.data?.repoName!,
-      npmPackage.data?.projectName!,
-      !!npmPackage.data?.repoName && !!githubRepo.data,
-    );
+type ProjectInfoDataRowProps = ProjectInfoRowProps & { note?: string };
 
-    const projectName = npmPackage.data?.projectName ?? "";
-    const homepageUrl = safeExternalUrl(npmPackage.data?.homepage);
-    const repositoryUrl = safeExternalUrl(npmPackage.data?.repositoryUrl);
+const ProjectInfoDataRow = memo(
+  ({
+    projectName,
+    npmPackage,
+    index,
+    bundleSize,
+    depsDev,
+    note,
+  }: ProjectInfoDataRowProps) => {
+    const isInfoLoading = !!npmPackage?.isLoading;
+    const packageInfo = npmPackage?.data;
+    const repoName = packageInfo?.repoName;
+    const githubRepo = useGithubRepoInfo(repoName, depsDev);
+    const githubPullRequestsCount = useGithubPullRequestsCount(repoName);
+    const githubContributorsCount = useGithubContributorsCount(repoName);
+    const isRepoStatsLoading = !!depsDev?.isLoading || githubRepo.isLoading;
+    const starsCount = depsDev?.data?.starsCount ?? githubRepo.data?.starsCount;
+    const openIssuesCount =
+      depsDev?.data?.openIssuesCount ?? githubRepo.data?.openIssuesCount;
+
+    const homepageUrl = safeExternalUrl(packageInfo?.homepage);
+    const repositoryUrl = safeExternalUrl(packageInfo?.repositoryUrl);
 
     return (
-      <TableRow key={`${npmPackage.data?.projectName}-${index}`}>
+      <TableRow>
         <ProjectNameCell
-          isLoading={npmPackage.isLoading}
-          projectName={npmPackage.data?.projectName ?? ""}
+          projectName={projectName}
           index={index}
-        />
+          isLoading={isInfoLoading}
+          title={note}
+        >
+          {note && <span className="sr-only">{note}</span>}
+        </ProjectNameCell>
         <TableCell className="flex items-center justify-between gap-1 text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
             <div className="text-right">
-              {npmPackage.data?.lastReleaseDate ? (
+              {packageInfo?.lastReleaseDate ? (
                 <>
                   <div className="flex items-center gap-1">
                     <PulsatingDotIndicator
-                      active={!!npmPackage.data?.lastReleaseDate}
+                      active={!!packageInfo?.lastReleaseDate}
                       color={getPulsatingDotIndicatorColor(
-                        npmPackage.data?.lastReleaseDate,
+                        packageInfo?.lastReleaseDate,
                       )}
                     />
                     <span className="text-nowrap">
-                      {formatDate(npmPackage.data.lastReleaseDate)}
+                      {formatDate(packageInfo.lastReleaseDate)}
                     </span>
                   </div>
-                  <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.lastReleaseDate)} ago)`}</span>
+                  <span className="text-nowrap">{`(${formatDistanceToNow(packageInfo.lastReleaseDate)} ago)`}</span>
                 </>
               ) : (
                 "-"
@@ -218,17 +309,14 @@ const ProjectInfoRow = memo(
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {npmPackage.data?.createdAt ? (
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
+            {packageInfo?.createdAt ? (
               <>
                 <span className="text-nowrap">
-                  {formatDate(npmPackage.data.createdAt)}
+                  {formatDate(packageInfo.createdAt)}
                 </span>
                 <br />
-                <span className="text-nowrap">{`(${formatDistanceToNow(npmPackage.data.createdAt)} ago)`}</span>
+                <span className="text-nowrap">{`(${formatDistanceToNow(packageInfo.createdAt)} ago)`}</span>
               </>
             ) : (
               "-"
@@ -236,71 +324,56 @@ const ProjectInfoRow = memo(
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader isLoading={githubRepo.isLoading} fallback={<Skeleton />}>
-            {githubRepo?.data?.info?.stargazers_count ?? " - "}
+          <Loader isLoading={isRepoStatsLoading} fallback={<CellSkeleton />}>
+            {starsCount ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={githubRepo.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {githubRepo?.data?.info?.open_issues_count ?? " - "}
+          <Loader isLoading={isRepoStatsLoading} fallback={<CellSkeleton />}>
+            {openIssuesCount ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
           <Loader
             isLoading={githubPullRequestsCount.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
+            fallback={<CellSkeleton />}
           >
-            {githubPullRequestsCount?.data?.count ?? " - "}
+            {githubPullRequestsCount.data ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
           <Loader
             isLoading={githubContributorsCount.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
+            fallback={<CellSkeleton />}
           >
-            {githubContributorsCount?.data?.count ?? " - "}
+            {githubContributorsCount.data ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {npmPackage.data?.contributorsCount}
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
+            {packageInfo?.contributorsCount ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {npmPackage.data?.dependenciesCount ?? " - "} (
-            {npmPackage.data?.devDependenciesCount ?? " - "})
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
+            {packageInfo?.dependenciesCount ?? " - "} (
+            {packageInfo?.devDependenciesCount ?? " - "})
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {npmPackage.data?.latestVersion?.version}
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
+            {packageInfo?.latestVersion ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
-            {npmPackage.data?.license}
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
+            {packageInfo?.license ?? " - "}
           </Loader>
         </TableCell>
         <TableCell className="text-center">
           <Loader
             isLoading={bundleSize?.isLoading ?? false}
-            fallback={<Skeleton className="h-4 w-full" />}
+            fallback={<CellSkeleton />}
           >
             {bundleSize?.data ? (
               <div className="flex flex-col items-center gap-1">
@@ -338,7 +411,7 @@ const ProjectInfoRow = memo(
         <TableCell className="text-center">
           <Loader
             isLoading={depsDev?.isLoading ?? false}
-            fallback={<Skeleton className="h-4 w-full" />}
+            fallback={<CellSkeleton />}
           >
             <div className="flex items-center justify-center gap-1">
               <PulsatingDotIndicator
@@ -352,7 +425,7 @@ const ProjectInfoRow = memo(
         <TableCell className="text-center">
           <Loader
             isLoading={depsDev?.isLoading ?? false}
-            fallback={<Skeleton className="h-4 w-full" />}
+            fallback={<CellSkeleton />}
           >
             <div className="flex items-center justify-center gap-1">
               <PulsatingDotIndicator
@@ -360,7 +433,7 @@ const ProjectInfoRow = memo(
                 color={getHealthScoreColor(depsDev?.data?.healthScore)}
               />
               <span className="text-nowrap">
-                {depsDev?.data?.healthScore !== undefined
+                {typeof depsDev?.data?.healthScore === "number"
                   ? `${round(depsDev.data.healthScore, 1)} / 10`
                   : " - "}
               </span>
@@ -368,10 +441,7 @@ const ProjectInfoRow = memo(
           </Loader>
         </TableCell>
         <TableCell>
-          <Loader
-            isLoading={npmPackage.isLoading}
-            fallback={<Skeleton className="h-4 w-full" />}
-          >
+          <Loader isLoading={isInfoLoading} fallback={<CellSkeleton />}>
             <div className="flex items-center gap-2">
               {homepageUrl && (
                 <SimpleTooltip content={<span>Homepage</span>}>
@@ -380,14 +450,14 @@ const ProjectInfoRow = memo(
                     outside
                     aria-label={`${projectName} homepage`}
                   >
-                    <HomeIcon className="size-5" />
+                    <House className="size-5" />
                   </TextLink>
                 </SimpleTooltip>
               )}
-              {npmPackage.data?.projectName && (
+              {packageInfo?.projectName && (
                 <SimpleTooltip content={<span>NPM package site</span>}>
                   <TextLink
-                    href={getNpmLink(npmPackage.data?.projectName)}
+                    href={getNpmLink(packageInfo.projectName)}
                     outside
                     aria-label={`${projectName} on npm`}
                   >
@@ -409,7 +479,7 @@ const ProjectInfoRow = memo(
                     className="text-white"
                     aria-label={`${projectName} GitHub repository`}
                   >
-                    <GitHubLogoIcon className="size-5" />
+                    <GithubIcon className="size-5" />
                   </TextLink>
                 </SimpleTooltip>
               )}
@@ -421,4 +491,4 @@ const ProjectInfoRow = memo(
   },
 );
 
-ProjectInfoRow.displayName = "ProjectInfoRow";
+ProjectInfoDataRow.displayName = "ProjectInfoDataRow";

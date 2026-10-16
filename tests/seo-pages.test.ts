@@ -31,6 +31,32 @@ test.describe("compare pages", () => {
       .toMatch(/\/compare\/react-vs-vue$/);
   });
 
+  test("renders the selection H1 without hydration errors", async ({
+    page,
+  }) => {
+    const hydrationErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() !== "error") return;
+      if (/hydrat/i.test(message.text())) hydrationErrors.push(message.text());
+    });
+    page.on("pageerror", (error) => {
+      if (/hydrat/i.test(error.message)) hydrationErrors.push(error.message);
+    });
+
+    await page.goto("/compare/react-vs-vue");
+
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "react vs vue npm downloads",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid='main-chart'] .recharts-wrapper"),
+    ).toBeVisible();
+    expect(hydrationErrors).toEqual([]);
+  });
+
   test("invalid slug returns 404", async ({ page }) => {
     const response = await page.goto("/compare/%21%21%21");
     expect(response?.status()).toBe(404);
@@ -127,6 +153,29 @@ test.describe("home empty state", () => {
       page.getByRole("heading", { name: "How Package Pulse Works" }),
     ).toBeVisible();
     await expect(page.getByTestId("main-chart")).toBeHidden();
+  });
+
+  test("restores the saved selection without overwriting it", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.evaluate(
+      (key) => localStorage.setItem(key, JSON.stringify(["zod", "yup"])),
+      SELECTED_PROJECTS_KEY,
+    );
+
+    await page.goto("/");
+
+    await expect(tag(page, "zod")).toBeVisible();
+    await expect(tag(page, "yup")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "How Package Pulse Works" }),
+    ).toBeHidden();
+    const stored = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      SELECTED_PROJECTS_KEY,
+    );
+    expect(JSON.parse(stored ?? "null")).toEqual(["zod", "yup"]);
   });
 });
 

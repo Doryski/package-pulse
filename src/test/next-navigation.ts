@@ -28,6 +28,23 @@ function createRouter() {
   };
 }
 
+function toUrl(pathname: string, searchParams: URLSearchParams) {
+  const query = searchParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+function createReplaceStateSpy() {
+  const nativeReplaceState = window.history.replaceState.bind(window.history);
+  const replaceState = vi.fn((...args: Parameters<History["replaceState"]>) =>
+    nativeReplaceState(...args),
+  );
+  window.history.replaceState = replaceState;
+
+  const setUrl = (url: string) => nativeReplaceState(null, "", url);
+
+  return { replaceState, setUrl };
+}
+
 export function createNavigationMock({
   pathname = "/",
   searchParams = "",
@@ -37,20 +54,28 @@ export function createNavigationMock({
     searchParams: new URLSearchParams(searchParams),
   };
   const router = createRouter();
+  const { replaceState, setUrl } = createReplaceStateSpy();
+
+  const syncWindowUrl = () => setUrl(toUrl(state.pathname, state.searchParams));
 
   const setPathname = (nextPathname: string) => {
     state.pathname = nextPathname;
+    syncWindowUrl();
   };
 
   const setSearchParams = (init: SearchParamsInit) => {
     state.searchParams = new URLSearchParams(init);
+    syncWindowUrl();
   };
 
   const reset = () => {
     setPathname(pathname);
     setSearchParams(searchParams);
     Object.values(router).forEach((fn) => fn.mockReset());
+    replaceState.mockClear();
   };
+
+  syncWindowUrl();
 
   return {
     useRouter: vi.fn(() => router),
@@ -78,6 +103,7 @@ export function createNavigationMock({
     ),
     RedirectType: REDIRECT_TYPES,
     router,
+    replaceState,
     setPathname,
     setSearchParams,
     reset,

@@ -2,25 +2,32 @@ import getStatsMatrix, {
   GetStatsMatrixResult,
   StatsRow,
 } from "@/app/(home)/utils/getStatsMatrix";
+import {
+  loadBundleSize,
+  loadDepsDev,
+  loadPackageInfo,
+} from "@/api/packageData";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
-import useBundleSize from "@/lib/queries/useBundleSize";
-import useDepsDev from "@/lib/queries/useDepsDev";
-import usePackagesInfo from "@/lib/queries/usePackagesInfo";
+import { getProjectStatsQueryKey } from "@/lib/queries/keys";
+import AppError from "@/lib/utils/AppError";
 import { exportCsv, exportJson } from "@/lib/utils/exportUtils";
 import {
   buildProjectStats,
   buildSuccessQuery,
   FIXED_TIMESTAMP,
 } from "@/test/factories";
-import { renderWithForm } from "@/test/render";
-import { screen, within } from "@testing-library/react";
+import { createTestQueryClient, renderWithForm } from "@/test/render";
+import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { statsTableColumns } from "./stats-table-columns";
 import TableSection from "./table-section";
 
 vi.mock("@/app/(home)/utils/getStatsMatrix", () => ({ default: vi.fn() }));
-vi.mock("@/lib/queries/usePackagesInfo");
-vi.mock("@/lib/queries/useBundleSize");
-vi.mock("@/lib/queries/useDepsDev");
+vi.mock("@/api/packageData", () => ({
+  loadPackageInfo: vi.fn(),
+  loadBundleSize: vi.fn(),
+  loadDepsDev: vi.fn(),
+}));
 vi.mock("@/lib/utils/exportUtils", () => ({
   exportCsv: vi.fn(),
   exportJson: vi.fn(),
@@ -93,7 +100,7 @@ const ROWS = [
 const PACKAGE_INFO = {
   projectName: "beta",
   repoName: "org/beta",
-  latestVersion: { version: "2.0.0" },
+  latestVersion: "2.0.0",
   lastReleaseDate: "2024-01-10",
   contributorsCount: 4,
   dependenciesCount: 1,
@@ -103,38 +110,89 @@ const PACKAGE_INFO = {
   repositoryUrl: "https://github.com/org/beta",
   description: "Beta package",
   createdAt: "2020-01-01",
-  versions: [],
+  latestRelease: null,
 };
 
 const projectsStats = PROJECTS.map((name) =>
   buildSuccessQuery(buildProjectStats(name)),
 );
 
-const success = <T,>(data: T) => ({ data, isSuccess: true, isLoading: false });
+const PACKAGE_INFO_BY_NAME = new Map<string, object>([
+  ["beta", PACKAGE_INFO],
+  ["gamma", { ...PACKAGE_INFO, projectName: "gamma", license: "MIT, ISC" }],
+]);
+
+const BUNDLE_SIZE_BY_SPEC = new Map<string, object>([
+  [
+    "beta@2.0.0",
+    { size: 1000, gzip: 400, treeShakeable: true, dependencyCount: 3 },
+  ],
+]);
+
+const DEPS_DEV_BY_NAME = new Map<string, object>([
+  ["beta", { vulnerabilityCount: 1, healthScore: 7, licenses: ["MIT"] }],
+  ["alpha", { vulnerabilityCount: 0, licenses: "MIT" }],
+]);
+
+const resolveFrom = (source: Map<string, object>, key: string) => {
+  const value = source.get(key);
+  if (!value) return Promise.reject(new AppError("missing", { status: 404 }));
+  return Promise.resolve(value as never);
+};
 
 const mockSources = () => {
   vi.mocked(getStatsMatrix).mockReturnValue({
     stats: ROWS,
     dates: EMPTY_DATES,
   });
-  vi.mocked(usePackagesInfo).mockReturnValue([
-    success(PACKAGE_INFO),
-    { data: { ...PACKAGE_INFO, projectName: "alpha" }, isSuccess: false },
-    success({ ...PACKAGE_INFO, projectName: "gamma", license: ["MIT", "ISC"] }),
-  ] as never);
-  vi.mocked(useBundleSize).mockReturnValue([
-    success({ size: 1000, gzip: 400, treeShakeable: true, dependencyCount: 3 }),
-    success(null),
-  ] as never);
-  vi.mocked(useDepsDev).mockReturnValue([
-    success({ vulnerabilityCount: 1, healthScore: 7, licenses: ["MIT"] }),
-    success({ vulnerabilityCount: 0, licenses: "MIT" }),
-  ] as never);
+  vi.mocked(loadPackageInfo).mockImplementation((name) =>
+    resolveFrom(PACKAGE_INFO_BY_NAME, name),
+  );
+  vi.mocked(loadBundleSize).mockImplementation((name, version) =>
+    resolveFrom(BUNDLE_SIZE_BY_SPEC, `${name}@${version}`),
+  );
+  vi.mocked(loadDepsDev).mockImplementation((name) =>
+    resolveFrom(DEPS_DEV_BY_NAME, name),
+  );
 };
 
-const renderSection = (stats: object[] = projectsStats) =>
-  renderWithForm(<TableSection projectsStats={stats as never} />, {
-    projects: [...PROJECTS],
+const renderSection = (
+  stats: object[] = projectsStats,
+  projects: string[] = [...PROJECTS],
+  queryClient = createTestQueryClient(),
+) =>
+  renderWithForm(
+    <TableSection projectsStats={stats as never} />,
+    { projects },
+    { queryClient },
+  );
+
+const settleStats = (
+  queryClient: ReturnType<typeof createTestQueryClient>,
+  names: readonly string[],
+) =>
+  Promise.all(
+    names.map((name) =>
+      queryClient
+        .prefetchQuery({
+          queryKey: getProjectStatsQueryKey(name),
+          queryFn: () => Promise.reject(new Error("failed")),
+        })
+        .catch(() => undefined),
+    ),
+  );
+
+const expectNoPackageDataRequests = () => {
+  expect(loadPackageInfo).not.toHaveBeenCalled();
+  expect(loadBundleSize).not.toHaveBeenCalled();
+  expect(loadDepsDev).not.toHaveBeenCalled();
+};
+
+const lastExportRows = (exporter: typeof exportCsv | typeof exportJson) =>
+  waitFor(() => {
+    const rows = vi.mocked(exporter).mock.lastCall?.[1];
+    if (!rows) throw new Error("export not called yet");
+    return rows;
   });
 
 const tableRowNames = () =>
@@ -143,14 +201,12 @@ const tableRowNames = () =>
     .slice(1)
     .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
 
-const exportedNames = (exporter: typeof exportCsv) =>
-  vi
-    .mocked(exporter)
-    .mock.lastCall?.[1].map((row) =>
-      row && typeof row === "object" && "projectName" in row
-        ? row.projectName
-        : undefined,
-    );
+const exportedNames = async (exporter: typeof exportCsv | typeof exportJson) =>
+  (await lastExportRows(exporter)).map((row) =>
+    row && typeof row === "object" && "projectName" in row
+      ? row.projectName
+      : undefined,
+  );
 
 const header = (name: string) =>
   screen.getByRole("columnheader", { name: new RegExp(`^${name}`) });
@@ -167,25 +223,110 @@ describe("TableSection", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows a loading message while any project is loading", () => {
-    renderSection([...projectsStats, { isLoading: true }]);
+  it("renders a skeleton table with real headers while stats are pending", () => {
+    renderSection([]);
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
-    expect(screen.queryByRole("table")).toBeNull();
+    const section = screen.getByRole("heading", {
+      name: "Downloads by project",
+    }).parentElement?.parentElement;
+    expect(section).not.toHaveClass("hidden");
+    expect(section).toHaveAttribute("aria-busy", "true");
+    const skeleton = screen.getByTestId("stats-table-skeleton");
+    expect(
+      within(skeleton)
+        .getAllByRole("columnheader")
+        .map((head) => head.textContent),
+    ).toEqual(statsTableColumns.map(({ label }) => label));
+    expect(within(skeleton).getAllByRole("columnheader")[0]).toHaveClass(
+      "sticky",
+      "bg-slate-100",
+      "dark:bg-slate-900",
+    );
+    const rows = within(skeleton).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(PROJECTS.length);
+    expect(within(rows[0]!).getAllByRole("cell")[0]).toHaveClass("sticky");
+    expect(skeleton.querySelectorAll('[aria-hidden="true"]').length).toBe(
+      PROJECTS.length * 8,
+    );
+    expect(screen.getByRole("button", { name: "CSV" })).toBeDisabled();
   });
 
-  it("is hidden when there are no projects", () => {
+  it("shows skeleton rows only for packages still pending", async () => {
+    const queryClient = createTestQueryClient();
+    await settleStats(queryClient, ["beta"]);
+    renderSection([], [...PROJECTS], queryClient);
+
+    const skeleton = screen.getByTestId("stats-table-skeleton");
+    expect(within(skeleton).getAllByRole("row").slice(1)).toHaveLength(2);
+  });
+
+  it("is hidden when no project is selected", () => {
     vi.mocked(getStatsMatrix).mockReturnValue({
       stats: [],
       dates: EMPTY_DATES,
     });
-    renderSection([]);
+    renderSection([], []);
 
     const heading = screen.getByRole("heading", {
       name: "Downloads by project",
       hidden: true,
     });
     expect(heading.parentElement?.parentElement).toHaveClass("hidden");
+    expect(heading.parentElement?.parentElement).not.toHaveAttribute(
+      "aria-busy",
+    );
+  });
+
+  it("is hidden when every stats query failed", async () => {
+    const queryClient = createTestQueryClient();
+    await settleStats(queryClient, PROJECTS);
+    renderSection([], [...PROJECTS], queryClient);
+
+    const heading = screen.getByRole("heading", {
+      name: "Downloads by project",
+      hidden: true,
+    });
+    expect(heading.parentElement?.parentElement).toHaveClass("hidden");
+    expect(screen.queryByTestId("stats-table-skeleton")).toBeNull();
+  });
+
+  it("requests no package info, bundle size or deps.dev data until export", async () => {
+    const { user } = renderSection();
+
+    await user.click(header("Project name"));
+    await user.click(screen.getByRole("radio", { name: "Toggle info" }));
+    await user.click(screen.getByRole("radio", { name: "Toggle stats" }));
+    expectNoPackageDataRequests();
+
+    await user.click(screen.getByRole("button", { name: "CSV" }));
+    await lastExportRows(exportCsv);
+
+    expect(loadPackageInfo).toHaveBeenCalledTimes(PROJECTS.length);
+    expect(loadDepsDev).toHaveBeenCalledTimes(PROJECTS.length);
+    expect(loadBundleSize).toHaveBeenCalledWith(
+      "beta",
+      "2.0.0",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("reuses cached package data on repeated exports", async () => {
+    const { user } = renderSection();
+
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    await lastExportRows(exportJson);
+    await user.click(screen.getByRole("button", { name: "CSV" }));
+    await lastExportRows(exportCsv);
+
+    const callsFor = (calls: unknown[][], name: string) =>
+      calls.filter(([called]) => called === name);
+    expect(
+      callsFor(vi.mocked(loadPackageInfo).mock.calls, "beta"),
+    ).toHaveLength(1);
+    expect(callsFor(vi.mocked(loadDepsDev).mock.calls, "beta")).toHaveLength(1);
+    expect(callsFor(vi.mocked(loadBundleSize).mock.calls, "beta")).toHaveLength(
+      1,
+    );
   });
 
   it("is visible with projects and defaults to the stats table", () => {
@@ -280,12 +421,13 @@ describe("TableSection", () => {
     const { user } = renderSection();
 
     await user.click(screen.getByRole("button", { name: "CSV" }));
+    await lastExportRows(exportCsv);
 
     expect(exportCsv).toHaveBeenCalledWith(
       `package-pulse-${FIXED_TIMESTAMP}`,
       expect.any(Array),
     );
-    expect(exportedNames(exportCsv)).toEqual(tableRowNames());
+    expect(await exportedNames(exportCsv)).toEqual(tableRowNames());
     expect(exportJson).not.toHaveBeenCalled();
   });
 
@@ -300,13 +442,13 @@ describe("TableSection", () => {
       await user.click(header("Project name"));
       await user.click(header("Project name"));
       await user.click(screen.getByRole("button", { name: button }));
-      expect(exportedNames(exporter)).toEqual(["alpha", "beta", "gamma"]);
-      expect(exportedNames(exporter)).toEqual(tableRowNames());
+      expect(await exportedNames(exporter)).toEqual(["alpha", "beta", "gamma"]);
+      expect(await exportedNames(exporter)).toEqual(tableRowNames());
 
       await user.click(header("YoY Month"));
       await user.click(screen.getByRole("button", { name: button }));
-      expect(exportedNames(exporter)).toEqual(["gamma", "beta", "alpha"]);
-      expect(exportedNames(exporter)).toEqual(tableRowNames());
+      expect(await exportedNames(exporter)).toEqual(["gamma", "beta", "alpha"]);
+      expect(await exportedNames(exporter)).toEqual(tableRowNames());
     },
   );
 
@@ -314,6 +456,7 @@ describe("TableSection", () => {
     const { user } = renderSection();
 
     await user.click(screen.getByRole("button", { name: "JSON" }));
+    await lastExportRows(exportJson);
 
     expect(exportJson).toHaveBeenCalledWith(
       `package-pulse-${FIXED_TIMESTAMP}`,
@@ -327,7 +470,7 @@ describe("TableSection", () => {
 
     await user.click(screen.getByRole("button", { name: "JSON" }));
 
-    const rows = vi.mocked(exportJson).mock.lastCall?.[1];
+    const rows = await lastExportRows(exportJson);
     expect(rows).toEqual([
       {
         projectName: "gamma",
@@ -413,16 +556,17 @@ describe("TableSection", () => {
   });
 
   it("exports nulls for projects missing every optional source", async () => {
-    vi.mocked(usePackagesInfo).mockReturnValue([
-      success({ ...PACKAGE_INFO, latestVersion: null }),
-    ] as never);
-    vi.mocked(useBundleSize).mockReturnValue([]);
-    vi.mocked(useDepsDev).mockReturnValue([]);
+    vi.mocked(loadPackageInfo).mockResolvedValue({
+      ...PACKAGE_INFO,
+      latestVersion: null,
+    } as never);
+    vi.mocked(loadDepsDev).mockRejectedValue(new Error("upstream"));
     const { user } = renderSection();
 
     await user.click(screen.getByRole("button", { name: "CSV" }));
 
-    const rows = vi.mocked(exportCsv).mock.lastCall?.[1];
+    const rows = await lastExportRows(exportCsv);
+    expect(loadBundleSize).not.toHaveBeenCalled();
     expect(rows).toContainEqual(
       expect.objectContaining({
         projectName: "beta",

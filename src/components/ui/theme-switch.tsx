@@ -5,6 +5,7 @@ import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { Monitor, Moon, Smartphone, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import ClientOnly from "./client-only";
+import { TogglePosition, toggleVariants } from "./toggle";
 
 const THEME_OPTIONS = [
   { value: "system", label: "System", Icon: null },
@@ -39,8 +40,31 @@ const ThemeSwitch = () => {
   );
 };
 
+const PLACEHOLDER_POSITIONS = [
+  "first",
+  "middle",
+  "last",
+] as const satisfies TogglePosition[];
+
+const ThemeSwitchPlaceholder = () => (
+  <div
+    aria-hidden="true"
+    data-testid="theme-switch-placeholder"
+    className="flex items-center justify-center"
+  >
+    {PLACEHOLDER_POSITIONS.map((position) => (
+      <span
+        key={position}
+        className={toggleVariants({ variant: "outline", position })}
+      >
+        <span className="size-4" />
+      </span>
+    ))}
+  </div>
+);
+
 const ThemeSwitchClientOnly = () => (
-  <ClientOnly>
+  <ClientOnly fallback={<ThemeSwitchPlaceholder />}>
     <ThemeSwitch />
   </ClientOnly>
 );

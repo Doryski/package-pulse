@@ -1,8 +1,5 @@
-"use client";
-
 import { cn } from "@/lib/utils/cn";
-import getChartColor from "@/lib/utils/getChartColor";
-import { useTheme } from "next-themes";
+import { getChartColorVar } from "@/lib/utils/getChartColor";
 
 export type DotIndicatorProps = { className?: string } & (
   | {
@@ -15,23 +12,17 @@ export type DotIndicatorProps = { className?: string } & (
     }
 );
 
-const DotIndicator = ({ index, color, className }: DotIndicatorProps) => {
-  const { resolvedTheme } = useTheme();
-
-  const getFinalColor = () => {
-    if (color) return color;
-    if (index !== undefined) return getChartColor(resolvedTheme, index);
-    return undefined;
-  };
-
-  return (
-    <span
-      className={cn("size-3 rounded-full md:size-4", className)}
-      style={{
-        backgroundColor: getFinalColor(),
-      }}
-    />
-  );
+const resolveColor = ({ index, color }: DotIndicatorProps) => {
+  if (color) return color;
+  if (index !== undefined) return getChartColorVar(index);
+  return undefined;
 };
+
+const DotIndicator = (props: DotIndicatorProps) => (
+  <span
+    className={cn("size-3 rounded-full md:size-4", props.className)}
+    style={{ backgroundColor: resolveColor(props) }}
+  />
+);
 
 export default DotIndicator;

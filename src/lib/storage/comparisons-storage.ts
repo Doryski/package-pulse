@@ -1,3 +1,4 @@
+import "server-only";
 import { env } from "@/lib/config/env";
 import {
   GlobalComparison,

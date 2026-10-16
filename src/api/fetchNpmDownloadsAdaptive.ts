@@ -9,7 +9,7 @@ import { NPMDownloadCount } from "@/lib/schemas/npmDownloadsPeriod.schema";
 import { normalizeRangeResponse } from "@/lib/schemas/npmBulkDownloads.schema";
 import { getUpstreamFetchInit } from "@/lib/config/upstreamFetchInit";
 import AppError from "@/lib/utils/AppError";
-import getTimePeriods from "@/lib/utils/getTimePeriods";
+import getTimePeriods, { Period } from "@/lib/utils/getTimePeriods";
 import partitionPackages from "@/lib/utils/partitionPackages";
 import trimToDataHorizon from "@/lib/utils/trimToDataHorizon";
 import {
@@ -18,13 +18,15 @@ import {
   RateLimitError,
   RetryConfig,
 } from "adaptive-promise-pool";
-import { isValid, max, startOfDay, sub } from "date-fns";
+import { isBefore, isValid, max, startOfDay, sub } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 const NPM_RANGE_BASE_URL = "https://api.npmjs.org/downloads/range";
 const UPSTREAM_REVALIDATE_SECONDS = 3600;
+export const CLOSED_WINDOW_REVALIDATE_SECONDS = 2_592_000;
 const NPM_MAX_LAG_DAYS = 7;
 const PACKAGE_LIST_DELIMITER = ",";
+export const UPSTREAM_TIMEOUT_MS = 25_000;
 
 const DEFAULT_CONCURRENCY: ConcurrencyConfig = { initial: 4, min: 1, max: 8 };
 const DEFAULT_RETRY: RetryConfig = {
@@ -56,7 +58,11 @@ type FetchNpmDownloadsAdaptiveOptions = {
   signal?: AbortSignal;
 };
 
-type DownloadTask = { url: string; packages: string[] };
+type DownloadTask = {
+  url: string;
+  packages: string[];
+  revalidateSeconds: number;
+};
 
 type NormalizedMap = ReturnType<typeof normalizeRangeResponse>;
 type TaskSuccess = { packages: string[]; map: NormalizedMap };
@@ -65,6 +71,9 @@ type TaskResult = TaskSuccess | TaskFailure;
 
 const isTaskFailure = (result: TaskResult): result is TaskFailure =>
   "error" in result;
+
+export const createUpstreamSignal = (requestSignal: AbortSignal) =>
+  AbortSignal.any([requestSignal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
 
 export const notFoundMessage = (name: string) => `Package "${name}" not found`;
 
@@ -95,33 +104,69 @@ export const parsePackageList = (raw: string | null): string[] =>
     ),
   ].sort();
 
-const buildWindows = (from: Date, to: Date) => ({
-  bulk: getTimePeriods(from, to, NPM_BULK_RANGE_API_PERIOD_DAYS, "days"),
-  scoped: getTimePeriods(from, to, NPM_RANGE_API_PERIOD_MONTHS, "months"),
-});
+const buildWindows = (from: Date, to: Date) => {
+  const anchor = parseDate(NPM_API_FIRST_DAY);
+  return {
+    bulk: getTimePeriods(
+      from,
+      to,
+      NPM_BULK_RANGE_API_PERIOD_DAYS,
+      "days",
+      anchor,
+    ),
+    scoped: getTimePeriods(
+      from,
+      to,
+      NPM_RANGE_API_PERIOD_MONTHS,
+      "months",
+      anchor,
+    ),
+  };
+};
 
 type DownloadWindows = ReturnType<typeof buildWindows>;
+
+const getOpenWindowThreshold = (today: Date) =>
+  sub(today, { days: NPM_MAX_LAG_DAYS });
+
+const getWindowRevalidateSeconds = (window: Period, openThreshold: Date) =>
+  isBefore(window.end, openThreshold)
+    ? CLOSED_WINDOW_REVALIDATE_SECONDS
+    : UPSTREAM_REVALIDATE_SECONDS;
+
+const buildTask = (
+  window: Period,
+  packages: string[],
+  openThreshold: Date,
+): DownloadTask => ({
+  url: buildRangeUrl(
+    window.start,
+    window.end,
+    packages.join(PACKAGE_LIST_DELIMITER),
+  ),
+  packages,
+  revalidateSeconds: getWindowRevalidateSeconds(window, openThreshold),
+});
 
 function buildTasks(
   packages: string[],
   windows: DownloadWindows,
+  today: Date,
 ): DownloadTask[] {
   const { unscoped, scoped } = partitionPackages(packages);
-  const joined = unscoped.join(PACKAGE_LIST_DELIMITER);
+  const openThreshold = getOpenWindowThreshold(today);
 
   const bulkTasks =
     unscoped.length === 0
       ? []
-      : windows.bulk.map((window) => ({
-          url: buildRangeUrl(window.start, window.end, joined),
-          packages: unscoped,
-        }));
+      : windows.bulk
+          .toReversed()
+          .map((window) => buildTask(window, unscoped, openThreshold));
 
   const scopedTasks = scoped.flatMap((pkg) =>
-    windows.scoped.map((window) => ({
-      url: buildRangeUrl(window.start, window.end, pkg),
-      packages: [pkg],
-    })),
+    windows.scoped
+      .toReversed()
+      .map((window) => buildTask(window, [pkg], openThreshold)),
   );
 
   return [...bulkTasks, ...scopedTasks];
@@ -192,7 +237,7 @@ export default async function fetchNpmDownloadsAdaptive(
 
   const from = resolveStartDate(opts?.startDate);
   const today = startOfDay(toZonedTime(new Date(), "UTC"));
-  const tasks = buildTasks(uniquePackages, buildWindows(from, today));
+  const tasks = buildTasks(uniquePackages, buildWindows(from, today), today);
 
   const processor = async (
     task: DownloadTask,
@@ -200,7 +245,7 @@ export default async function fetchNpmDownloadsAdaptive(
   ): Promise<TaskResult> => {
     const res = await fetchImpl(task.url, {
       signal: ctx.signal,
-      ...getUpstreamFetchInit(UPSTREAM_REVALIDATE_SECONDS),
+      ...getUpstreamFetchInit(task.revalidateSeconds),
     });
 
     if (res.status === 429) {
@@ -242,6 +287,7 @@ export default async function fetchNpmDownloadsAdaptive(
     retry: opts?.retry ?? DEFAULT_RETRY,
     signal: opts?.signal,
   });
+  opts?.signal?.throwIfAborted();
 
   const accumulators = new Map(
     uniquePackages.map((name) => [name, createAccumulator()] as const),
@@ -282,7 +328,7 @@ export default async function fetchNpmDownloadsAdaptive(
     Object.fromEntries(
       resolved.map(([name, { downloads }]) => [name, downloads]),
     ),
-    formatDate(sub(today, { days: NPM_MAX_LAG_DAYS })),
+    formatDate(getOpenWindowThreshold(today)),
   );
   const errors = Object.fromEntries(
     resolved.flatMap(([name, { error }]) =>

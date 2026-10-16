@@ -1,16 +1,4 @@
-import * as Papa from "papaparse";
-
-export const downloadFile = (filename: string, blobOrUrl: Blob | string) => {
-  const url =
-    typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
+import { downloadFile } from "@/lib/utils/downloadFile";
 
 export const exportJson = (filename: string, data: unknown[]) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -19,13 +7,14 @@ export const exportJson = (filename: string, data: unknown[]) => {
   downloadFile(`${filename}.json`, blob);
 };
 
-export const exportCsv = (filename: string, data: unknown[]) => {
+export const exportCsv = async (filename: string, data: unknown[]) => {
   if (!data || data.length === 0) {
     console.warn("No data provided for CSV export");
     return;
   }
 
-  const csvContent = Papa.unparse(data, {
+  const { unparse } = await import("papaparse");
+  const csvContent = unparse(data, {
     header: true,
     skipEmptyLines: true,
     escapeFormulae: true,

@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   calculateBreakDrop,
+  createBreakDropAccumulator,
   getLast5ChristmasYears,
 } from "./calculateBreakDrop";
 import { DownloadStat } from "./groupByPeriod";
@@ -205,5 +206,51 @@ describe("calculateBreakDrop", () => {
         vi.useRealTimers();
       },
     );
+  });
+});
+
+describe("calculateBreakDrop with an explicit today", () => {
+  const rawData = makeSeries(
+    new Date(2020, 0, 1),
+    new Date(2025, 1, 28),
+    corporateCountFn(3000),
+  );
+
+  test("should match the system-time result when today is passed explicitly", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 11, 25));
+    const fromSystemTime = calculateBreakDrop(rawData);
+    vi.useRealTimers();
+
+    expect(calculateBreakDrop(rawData, new Date(2024, 11, 25))).toEqual(
+      fromSystemTime,
+    );
+    expect(getLast5ChristmasYears(new Date(2024, 11, 25))).toEqual([
+      2024, 2023, 2022, 2021, 2020,
+    ]);
+  });
+
+  test("should report a zero christmas drop when a christmas day has no downloads", () => {
+    const withZeroChristmasDay = rawData.map((item) =>
+      item.date.endsWith("-12-25") ? { ...item, count: 0 } : item,
+    );
+
+    const result = calculateBreakDrop(
+      withZeroChristmasDay,
+      new Date(2024, 11, 25),
+    );
+
+    expect(result.christmasDropPercentage).toBe(0);
+    expect(result.corporateUsageScore).toBeCloseTo(42, 5);
+  });
+
+  test("should give the same result through the accumulator with precomputed weekdays", () => {
+    const today = new Date(2024, 11, 25);
+    const accumulator = createBreakDropAccumulator(rawData.length, today);
+    rawData.forEach(({ date, count }, index) =>
+      accumulator.add(index, date, count, new Date(date).getUTCDay()),
+    );
+
+    expect(accumulator.result()).toEqual(calculateBreakDrop(rawData, today));
   });
 });

@@ -1,5 +1,5 @@
 "use client";
-import { formatDate, startOfWeek } from "@/app/(home)/utils/date-utils";
+import { XIcon } from "@/components/icons/brand-icons";
 import normalizeProjectName from "@/app/(home)/utils/normalizeProjectName";
 import {
   useInitialChartModeFromSearchParams,
@@ -28,24 +28,17 @@ import chartScales, { ChartScale } from "@/lib/enums/ChartScale";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
 import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
 import { useSearchParams } from "next/navigation";
-import { z } from "zod";
+import * as z from "zod/mini";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import { cn } from "@/lib/utils/cn";
 import { exportCsv } from "@/lib/utils/exportUtils";
 import { copyAsImage, downloadAsImage } from "@/lib/utils/imageExport";
-import sortByVersion from "@/lib/utils/sortByVersion";
-import {
-  ChevronDownIcon,
-  CopyIcon,
-  DownloadIcon,
-  Link2Icon,
-  TableIcon,
-  TwitterLogoIcon,
-} from "@radix-ui/react-icons";
+import { ChevronDown, Copy, Download, Link2, Table } from "lucide-react";
 import {
   Fragment,
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -63,15 +56,15 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { create } from "zustand";
-import { devtools } from "zustand/middleware";
 import Dash from "./dash";
+import { useHiddenElements } from "./line-chart-store";
 import {
   buildShareToXUrl,
   ChartConfig,
   ChartData,
   ChartRow,
   filterByTimePeriod,
+  findReleaseRowKey,
   formatLatestVersion,
   formatNormalizedLabel,
   formatXAxisTick,
@@ -80,6 +73,7 @@ import {
   getYAxisDomain,
   NormalizedChartData,
   nullifyZeroValues,
+  type VersionData,
 } from "./line-chart-utils";
 import {
   Select,
@@ -98,51 +92,24 @@ export type {
   VersionData,
 } from "./line-chart-utils";
 
-type LineChartStore = {
-  config: ChartConfig;
-  hiddenElements: Set<string>;
-  setConfig: (config: ChartConfig) => void;
-  toggleElement: (key: string) => void;
-  isHiddenElement: (key: string) => boolean;
-};
-
 const chartModeSchema = z.custom<ChartMode>((value) =>
   chartModes.some((mode) => mode.value === value),
 );
 
-const createLineChartStore = (key: string) => {
-  const storeName = `line-chart-${key}`;
-  return create<LineChartStore>()(
-    devtools(
-      (set, get) => ({
-        config: {},
-        hiddenElements: new Set(),
-        setConfig: (config) => set({ config }),
-        toggleElement: (key) =>
-          set((state) => {
-            const nextHiddenKeys = new Set(state.hiddenElements);
-            if (nextHiddenKeys.has(key)) {
-              nextHiddenKeys.delete(key);
-            } else {
-              nextHiddenKeys.add(key);
-            }
-            return { hiddenElements: nextHiddenKeys };
-          }),
-        isHiddenElement: (key) => get().hiddenElements.has(key),
-      }),
-      { name: storeName },
-    ),
-  );
-};
+const CHART_MARGIN = { left: 4, right: 12 } as const;
 
-const storeCache = new Map<string, ReturnType<typeof createLineChartStore>>();
+const toNormalizedLabel = (
+  _value: unknown,
+  payload: Parameters<typeof formatNormalizedLabel>[0],
+) => formatNormalizedLabel(payload);
 
-export const useLineChart = (key: string) => {
-  if (!storeCache.has(key)) {
-    storeCache.set(key, createLineChartStore(key));
-  }
-  return storeCache.get(key)!;
-};
+const toCalendarLabel = (value: ReactNode) => value;
+
+const formatCalendarTick = (value: string | number | Date) =>
+  formatXAxisTick(value, false);
+
+const formatNormalizedTick = (value: string | number | Date) =>
+  formatXAxisTick(value, true);
 
 type LastReleasesListProps = {
   config: ChartConfig;
@@ -170,7 +137,7 @@ export function LastReleasesList({ config }: LastReleasesListProps) {
                   {displayName}
                 </span>
                 <span className="text-right text-xs text-foreground">
-                  {formatLatestVersion(config[key]?.versions)}
+                  {formatLatestVersion(config[key]?.latestRelease)}
                 </span>
               </div>
             </div>
@@ -186,6 +153,31 @@ type MultipleLineChartProps = {
   normalizedData: NormalizedChartData[];
   config: ChartConfig;
   chartKey: string;
+};
+
+type LatestReleaseLineProps = {
+  normalizedKey: string;
+  release?: VersionData | null;
+  rows: ChartRow[];
+  xKey: string;
+};
+
+const LatestReleaseLine = ({
+  normalizedKey,
+  release,
+  rows,
+  xKey,
+}: LatestReleaseLineProps) => {
+  if (!release) return null;
+  const x = findReleaseRowKey(rows, xKey, release.date);
+  if (!x) return null;
+  return (
+    <ReferenceLine
+      x={x}
+      stroke={`var(--color-${normalizedKey})`}
+      strokeDasharray="3 3"
+    />
+  );
 };
 
 function MultipleLineChart({
@@ -217,7 +209,7 @@ function MultipleLineChart({
   }, [hasModeParam]);
 
   const [isPending, startTransition] = useTransition();
-  const { isHiddenElement } = useLineChart(chartKey)();
+  const hiddenElements = useHiddenElements(chartKey);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useUpdateSearchParamsChart(timePeriod, chartScale, chartMode);
@@ -237,12 +229,14 @@ function MultipleLineChart({
     });
   }, []);
 
+  const [now] = useState(() => new Date());
+
   const chartData = useMemo<ChartRow[]>(() => {
     if (isNormalized) {
       return normalizedData;
     }
-    return filterByTimePeriod(data, timePeriod, new Date());
-  }, [data, normalizedData, timePeriod, isNormalized]);
+    return filterByTimePeriod(data, timePeriod, now);
+  }, [data, normalizedData, timePeriod, isNormalized, now]);
 
   const seriesKeys = useMemo(
     () => getSeriesKeys(chartData, xKey),
@@ -276,6 +270,30 @@ function MultipleLineChart({
   useLocalStorage(LocalStorageKey.CHART_MODE, chartMode);
 
   const yAxisScale = chartScale === "logarithmic" ? "log" : "linear";
+  const xAxisTickFormatter = isNormalized
+    ? formatNormalizedTick
+    : formatCalendarTick;
+  const tooltipLabelFormatter = isNormalized
+    ? toNormalizedLabel
+    : toCalendarLabel;
+
+  const handleTimePeriodSelect = useCallback(
+    (value: string) => handleTimePeriodChange(value as TimePeriod),
+    [handleTimePeriodChange],
+  );
+
+  const handleChartScaleSelect = useCallback((value: string) => {
+    if (!value) return;
+    setChartScale(value as ChartScale);
+  }, []);
+
+  const handleChartModeSelect = useCallback(
+    (value: string) => {
+      if (!value) return;
+      handleChartModeChange(value as ChartMode);
+    },
+    [handleChartModeChange],
+  );
 
   const handleDownloadImage = useCallback(async () => {
     if (!chartRef.current) return;
@@ -292,7 +310,7 @@ function MultipleLineChart({
   }, []);
 
   const handleExportCsv = useCallback(() => {
-    exportCsv(`package-pulse-chart-${Date.now()}`, chartData);
+    void exportCsv(`package-pulse-chart-${Date.now()}`, chartData);
   }, [chartData]);
 
   const handleCopyLink = useCallback(async () => {
@@ -330,9 +348,7 @@ function MultipleLineChart({
           </label>
           <Select
             value={timePeriod}
-            onValueChange={(value) =>
-              handleTimePeriodChange(value as TimePeriod)
-            }
+            onValueChange={handleTimePeriodSelect}
             disabled={isNormalized}
           >
             <SimpleTooltip
@@ -360,11 +376,7 @@ function MultipleLineChart({
               type="single"
               aria-label="Scale"
               value={chartScale}
-              onValueChange={(value) => {
-                if (value) {
-                  setChartScale(value as ChartScale);
-                }
-              }}
+              onValueChange={handleChartScaleSelect}
               variant="outline"
               size="sm"
               className="w-full sm:w-auto"
@@ -387,11 +399,7 @@ function MultipleLineChart({
               type="single"
               aria-label="Timeline"
               value={chartMode}
-              onValueChange={(value) => {
-                if (value) {
-                  handleChartModeChange(value as ChartMode);
-                }
-              }}
+              onValueChange={handleChartModeSelect}
               variant="outline"
               size="sm"
               className="w-full sm:w-auto"
@@ -416,14 +424,14 @@ function MultipleLineChart({
                 onClick={handleDownloadImage}
                 aria-label="Download chart as PNG"
               >
-                <DownloadIcon className="size-4" />
+                <Download className="size-4" />
               </Button>
             </SimpleTooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="px-2">
                   <span className="text-sm">Share</span>
-                  <ChevronDownIcon className="ml-1 size-3" />
+                  <ChevronDown className="ml-1 size-3" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -431,28 +439,28 @@ function MultipleLineChart({
                   onClick={handleCopyImage}
                   className="flex items-center gap-2"
                 >
-                  <CopyIcon className="size-4" />
+                  <Copy className="size-4" />
                   <span>Copy image</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleExportCsv}
                   className="flex items-center gap-2"
                 >
-                  <TableIcon className="size-4" />
+                  <Table className="size-4" />
                   <span>Export CSV</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleCopyLink}
                   className="flex items-center gap-2"
                 >
-                  <Link2Icon className="size-4" />
+                  <Link2 className="size-4" />
                   <span>Copy link</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleShareToX}
                   className="flex items-center gap-2"
                 >
-                  <TwitterLogoIcon className="size-4" />
+                  <XIcon className="size-4" />
                   <span>Share to X</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -461,7 +469,7 @@ function MultipleLineChart({
         </div>
       </div>
 
-      <div ref={chartRef} className={cn("relative mx-auto size-full")}>
+      <div ref={chartRef} className="relative mx-auto size-full">
         <ChartContainer
           config={config}
           className="aspect-square max-h-[450px] w-full sm:aspect-video"
@@ -470,10 +478,7 @@ function MultipleLineChart({
             accessibilityLayer
             data={transformedData}
             className="-ml-2 sm:ml-0"
-            margin={{
-              left: 4,
-              right: 12,
-            }}
+            margin={CHART_MARGIN}
           >
             <ChartLegend
               content={
@@ -499,7 +504,7 @@ function MultipleLineChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => formatXAxisTick(value, isNormalized)}
+              tickFormatter={xAxisTickFormatter}
             />
             <YAxis
               tickLine={false}
@@ -516,10 +521,7 @@ function MultipleLineChart({
               content={
                 <ChartTooltipContent
                   chartKey={chartKey}
-                  labelFormatter={(value, payload) => {
-                    if (!isNormalized) return value;
-                    return formatNormalizedLabel(payload);
-                  }}
+                  labelFormatter={tooltipLabelFormatter}
                 >
                   <LastReleasesList config={config} />
                 </ChartTooltipContent>
@@ -528,6 +530,7 @@ function MultipleLineChart({
             {seriesKeys.map((key) => {
               const normalizedKey = normalizeProjectName(key);
               const projectConfig = config[normalizedKey];
+              const isHidden = hiddenElements.has(normalizedKey);
 
               return (
                 <Fragment key={normalizedKey}>
@@ -537,25 +540,17 @@ function MultipleLineChart({
                     stroke={`var(--color-${normalizedKey})`}
                     strokeWidth={2}
                     dot={false}
-                    hide={isHiddenElement(normalizedKey)}
+                    isAnimationActive={false}
+                    hide={isHidden}
                   />
-                  {!isNormalized &&
-                    !isHiddenElement(normalizedKey) &&
-                    projectConfig?.versions &&
-                    sortByVersion(projectConfig.versions)
-                      .slice(-1)
-                      .map((version) => {
-                        const weekStart = formatDate(startOfWeek(version.date));
-
-                        return (
-                          <ReferenceLine
-                            key={`${normalizedKey}-${version.version}`}
-                            x={weekStart}
-                            stroke={`var(--color-${normalizedKey})`}
-                            strokeDasharray="3 3"
-                          />
-                        );
-                      })}
+                  {!isNormalized && !isHidden && (
+                    <LatestReleaseLine
+                      normalizedKey={normalizedKey}
+                      release={projectConfig?.latestRelease}
+                      rows={chartData}
+                      xKey={xKey}
+                    />
+                  )}
                 </Fragment>
               );
             })}
@@ -568,7 +563,7 @@ function MultipleLineChart({
             data-testid="main-chart-loader"
             className="absolute inset-0 flex items-center justify-center bg-background/65"
           >
-            <div className="size-12 animate-spin rounded-full border-y-2 border-primary" />
+            <div className="size-12 animate-spin rounded-full border-y-2 border-primary motion-reduce:animate-none" />
           </div>
         )}
       </div>

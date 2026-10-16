@@ -1,11 +1,21 @@
 import { expect, test } from "./fixtures";
 import { seededDownloads } from "./mocks/data";
+import {
+  fillSearchInput,
+  getOptionsList,
+  getSearchInput,
+  waitForSearchResponse,
+} from "./utils";
 
 const CANARY_PACKAGE = "e2e-canary";
 const CANARY_DAY = "2024-06-15";
 
 type DownloadsBody = {
   data: Record<string, Array<{ date: string; count: number }> | null>;
+};
+
+type SearchBody = {
+  objects: Array<{ package: { name: string; description: string } }>;
 };
 
 const countOn = (body: DownloadsBody, pkg: string, day: string) =>
@@ -26,21 +36,23 @@ test.describe("test mode canary", () => {
     page,
     unhandledGuard,
   }) => {
-    const registryResponse = page.waitForResponse(
-      (res) =>
-        res.url() === `https://registry.npmjs.org/${CANARY_PACKAGE}` &&
-        res.status() === 200,
-    );
+    await page.goto("/");
+    const searchResponse = waitForSearchResponse(page, CANARY_PACKAGE);
 
-    await page.goto(`/?projects=${CANARY_PACKAGE}`);
+    await fillSearchInput(getSearchInput(page), CANARY_PACKAGE);
 
-    const registry = await registryResponse;
-    expect(await registry.json()).toMatchObject({
+    const search = await searchResponse;
+    expect(search.status()).toBe(200);
+    const body: SearchBody = await search.json();
+    expect(body.objects[0]?.package).toMatchObject({
       name: CANARY_PACKAGE,
       description: `Mock package ${CANARY_PACKAGE}`,
     });
     await expect(
-      page.getByRole("row").filter({ hasText: CANARY_PACKAGE }).first(),
+      getOptionsList(page)
+        .getByRole("option")
+        .filter({ hasText: CANARY_PACKAGE })
+        .first(),
     ).toBeVisible();
     expect(unhandledGuard).toEqual([]);
   });

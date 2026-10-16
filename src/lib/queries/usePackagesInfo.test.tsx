@@ -4,13 +4,16 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ fetchPackageInfo: vi.fn() }));
+const mocks = vi.hoisted(() => ({ loadPackageInfo: vi.fn() }));
 
-vi.mock("@/api/fetchPackageInfo", () => ({
-  fetchPackageInfo: mocks.fetchPackageInfo,
+vi.mock("@/api/packageData", () => ({
+  loadPackageInfo: mocks.loadPackageInfo,
 }));
 
-import usePackagesInfo from "./usePackagesInfo";
+import usePackagesInfo, {
+  packageInfoQueryOptions,
+  useLatestReleases,
+} from "./usePackagesInfo";
 
 const wrapper = ({ children }: PropsWithChildren) => (
   <QueryClientProvider client={createTestQueryClient()}>
@@ -18,13 +21,15 @@ const wrapper = ({ children }: PropsWithChildren) => (
   </QueryClientProvider>
 );
 
+const RELEASE = { version: "1.0.0", date: "2024-01-01" } as const;
+
 describe("usePackagesInfo", () => {
   beforeEach(() => {
-    mocks.fetchPackageInfo.mockReset();
+    mocks.loadPackageInfo.mockReset();
   });
 
-  test("fetches info per project", async () => {
-    mocks.fetchPackageInfo.mockImplementation(async (name: string) => ({
+  test("loads info per project with the query signal", async () => {
+    mocks.loadPackageInfo.mockImplementation(async (name: string) => ({
       name,
     }));
 
@@ -39,12 +44,41 @@ describe("usePackagesInfo", () => {
       { name: "react" },
       { name: "vue" },
     ]);
+    expect(mocks.loadPackageInfo).toHaveBeenCalledWith(
+      "react",
+      expect.any(AbortSignal),
+    );
   });
 
   test("skips empty project names", () => {
     const { result } = renderHook(() => usePackagesInfo([""]), { wrapper });
 
     expect(result.current[0]?.fetchStatus).toBe("idle");
-    expect(mocks.fetchPackageInfo).not.toHaveBeenCalled();
+    expect(mocks.loadPackageInfo).not.toHaveBeenCalled();
+  });
+
+  test("query options are keyed by the package name", () => {
+    expect(packageInfoQueryOptions("react").queryKey).toEqual([
+      "package-info",
+      "react",
+    ]);
+  });
+});
+
+describe("useLatestReleases", () => {
+  beforeEach(() => {
+    mocks.loadPackageInfo.mockReset();
+  });
+
+  test("maps each package to its latest release or null", async () => {
+    mocks.loadPackageInfo.mockImplementation(async (name: string) => ({
+      latestRelease: name === "react" ? RELEASE : null,
+    }));
+
+    const { result } = renderHook(() => useLatestReleases(["react", "vue"]), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current).toEqual([RELEASE, null]));
   });
 });

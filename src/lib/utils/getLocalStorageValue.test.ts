@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
+import * as z from "zod/mini";
 import getLocalStorageValue from "./getLocalStorageValue";
 
 describe("getLocalStorageValue", () => {
@@ -57,7 +57,7 @@ describe("getLocalStorageValue", () => {
   });
 
   it("should fall back to the schema default when stored JSON is corrupted", () => {
-    const schema = z.string().catch("fallback");
+    const schema = z.catch(z.string(), "fallback");
     mockLocalStorage.getItem.mockReturnValue("<<corrupted>>");
     const result = getLocalStorageValue("testKey", schema);
     expect(result).toBe("fallback");

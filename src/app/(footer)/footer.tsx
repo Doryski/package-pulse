@@ -1,6 +1,6 @@
 import TextLink from "@/components/ui/text-link";
 import { links } from "@/lib/config/constants";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
+import { GithubIcon } from "@/components/icons/brand-icons";
 
 const Footer = () => {
   return (
@@ -12,7 +12,7 @@ const Footer = () => {
           className="inline-flex items-center px-0.5"
           outside
         >
-          <GitHubLogoIcon className="mr-1 text-black dark:text-white" />
+          <GithubIcon className="mr-1 size-4 text-black dark:text-white" />
           <span>Doryski</span>
         </TextLink>
         )
@@ -29,8 +29,8 @@ const Footer = () => {
           outside
           className="inline-flex items-center"
         >
-          <GitHubLogoIcon className="mr-1 text-black dark:text-white" /> GitHub
-          repository
+          <GithubIcon className="mr-1 size-4 text-black dark:text-white" />{" "}
+          GitHub repository
         </TextLink>
       </p>
     </footer>

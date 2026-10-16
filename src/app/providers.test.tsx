@@ -17,6 +17,8 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 
 const loadProviders = async () => (await import("./providers")).default;
 
+const loadAppError = async () => (await import("@/lib/utils/AppError")).default;
+
 const captured: { clients: QueryClient[] } = { clients: [] };
 
 function QueryClientProbe() {
@@ -77,8 +79,25 @@ describe("Providers", () => {
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: "always",
+      refetchOnReconnect: true,
     });
+  });
+
+  it.each([404, 429])(
+    "does not retry AppError with client status %i",
+    async (status) => {
+      await renderProviders();
+      const AppError = await loadAppError();
+
+      expect(getRetry()(0, new AppError("client", { status }))).toBe(false);
+    },
+  );
+
+  it("retries AppError with server status", async () => {
+    await renderProviders();
+    const AppError = await loadAppError();
+
+    expect(getRetry()(0, new AppError("server", { status: 503 }))).toBe(true);
   });
 
   it("does not retry 404 errors", async () => {

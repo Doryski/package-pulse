@@ -5,7 +5,12 @@ import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 import type { TooltipValueType } from "recharts";
 import Dash from "./dash";
-import { ChartConfig, useLineChart } from "./line-chart";
+import {
+  useHiddenElements,
+  useIsHiddenElement,
+  useToggleElement,
+} from "./line-chart-store";
+import type { ChartConfig } from "./line-chart-utils";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
@@ -13,6 +18,18 @@ const THEMES = { light: "", dark: ".dark" } as const;
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
 
 type TooltipNameType = number | string;
+
+const ChartContext = React.createContext<ChartConfig | null>(null);
+
+const useChartConfig = () => {
+  const config = React.use(ChartContext);
+  if (!config) {
+    throw new Error(
+      "Chart components must be used within a <ChartContainer />",
+    );
+  }
+  return config;
+};
 
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
@@ -27,22 +44,24 @@ const ChartContainer = React.forwardRef<
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
 
   return (
-    <div
-      data-chart={chartId}
-      ref={ref}
-      className={cn(
-        "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick-label_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
-        className,
-      )}
-      {...props}
-    >
-      <ChartStyle id={chartId} config={config} />
-      <RechartsPrimitive.ResponsiveContainer
-        initialDimension={INITIAL_DIMENSION}
+    <ChartContext value={config}>
+      <div
+        data-chart={chartId}
+        ref={ref}
+        className={cn(
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick-label_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
+          className,
+        )}
+        {...props}
       >
-        {children}
-      </RechartsPrimitive.ResponsiveContainer>
-    </div>
+        <ChartStyle id={chartId} config={config} />
+        <RechartsPrimitive.ResponsiveContainer
+          initialDimension={INITIAL_DIMENSION}
+        >
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
+      </div>
+    </ChartContext>
   );
 });
 ChartContainer.displayName = "Chart";
@@ -121,7 +140,8 @@ const ChartTooltipContent = React.forwardRef<
     },
     ref,
   ) => {
-    const { config, isHiddenElement } = useLineChart(chartKey)();
+    const config = useChartConfig();
+    const hiddenElements = useHiddenElements(chartKey);
 
     const getTooltipLabel = () => {
       if (hideLabel || !payload?.length) {
@@ -172,7 +192,7 @@ const ChartTooltipContent = React.forwardRef<
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
             const indicatorColor = color || item.payload?.fill || item.color;
-            const isHidden = isHiddenElement(normalizeProjectName(key));
+            const isHidden = hiddenElements.has(normalizeProjectName(key));
 
             return (
               <div
@@ -257,7 +277,7 @@ const ChartLegendContent = React.forwardRef<
     },
     ref,
   ) => {
-    const { config, isHiddenElement, toggleElement } = useLineChart(chartKey)();
+    const config = useChartConfig();
 
     if (!payload?.length) {
       return null;
@@ -275,42 +295,16 @@ const ChartLegendContent = React.forwardRef<
         {payload.map((item, index) => {
           const key = `${nameKey || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
-          const isHidden = isHiddenElement(normalizeProjectName(key));
-          const label = itemConfig?.label || item.value;
-          const ariaLabel =
-            typeof label === "string" ? `Toggle ${label} series` : undefined;
 
           return (
-            <button
+            <ChartLegendItem
               key={item.value ?? index}
-              type="button"
-              aria-pressed={!isHidden}
-              aria-label={ariaLabel}
-              className={cn(
-                "flex cursor-pointer items-center gap-1.5 rounded focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden [&>svg]:size-3 [&>svg]:text-muted-foreground",
-                isHidden && "opacity-50",
-              )}
-              onClick={() => toggleElement(normalizeProjectName(key))}
-            >
-              {itemConfig?.icon && !hideIcon ? (
-                <itemConfig.icon />
-              ) : (
-                <span
-                  className="inline-block size-2 shrink-0 rounded-full md:size-3"
-                  style={{
-                    backgroundColor: item.color,
-                  }}
-                />
-              )}
-              <span
-                className={cn(
-                  "text-xs leading-none md:text-sm md:leading-none",
-                  isHidden && "line-through",
-                )}
-              >
-                {itemConfig?.label || item.value}
-              </span>
-            </button>
+              chartKey={chartKey}
+              seriesKey={normalizeProjectName(key)}
+              label={itemConfig?.label || item.value}
+              color={item.color}
+              icon={hideIcon ? undefined : itemConfig?.icon}
+            />
           );
         })}
         {children}
@@ -319,6 +313,58 @@ const ChartLegendContent = React.forwardRef<
   },
 );
 ChartLegendContent.displayName = "ChartLegend";
+
+type ChartLegendItemProps = {
+  chartKey: string;
+  seriesKey: string;
+  label: React.ReactNode;
+  color?: string;
+  icon?: React.ComponentType;
+};
+
+const ChartLegendItem = React.memo(
+  ({ chartKey, seriesKey, label, color, icon: Icon }: ChartLegendItemProps) => {
+    const isHidden = useIsHiddenElement(chartKey, seriesKey);
+    const toggleElement = useToggleElement(chartKey);
+    const handleClick = React.useCallback(
+      () => toggleElement(seriesKey),
+      [seriesKey, toggleElement],
+    );
+    const ariaLabel =
+      typeof label === "string" ? `Toggle ${label} series` : undefined;
+
+    return (
+      <button
+        type="button"
+        aria-pressed={!isHidden}
+        aria-label={ariaLabel}
+        className={cn(
+          "flex cursor-pointer items-center gap-1.5 rounded focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden [&>svg]:size-3 [&>svg]:text-muted-foreground",
+          isHidden && "opacity-50",
+        )}
+        onClick={handleClick}
+      >
+        {Icon ? (
+          <Icon />
+        ) : (
+          <span
+            className="inline-block size-2 shrink-0 rounded-full md:size-3"
+            style={{ backgroundColor: color }}
+          />
+        )}
+        <span
+          className={cn(
+            "text-xs leading-none md:text-sm md:leading-none",
+            isHidden && "line-through",
+          )}
+        >
+          {label}
+        </span>
+      </button>
+    );
+  },
+);
+ChartLegendItem.displayName = "ChartLegendItem";
 
 type ChartDotIndicatorProps = {
   indicator: "dot" | "line" | "dashed";
@@ -403,5 +449,4 @@ export {
   ChartStyle,
   ChartTooltip,
   ChartTooltipContent,
-  useLineChart,
 };

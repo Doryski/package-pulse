@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { z } from "zod";
+import * as z from "zod/mini";
 
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
 
@@ -10,7 +10,9 @@ import AppError from "../utils/AppError";
 import useHandleQueryError from "./useHandleQueryError";
 
 const getZodError = (value: unknown) => {
-  const parsed = z.object({ name: z.string() }).safeParse(value);
+  const parsed = z.safeParse(z.object({ name: z.string() }), value, {
+    reportInput: true,
+  });
   if (parsed.success) throw new Error("expected a validation failure");
   return parsed.error;
 };
@@ -58,7 +60,7 @@ describe("useHandleQueryError", () => {
 
   test("toasts when a validation error has no issues", async () => {
     const { result } = renderHook(() => useHandleQueryError());
-    const error = new z.ZodError([]);
+    const error = new z.core.$ZodError([]);
 
     await expect(
       result.current(() => Promise.reject(error), "fallback"),
@@ -68,7 +70,7 @@ describe("useHandleQueryError", () => {
 
   test("detects an explicitly undefined input on the issue", async () => {
     const { result } = renderHook(() => useHandleQueryError());
-    const error = new z.ZodError([
+    const error = new z.core.$ZodError([
       {
         code: "invalid_type",
         expected: "string",
@@ -95,7 +97,7 @@ describe("useHandleQueryError", () => {
 
   test("detects undefined issues by message when input is absent", async () => {
     const { result } = renderHook(() => useHandleQueryError());
-    const error = new z.ZodError([
+    const error = new z.core.$ZodError([
       {
         code: "invalid_type",
         expected: "string",

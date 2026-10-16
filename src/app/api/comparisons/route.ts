@@ -1,4 +1,3 @@
-import { encodeRegistryPackageName } from "@/api/fetchPackageInfo";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import {
   comparisonsStorage,
@@ -11,6 +10,7 @@ import {
   GlobalComparisonResponse,
   PublicComparison,
 } from "@/lib/types/global-comparison";
+import { fetchPackageExists } from "@/lib/server/npmRegistry";
 import getClientIp from "@/lib/utils/getClientIp";
 import { checkRateLimit } from "@/lib/utils/rateLimit";
 import isValidPackageName from "@/lib/utils/isValidPackageName";
@@ -32,14 +32,16 @@ function toPublicComparison(comparison: GlobalComparison): PublicComparison {
   return rest;
 }
 
+const GET_SUCCESS_CACHE_CONTROL =
+  "public, s-maxage=30, stale-while-revalidate=300";
+const NO_STORE = "no-store";
+
 const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 10 } as const;
 
 const VALIDATION_CACHE = {
   ttlMs: 5 * 60 * 1000,
   maxEntries: 1000,
 } as const;
-const REGISTRY_TIMEOUT_MS = 5000;
-const ABBREVIATED_PACKUMENT = "application/vnd.npm.install-v1+json";
 
 const packageValidationCache = new Map<
   string,
@@ -71,18 +73,6 @@ function cacheValidation(packageName: string, isValid: boolean): void {
   packageValidationCache.set(packageName, { isValid, timestamp: now });
   if (packageValidationCache.size <= VALIDATION_CACHE.maxEntries) return;
   evictValidationCache(now);
-}
-
-async function fetchPackageExists(packageName: string): Promise<boolean> {
-  const response = await fetch(
-    `https://registry.npmjs.org/${encodeRegistryPackageName(packageName)}`,
-    {
-      method: "HEAD",
-      headers: { Accept: ABBREVIATED_PACKUMENT },
-      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
-    },
-  );
-  return response.status === 200;
 }
 
 async function validatePackageExists(packageName: string): Promise<boolean> {
@@ -122,7 +112,10 @@ function isSameOriginRequest(request: NextRequest): boolean {
 }
 
 const errorResponse = (error: string, status: number) =>
-  NextResponse.json<GlobalComparisonError>({ error }, { status });
+  NextResponse.json<GlobalComparisonError>(
+    { error },
+    { status, headers: { "Cache-Control": NO_STORE } },
+  );
 
 const rateLimitedResponse = () =>
   errorResponse("Rate limit exceeded. Too many requests.", 429);
@@ -131,28 +124,27 @@ async function validateAndFilterPackages(packages: string[]): Promise<{
   validPackages: string[];
   invalidPackages: string[];
 }> {
-  const validPackages: string[] = [];
-  const invalidPackages: string[] = [];
+  const names = packages.map((name) => name.trim()).filter(Boolean);
+  const pending = new Map<string, Promise<boolean>>();
+  const checkOnce = (name: string) => {
+    const existing = pending.get(name);
+    if (existing) return existing;
+    const check = validatePackageExists(name);
+    pending.set(name, check);
+    return check;
+  };
 
-  for (const packageName of packages) {
-    const trimmedName = packageName.trim();
+  const results = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      isValid: isValidPackageName(name) && (await checkOnce(name)),
+    })),
+  );
 
-    if (!trimmedName) continue;
-
-    if (!isValidPackageName(trimmedName)) {
-      invalidPackages.push(trimmedName);
-      continue;
-    }
-
-    const exists = await validatePackageExists(trimmedName);
-    if (exists) {
-      validPackages.push(trimmedName);
-    } else {
-      invalidPackages.push(trimmedName);
-    }
-  }
-
-  return { validPackages, invalidPackages };
+  return {
+    validPackages: results.filter((r) => r.isValid).map((r) => r.name),
+    invalidPackages: results.filter((r) => !r.isValid).map((r) => r.name),
+  };
 }
 
 function generateComparisonId(): string {
@@ -179,10 +171,13 @@ export async function GET(
     const comparisons = await comparisonsStorage.getComparisons();
     const uniqueComparisons = getUniqueComparisons(comparisons, limit);
 
-    return NextResponse.json({
-      comparisons: uniqueComparisons.map(toPublicComparison),
-      total: comparisons.length,
-    });
+    return NextResponse.json(
+      {
+        comparisons: uniqueComparisons.map(toPublicComparison),
+        total: comparisons.length,
+      },
+      { headers: { "Cache-Control": GET_SUCCESS_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error in GET /api/comparisons:", error);
     return errorResponse("Failed to read comparisons", 500);

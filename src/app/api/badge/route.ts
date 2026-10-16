@@ -1,4 +1,5 @@
 import fetchNpmDownloadsAdaptive, {
+  createUpstreamSignal,
   hasTransientErrors,
   parsePackageList,
 } from "@/api/fetchNpmDownloadsAdaptive";
@@ -14,6 +15,7 @@ import { subWeeks } from "date-fns";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 20 } as const;
 
@@ -194,10 +196,12 @@ export async function GET(request: NextRequest) {
 
   const weeks = parseWeeks(searchParams.get("period"));
   const startDate = subWeeks(new Date(), weeks);
+  const signal = createUpstreamSignal(request.signal);
 
   try {
     const { data, errors } = await fetchNpmDownloadsAdaptive(packages, {
       startDate,
+      signal,
     });
 
     const series: BadgeSeries[] = packages.map((name, index) => {
@@ -225,6 +229,12 @@ export async function GET(request: NextRequest) {
       !hasTransientErrors(errors),
     );
   } catch (error) {
+    if (signal.aborted) {
+      return svgResponse(
+        renderMessageSvg("Timed out loading download data"),
+        504,
+      );
+    }
     console.error("Error in GET /api/badge:", error);
     const message = isAppError(error)
       ? error.message

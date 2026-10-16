@@ -1,4 +1,3 @@
-import { colors } from "@/lib/theme/colors";
 import { renderWithProviders } from "@/test/render";
 import { screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,22 +27,21 @@ afterEach(() => {
 });
 
 describe("ProjectTag", { timeout: 15_000 }, () => {
-  it("renders the project as a list item bordered with the light theme color", () => {
+  it("renders the project as a list item bordered with its chart CSS variable", () => {
     renderTag();
 
     const tag = screen.getByRole("listitem");
     expect(tag).toHaveTextContent("react");
-    expect(tag.style.border).toBe(normalizeBorder(colors.chart.light[2]));
-    expect(tag.style.border).not.toBe(normalizeBorder(colors.chart.dark[2]));
+    expect(tag.getAttribute("style")).toContain("hsl(var(--chart-2))");
     expect(tag.style.backgroundColor).toBe("");
   });
 
-  it("uses the dark theme color when the dark theme is active", () => {
+  it("keeps the same CSS variable when the dark theme is active", () => {
     localStorage.setItem("theme", "dark");
     renderTag();
 
-    expect(screen.getByRole("listitem").style.border).toBe(
-      normalizeBorder(colors.chart.dark[2]),
+    expect(screen.getByRole("listitem").getAttribute("style")).toContain(
+      "hsl(var(--chart-2))",
     );
   });
 

@@ -1,10 +1,8 @@
 import { render } from "@testing-library/react";
-import { ThemeProvider } from "next-themes";
 import { describe, expect, test } from "vitest";
 import DotIndicator from "./dot-indicator";
 
-const renderDot = (ui: React.ReactElement) =>
-  render(<ThemeProvider attribute="class">{ui}</ThemeProvider>);
+const renderDot = (ui: React.ReactElement) => render(ui);
 
 describe("DotIndicator", () => {
   test("uses explicit color", () => {
@@ -23,8 +21,10 @@ describe("DotIndicator", () => {
     expect(dot?.style.backgroundColor).toBe("");
   });
 
-  test("resolves chart color from index and theme", () => {
-    const { container } = renderDot(<DotIndicator index={0} />);
-    expect(container.querySelector("span")).toBeInTheDocument();
+  test("resolves a theme-independent chart CSS variable from the index", () => {
+    const { container } = renderDot(<DotIndicator index={2} />);
+    expect(container.querySelector("span")?.getAttribute("style")).toContain(
+      "hsl(var(--chart-3))",
+    );
   });
 });

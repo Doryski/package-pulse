@@ -46,6 +46,17 @@ describe("formatInteger", () => {
     expect(formatInteger(1000.4)).toBe(nbsp("1 000"));
     expect(formatInteger(-1000.6)).toBe(nbsp("-1 001"));
   });
+
+  it("replaces grouping spaces with a custom separator", () => {
+    expect(formatInteger(1234567, ",")).toBe("1,234,567");
+    expect(formatInteger(1234567)).toBe(nbsp("1 234 567"));
+  });
+
+  it("rejects a dot as thousand separator", () => {
+    expect(() => formatInteger(1000, ".")).toThrow(
+      "Thousand separator cannot be a dot",
+    );
+  });
 });
 
 describe("formatLargeNumber", () => {

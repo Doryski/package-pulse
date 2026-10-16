@@ -19,7 +19,7 @@ const navigationMock = await vi.hoisted(async () => {
 vi.mock("next/navigation", () => navigationMock);
 
 const DELIMITER = MULTI_SEARCH_DELIMITER;
-const NO_SCROLL = { scroll: false };
+const REPLACE_STATE_ARGS = [null, ""] as const;
 
 beforeEach(() => {
   navigationMock.reset();
@@ -84,9 +84,9 @@ describe("useUpdateSearchParamsProjects", () => {
 
     renderHook(() => useUpdateSearchParamsProjects(["react"], DELIMITER));
 
-    expect(navigationMock.router.replace).toHaveBeenCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenCalledWith(
+      ...REPLACE_STATE_ARGS,
       "/?projects=react",
-      NO_SCROLL,
     );
   });
 
@@ -96,7 +96,7 @@ describe("useUpdateSearchParamsProjects", () => {
 
     renderHook(() => useUpdateSearchParamsProjects(["react"], DELIMITER));
 
-    expect(navigationMock.router.replace).not.toHaveBeenCalled();
+    expect(navigationMock.replaceState).not.toHaveBeenCalled();
   });
 
   test("targets the compare path on compare routes", () => {
@@ -106,9 +106,9 @@ describe("useUpdateSearchParamsProjects", () => {
       useUpdateSearchParamsProjects(["react", "vue"], DELIMITER),
     );
 
-    expect(navigationMock.router.replace).toHaveBeenCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenCalledWith(
+      ...REPLACE_STATE_ARGS,
       expect.stringMatching(/^\/compare\/.*vue/),
-      NO_SCROLL,
     );
   });
 });
@@ -128,9 +128,9 @@ describe("useUpdateSearchParams", () => {
       ),
     );
 
-    expect(navigationMock.router.replace).toHaveBeenCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenCalledWith(
+      ...REPLACE_STATE_ARGS,
       "/?projects=react&period=months-1&scale=logarithmic&mode=normalized&foo=bar",
-      NO_SCROLL,
     );
   });
 
@@ -141,9 +141,9 @@ describe("useUpdateSearchParams", () => {
       useUpdateSearchParams(["react"], "all-time", "linear", DELIMITER),
     );
 
-    expect(navigationMock.router.replace).toHaveBeenCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenCalledWith(
+      ...REPLACE_STATE_ARGS,
       "/?projects=react",
-      NO_SCROLL,
     );
   });
 });
@@ -155,9 +155,9 @@ describe("useUpdateSearchParamsChart", () => {
 
     renderHook(() => useUpdateSearchParamsChart("years-1", "logarithmic"));
 
-    expect(navigationMock.router.replace).toHaveBeenCalledWith(
+    expect(navigationMock.replaceState).toHaveBeenCalledWith(
+      ...REPLACE_STATE_ARGS,
       "/?projects=react&period=years-1&scale=logarithmic",
-      NO_SCROLL,
     );
   });
 
@@ -169,6 +169,6 @@ describe("useUpdateSearchParamsChart", () => {
       useUpdateSearchParamsChart("all-time", "linear", "normalized"),
     );
 
-    expect(navigationMock.router.replace).not.toHaveBeenCalled();
+    expect(navigationMock.replaceState).not.toHaveBeenCalled();
   });
 });

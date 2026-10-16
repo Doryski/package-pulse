@@ -1,10 +1,10 @@
+import { WEEK_BUCKETING } from "@/lib/utils/groupByPeriod";
 import { formatDate } from "@/app/(home)/utils/date-utils";
 import type { ChartScale } from "@/lib/enums/ChartScale";
 import type { TimePeriod } from "@/lib/enums/TimePeriod";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { formatLargeNumber } from "@/lib/utils/formatters";
-import sortByVersion from "@/lib/utils/sortByVersion";
-import { isAfter, subMonths, subYears } from "date-fns";
+import { subMonths, subYears } from "date-fns";
 import type { ComponentType, ReactNode } from "react";
 
 export type ChartData = {
@@ -26,7 +26,7 @@ export type ChartConfig = {
   [k in string]: {
     label?: ReactNode;
     icon?: ComponentType;
-    versions?: VersionData[];
+    latestRelease?: VersionData | null;
   } & (
     | { color?: string; theme?: never }
     | { color?: never; theme: Record<"light" | "dark", string> }
@@ -41,35 +41,40 @@ const SHARE_TO_X_TEXT = "Compare npm package download trends on Package Pulse";
 
 const LOG_DOMAIN_FALLBACK = [1, 100];
 
-const isAfterPeriodStart = (date: Date, timePeriod: TimePeriod, now: Date) => {
+const getPeriodStart = (timePeriod: TimePeriod, now: Date) => {
   switch (timePeriod) {
     case "months-1":
-      return isAfter(date, subMonths(now, 1));
+      return subMonths(now, 1);
     case "months-3":
-      return isAfter(date, subMonths(now, 3));
+      return subMonths(now, 3);
     case "months-6":
-      return isAfter(date, subMonths(now, 6));
+      return subMonths(now, 6);
     case "years-1":
-      return isAfter(date, subYears(now, 1));
+      return subYears(now, 1);
     case "years-2":
-      return isAfter(date, subYears(now, 2));
+      return subYears(now, 2);
     case "years-5":
-      return isAfter(date, subYears(now, 5));
+      return subYears(now, 5);
     case "all-time":
-      return true;
+      return null;
     default:
       return assertUnreachable(timePeriod, "Invalid time period");
   }
 };
 
+const toIsoTime = (time: ChartData["time"]) =>
+  typeof time === "string" ? time : time.toISOString();
+
 export const filterByTimePeriod = (
   data: ChartData[],
   timePeriod: TimePeriod,
   now: Date,
-) =>
-  data.filter((item) =>
-    isAfterPeriodStart(new Date(item.time), timePeriod, now),
-  );
+) => {
+  const periodStart = getPeriodStart(timePeriod, now);
+  if (!periodStart) return data;
+  const cutoff = periodStart.toISOString();
+  return data.filter((item) => toIsoTime(item.time) > cutoff);
+};
 
 const getValueKeys = (row: ChartRow, xKey: string) =>
   Object.keys(row).filter((key) => key !== xKey);
@@ -90,11 +95,25 @@ export const formatYAxisTick = (value: number, chartScale: ChartScale) => {
 const isPositiveNumber = (value: unknown): value is number =>
   typeof value === "number" && value > 0;
 
-const getPositiveValues = (rows: ChartRow[], xKey: string) =>
-  rows.flatMap((row) =>
-    getValueKeys(row, xKey)
-      .map((key) => row[key])
-      .filter(isPositiveNumber),
+type ValueRange = { min: number; max: number };
+
+const extendRange = (range: ValueRange | null, value: number) => {
+  if (!range) return { min: value, max: value };
+  return {
+    min: Math.min(range.min, value),
+    max: Math.max(range.max, value),
+  };
+};
+
+const getPositiveRange = (rows: ChartRow[], xKey: string) =>
+  rows.reduce<ValueRange | null>(
+    (range, row) =>
+      getValueKeys(row, xKey).reduce((rowRange, key) => {
+        const value = row[key];
+        if (!isPositiveNumber(value)) return rowRange;
+        return extendRange(rowRange, value);
+      }, range),
+    null,
   );
 
 export const getYAxisDomain = (
@@ -106,15 +125,12 @@ export const getYAxisDomain = (
     return ["auto", "auto"];
   }
 
-  const values = getPositiveValues(rows, xKey);
-  if (values.length === 0) {
+  const range = getPositiveRange(rows, xKey);
+  if (!range) {
     return [...LOG_DOMAIN_FALLBACK];
   }
 
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-
-  return [Math.max(1, Math.floor(minValue * 0.9)), Math.ceil(maxValue * 1.1)];
+  return [Math.max(1, Math.floor(range.min * 0.9)), Math.ceil(range.max * 1.1)];
 };
 
 export const nullifyZeroValues = (rows: ChartRow[], xKey: string) =>
@@ -148,18 +164,25 @@ export const formatNormalizedLabel = (
   return `wk ${weekIndex}`;
 };
 
-export const getLatestVersion = (versions?: VersionData[]) => {
-  if (!versions) return;
-  return sortByVersion(versions).at(-1);
-};
-
 export const formatVersion = (version: VersionData) => {
   const formattedDate = formatDate(version.date);
   return `${version.version} (${formattedDate})`;
 };
 
-export const formatLatestVersion = (versions?: VersionData[]) => {
-  const latestVersion = getLatestVersion(versions);
-  if (!latestVersion) return "-";
-  return formatVersion(latestVersion);
+export const formatLatestVersion = (release?: VersionData | null) => {
+  if (!release) return "-";
+  return formatVersion(release);
+};
+
+const toReleaseWeekEnd = (releaseDate: string) =>
+  WEEK_BUCKETING.boundsOf(WEEK_BUCKETING.keyOf(releaseDate.slice(0, 10))).end;
+
+export const findReleaseRowKey = (
+  rows: ChartRow[],
+  xKey: string,
+  releaseDate: string,
+) => {
+  const weekEnd = toReleaseWeekEnd(releaseDate);
+  const hasRow = rows.some((row) => String(row[xKey]) === weekEnd);
+  return hasRow ? weekEnd : null;
 };

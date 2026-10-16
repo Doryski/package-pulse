@@ -115,6 +115,53 @@ describe("RequestQueue", () => {
 
     await expect(ok).resolves.toBe("ok");
   });
+
+  test("rejects an already aborted job with an AbortError without running it", async () => {
+    const queue = new RequestQueue();
+    const controller = new AbortController();
+    controller.abort();
+    const fn = vi.fn(async () => 1);
+
+    await expect(queue.add(fn, controller.signal)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  test("skips a queued job aborted before it starts and runs the next one", async () => {
+    const queue = new RequestQueue(1, 10);
+    const first = defer<string>();
+    const controller = new AbortController();
+    const skipped = vi.fn(async () => "skipped");
+    const next = vi.fn(async () => "next");
+
+    const firstResult = queue.add(() => first.promise);
+    const skippedResult = queue.add(skipped, controller.signal);
+    const nextResult = queue.add(next);
+    const abortAssertion =
+      expect(skippedResult).rejects.toBeInstanceOf(DOMException);
+
+    controller.abort();
+    await abortAssertion;
+    first.resolve("first");
+    await firstResult;
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(nextResult).resolves.toBe("next");
+    expect(skipped).not.toHaveBeenCalled();
+  });
+
+  test("does not reject a job that already started when its signal aborts", async () => {
+    const queue = new RequestQueue();
+    const controller = new AbortController();
+    const running = defer<string>();
+
+    const result = queue.add(() => running.promise, controller.signal);
+    controller.abort();
+    running.resolve("done");
+
+    await expect(result).resolves.toBe("done");
+  });
 });
 
 describe("exported queues", () => {

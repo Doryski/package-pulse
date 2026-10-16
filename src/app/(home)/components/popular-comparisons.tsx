@@ -1,8 +1,13 @@
 "use client";
 
 import usePopularComparisons from "@/lib/queries/usePopularComparisons";
-import { PopularComparison } from "@/lib/types/global-comparison";
-import ComparisonCard, { ComparisonCardSkeleton } from "./comparison-card";
+import { memo } from "react";
+import ComparisonCard from "./comparison-card";
+import ComparisonsFeedSection, {
+  ComparisonsFeedSkeleton,
+} from "./comparisons-feed-section";
+
+const TITLE = "Popular Searches or Comparisons";
 
 type PopularComparisonsProps = {
   selectedProjects: string[];
@@ -13,44 +18,31 @@ const PopularComparisons = ({
   selectedProjects,
   onAddMultipleProjects,
 }: PopularComparisonsProps) => {
-  const popularComparisons = usePopularComparisons();
+  const hasSelection = selectedProjects.length > 0;
+  const popularComparisons = usePopularComparisons({ enabled: !hasSelection });
 
-  if (selectedProjects.length > 0) {
-    return null;
+  if (hasSelection) return null;
+
+  if (popularComparisons.isLoading) {
+    return <ComparisonsFeedSkeleton title={TITLE} projectCount={3} />;
   }
 
-  const handleComparisonClick = (comparison: PopularComparison) => {
-    onAddMultipleProjects(comparison.projects);
-  };
+  const comparisons = popularComparisons.data?.comparisons;
 
-  if (
-    popularComparisons.error ||
-    !popularComparisons.data?.comparisons.length
-  ) {
-    return null;
-  }
+  if (popularComparisons.error || !comparisons?.length) return null;
 
   return (
-    <section className="mt-6">
-      <h2 className="mb-4 text-lg font-semibold">
-        Popular Searches or Comparisons
-      </h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {popularComparisons.isLoading
-          ? [...Array(6)].map((_, index) => (
-              <ComparisonCardSkeleton key={index} projectCount={3} />
-            ))
-          : popularComparisons.data?.comparisons.map((comparison) => (
-              <ComparisonCard
-                key={comparison.projects.join(",")}
-                projects={comparison.projects}
-                onProjectsClick={() => handleComparisonClick(comparison)}
-                title={""}
-              />
-            ))}
-      </div>
-    </section>
+    <ComparisonsFeedSection title={TITLE}>
+      {comparisons.map((comparison) => (
+        <ComparisonCard
+          key={comparison.projects.join(",")}
+          projects={comparison.projects}
+          onProjectsClick={onAddMultipleProjects}
+          title=""
+        />
+      ))}
+    </ComparisonsFeedSection>
   );
 };
 
-export default PopularComparisons;
+export default memo(PopularComparisons);

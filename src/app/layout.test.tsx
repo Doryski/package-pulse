@@ -67,7 +67,7 @@ describe("layout metadata", () => {
 });
 
 describe("RootLayout", () => {
-  it("renders the shell around the page content", () => {
+  it("renders the shell around the page content", async () => {
     renderLayout();
 
     expect(document.documentElement).toHaveAttribute("lang", "en");
@@ -75,7 +75,7 @@ describe("RootLayout", () => {
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveTextContent("Page content");
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
-    expect(screen.getByTestId("toaster")).toBeInTheDocument();
+    expect(await screen.findByTestId("toaster")).toBeInTheDocument();
   });
 
   it("adds website structured data to the head", () => {

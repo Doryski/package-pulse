@@ -249,4 +249,46 @@ test.describe("Search Projects Form", () => {
       ).not.toBeVisible();
     }
   });
+
+  test("should complete the keyboard-only flow from search to chart controls", async ({
+    page,
+  }) => {
+    const projectName = "react";
+    const searchInput = getSearchInput(page);
+    const timePeriodSelect = page.locator("#time-period-select");
+
+    await expect(searchInput).toBeFocused();
+    await expect(searchInput).toHaveAttribute("aria-expanded", "false");
+
+    const searchResponse = waitForSearchResponse(page, projectName);
+    await page.keyboard.type(projectName);
+    await searchResponse;
+
+    const list = getOptionsList(page);
+    await expect(list).toBeVisible();
+    await expect(searchInput).toHaveAttribute("aria-expanded", "true");
+    await expect(searchInput).toHaveAttribute(
+      "aria-controls",
+      (await list.getAttribute("id")) ?? "",
+    );
+
+    const firstOption = list.getByRole("option").first();
+    await expect(firstOption).toBeVisible();
+    const optionName = (await firstOption.textContent()) ?? "";
+
+    await page.keyboard.press("ArrowDown");
+    await expect(firstOption).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(getTags(page).getByText(optionName)).toBeVisible();
+    await expect(searchInput).toBeFocused();
+    await expect(searchInput).toHaveValue("");
+    await expect(page.getByTestId("main-chart")).toBeVisible();
+    await expect(searchInput).toBeFocused();
+
+    await expect(async () => {
+      await page.keyboard.press("Tab");
+      await expect(timePeriodSelect).toBeFocused({ timeout: 100 });
+    }).toPass({ timeout: 15_000, intervals: [0] });
+  });
 });

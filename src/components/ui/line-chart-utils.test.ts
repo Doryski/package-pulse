@@ -3,12 +3,12 @@ import {
   buildShareToXUrl,
   ChartData,
   filterByTimePeriod,
+  findReleaseRowKey,
   formatLatestVersion,
   formatNormalizedLabel,
   formatVersion,
   formatXAxisTick,
   formatYAxisTick,
-  getLatestVersion,
   getSeriesKeys,
   getYAxisDomain,
   nullifyZeroValues,
@@ -52,12 +52,6 @@ const PERIOD_CASES = [
   ["years-5", TIMELINE.slice(1)],
   ["all-time", TIMELINE],
 ] as const;
-
-const VERSIONS = [
-  { version: "1.10.0", date: "2024-03-01" },
-  { version: "1.2.0", date: "2024-01-01" },
-  { version: "1.9.5", date: "2024-02-01" },
-];
 
 describe("filterByTimePeriod", () => {
   it.each(PERIOD_CASES)("keeps rows within %s", (period, expected) => {
@@ -129,6 +123,19 @@ describe("getYAxisDomain", () => {
     expect(getYAxisDomain(rows, "time", "logarithmic")).toEqual([90, 1100]);
   });
 
+  it("scans every series of every row", () => {
+    expect(
+      getYAxisDomain(
+        [
+          { time: "a", react: 50, vue: 20 },
+          { time: "b", react: 10, vue: 5000 },
+        ],
+        "time",
+        "logarithmic",
+      ),
+    ).toEqual([9, 5500]);
+  });
+
   it("never goes below 1", () => {
     expect(
       getYAxisDomain([{ time: "a", react: 1 }], "time", "logarithmic"),
@@ -174,26 +181,52 @@ describe("formatNormalizedLabel", () => {
 });
 
 describe("versions", () => {
-  it("getLatestVersion returns undefined without versions", () => {
-    expect(getLatestVersion()).toBeUndefined();
-  });
-
-  it("getLatestVersion returns the highest semver", () => {
-    expect(getLatestVersion(VERSIONS)).toEqual(VERSIONS[0]);
-  });
-
   it("formatVersion includes the formatted date", () => {
     expect(formatVersion({ version: "2.0.0", date: "2024-05-01" })).toBe(
       "2.0.0 (2024-05-01)",
     );
   });
 
-  it("formatLatestVersion returns a dash for missing or empty versions", () => {
+  it("formatLatestVersion returns a dash without a release", () => {
     expect(formatLatestVersion()).toBe("-");
-    expect(formatLatestVersion([])).toBe("-");
+    expect(formatLatestVersion(null)).toBe("-");
   });
 
-  it("formatLatestVersion formats the latest version", () => {
-    expect(formatLatestVersion(VERSIONS)).toBe("1.10.0 (2024-03-01)");
+  it("formatLatestVersion formats the latest release", () => {
+    expect(formatLatestVersion({ version: "1.10.0", date: "2024-03-01" })).toBe(
+      "1.10.0 (2024-03-01)",
+    );
+  });
+});
+
+describe("findReleaseRowKey", () => {
+  const rows = [
+    { time: "2026-03-29", react: 1 },
+    { time: "2026-04-05", react: 2 },
+    { time: "2026-04-12", react: 3 },
+  ];
+
+  it.each([
+    ["2026-04-01T21:01:20.458Z", "2026-04-05"],
+    ["2026-03-30T00:30:00.000Z", "2026-04-05"],
+    ["2026-04-04T23:59:59.000Z", "2026-04-05"],
+    ["2026-03-29T10:00:00.000Z", "2026-04-05"],
+    ["2026-04-06T08:00:00.000Z", "2026-04-12"],
+  ])(
+    "places a release from %s in the week bucket ending %s",
+    (date, expected) => {
+      expect(findReleaseRowKey(rows, "time", date)).toBe(expected);
+    },
+  );
+
+  it.each([
+    ["older than the plotted window", "2026-03-01T10:00:00.000Z"],
+    ["newer than every plotted week", "2026-04-13T00:00:00.000Z"],
+  ])("returns null for a release %s", (_label, date) => {
+    expect(findReleaseRowKey(rows, "time", date)).toBeNull();
+  });
+
+  it("returns null for empty data", () => {
+    expect(findReleaseRowKey([], "time", "2026-04-01")).toBeNull();
   });
 });

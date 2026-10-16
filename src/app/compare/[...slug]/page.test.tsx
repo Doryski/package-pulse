@@ -1,11 +1,16 @@
 import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
+import { getProjectStatsQueryKey } from "@/lib/queries/keys";
+import prefetchCompareStats from "@/lib/server/prefetchCompareStats";
 import { projectsToSlug } from "@/lib/utils/slug";
-import { render, screen } from "@testing-library/react";
+import { buildProjectStats } from "@/test/factories";
+import { renderWithProviders } from "@/test/render";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ComparePage, {
   dynamicParams,
   generateMetadata,
   generateStaticParams,
+  revalidate,
 } from "./page";
 
 const navigationMock = await vi.hoisted(async () => {
@@ -19,15 +24,18 @@ vi.mock("@/app/(home)/components/home-shell", () => ({
   default: (props: {
     initialProjects: string[];
     persistSelection: boolean;
+    selectionHeading: boolean;
   }) => <output aria-label="home shell">{JSON.stringify(props)}</output>,
 }));
+
+vi.mock("@/lib/server/prefetchCompareStats", () => ({ default: vi.fn() }));
 
 const BASE_URL = "https://www.package-pulse.com";
 
 const toParams = (slug: string[]) => ({ params: Promise.resolve({ slug }) });
 
 const renderPage = async (slug: string[]) =>
-  render(await ComparePage(toParams(slug)));
+  renderWithProviders(await ComparePage(toParams(slug)));
 
 const getShellProps = () =>
   JSON.parse(
@@ -42,11 +50,16 @@ const getJsonLd = (container: HTMLElement) =>
 
 beforeEach(() => {
   navigationMock.reset();
+  vi.mocked(prefetchCompareStats).mockReset();
 });
 
 describe("compare page config", () => {
   it("allows dynamic params", () => {
     expect(dynamicParams).toBe(true);
+  });
+
+  it("revalidates hourly", () => {
+    expect(revalidate).toBe(3600);
   });
 
   it("generates static params for every quick comparison", () => {
@@ -117,13 +130,33 @@ describe("generateMetadata", () => {
 });
 
 describe("ComparePage", () => {
-  it("renders the home shell with projects and without persisting selection", async () => {
+  it("renders the home shell with projects, the selection heading and without persisting selection", async () => {
     await renderPage(["react-vs-vue"]);
 
     expect(getShellProps()).toEqual({
       initialProjects: ["react", "vue"],
       persistSelection: false,
+      selectionHeading: true,
     });
+  });
+
+  it("prefetches the selected projects and hydrates them into the client cache", async () => {
+    const stats = buildProjectStats("react");
+    vi.mocked(prefetchCompareStats).mockImplementation(
+      async (queryClient, projects) => {
+        queryClient.setQueryData(getProjectStatsQueryKey(projects[0]!), stats);
+      },
+    );
+
+    const { queryClient } = await renderPage(["react-vs-vue"]);
+
+    expect(prefetchCompareStats).toHaveBeenCalledWith(expect.anything(), [
+      "react",
+      "vue",
+    ]);
+    expect(queryClient.getQueryData(getProjectStatsQueryKey("react"))).toEqual(
+      stats,
+    );
   });
 
   it("renders software application structured data", async () => {
