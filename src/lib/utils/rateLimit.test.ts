@@ -12,11 +12,13 @@ const { envState, limitMock, ratelimitConstructor } = vi.hoisted(() => ({
 vi.mock("@/lib/config/env", () => ({ env: envState }));
 
 vi.mock("@upstash/redis", () => ({
-  Redis: vi.fn().mockImplementation(() => ({})),
+  Redis: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock("@upstash/ratelimit", () => {
-  const Ratelimit = vi.fn().mockImplementation((config: unknown) => {
+  const Ratelimit = vi.fn().mockImplementation(function (config: unknown) {
     ratelimitConstructor(config);
     return { limit: limitMock };
   });

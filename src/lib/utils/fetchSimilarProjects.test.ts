@@ -21,9 +21,9 @@ vi.mock("@/lib/config/env", () => ({
 }));
 
 vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    responses: { create: openaiCreate },
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { responses: { create: openaiCreate } };
+  }),
 }));
 
 vi.mock("openai/helpers/zod.mjs", () => ({
