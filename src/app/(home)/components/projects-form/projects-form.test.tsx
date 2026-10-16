@@ -127,6 +127,13 @@ const registryLookup = async (query: string) =>
 const jsonResponse = (body: unknown, ok = true) =>
   ({ ok, json: async () => body }) as Response;
 
+const statusResponse = (status: number) =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => ({}),
+  }) as Response;
+
 const PACKAGE_INFO_PATH = "/api/package-info";
 const UPSTREAM_FAILING_PACKAGE = "broken";
 
@@ -646,6 +653,50 @@ describe("ProjectsForm", { timeout: 15_000 }, () => {
       await settleTracking();
 
       expect(consoleError).toHaveBeenCalledWith("Failed to track comparison.");
+    });
+
+    it.each([
+      { status: 409, reason: "duplicate comparison" },
+      { status: 429, reason: "rate limited" },
+    ])(
+      "stays silent when the server rejects tracking as $reason ($status)",
+      async ({ status }) => {
+        fetchSpy.mockResolvedValue(statusResponse(status));
+        renderProjectsForm(["react"]);
+
+        await settleTracking();
+
+        expect(comparisonCalls()).toHaveLength(1);
+        expect(consoleError).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([400, 403, 500, 503])(
+      "logs an error for an unexpected %i response",
+      async (status) => {
+        fetchSpy.mockResolvedValue(statusResponse(status));
+        renderProjectsForm(["react"]);
+
+        await settleTracking();
+
+        expect(consoleError).toHaveBeenCalledWith(
+          "Failed to track comparison.",
+        );
+      },
+    );
+
+    it("stays silent when a remount re-tracks an already tracked selection", async () => {
+      fetchSpy.mockResolvedValue(statusResponse(201));
+      const first = renderProjectsForm(["react", "vue"]);
+      await settleTracking();
+      first.unmount();
+
+      fetchSpy.mockResolvedValue(statusResponse(409));
+      renderProjectsForm(["react", "vue"]);
+      await settleTracking();
+
+      expect(comparisonCalls()).toHaveLength(2);
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it("logs an error when the request throws", async () => {

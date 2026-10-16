@@ -28,6 +28,11 @@ const StatsSection = dynamic(() => import("../stats-section"), {
 
 const PROJECTS_URL_DELIMITER = ",";
 
+const EXPECTED_TRACKING_REJECTIONS = new Set([409, 429]);
+
+const isUnexpectedTrackingFailure = (response: Response) =>
+  !response.ok && !EXPECTED_TRACKING_REJECTIONS.has(response.status);
+
 async function trackComparison(projects: string[]) {
   if (projects.length === 0) return;
 
@@ -55,7 +60,7 @@ async function trackComparison(projects: string[]) {
         }
         console.info(result.validation.message);
       }
-    } else {
+    } else if (isUnexpectedTrackingFailure(response)) {
       console.error("Failed to track comparison.");
     }
   } catch (_error) {
