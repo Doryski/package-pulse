@@ -60,9 +60,11 @@ type TaskResult = TaskSuccess | TaskFailure;
 const isTaskFailure = (result: TaskResult): result is TaskFailure =>
   "error" in result;
 
-const notFoundMessage = (name: string) => `Package "${name}" not found`;
+export const notFoundMessage = (name: string) => `Package "${name}" not found`;
 const failedMessage = (name: string) =>
   `Failed to load downloads for "${name}"`;
+const partialMessage = (name: string) =>
+  `Some download data for "${name}" could not be loaded`;
 
 const isNotFoundErrorBody = (message: string) => {
   const normalized = message.toLowerCase();
@@ -116,6 +118,45 @@ function mergeDownloads(downloads: NPMDownloadCount[]): NPMDownloadCount[] {
     byDate.set(entry.date, entry);
   }
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+type PackageAccumulator = {
+  downloads: NPMDownloadCount[];
+  sawData: boolean;
+  notFoundWindows: number;
+  failedWindows: number;
+};
+
+type ResolvedPackage = {
+  downloads: NPMDownloadCount[] | null;
+  error?: string;
+};
+
+const createAccumulator = (): PackageAccumulator => ({
+  downloads: [],
+  sawData: false,
+  notFoundWindows: 0,
+  failedWindows: 0,
+});
+
+function resolvePackage(
+  name: string,
+  acc: PackageAccumulator,
+): ResolvedPackage {
+  if (acc.sawData && acc.failedWindows > 0) {
+    return {
+      downloads: mergeDownloads(acc.downloads),
+      error: partialMessage(name),
+    };
+  }
+  if (acc.sawData) return { downloads: mergeDownloads(acc.downloads) };
+  if (acc.failedWindows > 0) {
+    return { downloads: null, error: failedMessage(name) };
+  }
+  if (acc.notFoundWindows > 0) {
+    return { downloads: null, error: notFoundMessage(name) };
+  }
+  return { downloads: null };
 }
 
 export default async function fetchNpmDownloadsAdaptive(
@@ -178,55 +219,52 @@ export default async function fetchNpmDownloadsAdaptive(
     signal: opts?.signal,
   });
 
-  const accumulator = new Map<
-    string,
-    { downloads: NPMDownloadCount[]; sawData: boolean; failed: boolean }
-  >();
-  for (const name of packages) {
-    accumulator.set(name, { downloads: [], sawData: false, failed: false });
-  }
-
-  const errors: Record<string, string> = {};
-  const recordError = (name: string, message: string) => {
-    if (!errors[name]) errors[name] = message;
-  };
-
-  let hasNonNotFoundFailure = false;
-
-  const markFailed = (names: string[], notFound: boolean) => {
-    if (!notFound) hasNonNotFoundFailure = true;
-    for (const name of names) {
-      const acc = accumulator.get(name);
-      if (acc) acc.failed = true;
-      recordError(name, notFound ? notFoundMessage(name) : failedMessage(name));
-    }
-  };
+  const accumulators = new Map(
+    packages.map((name) => [name, createAccumulator()] as const),
+  );
+  const update = (names: string[], apply: (acc: PackageAccumulator) => void) =>
+    names
+      .map((name) => accumulators.get(name))
+      .filter((acc) => acc !== undefined)
+      .forEach(apply);
 
   for (const outcome of result.results) {
     if (isTaskFailure(outcome)) {
-      markFailed(outcome.packages, Boolean(outcome.notFound));
+      update(outcome.packages, (acc) => {
+        if (outcome.notFound) acc.notFoundWindows += 1;
+        else acc.failedWindows += 1;
+      });
       continue;
     }
     for (const [name, period] of Object.entries(outcome.map)) {
-      const acc = accumulator.get(name);
-      if (!acc || !period) continue;
-      acc.downloads.push(...period.downloads);
-      acc.sawData = true;
+      if (!period) continue;
+      update([name], (acc) => {
+        acc.downloads.push(...period.downloads);
+        acc.sawData = true;
+      });
     }
   }
 
   for (const failed of result.errors) {
-    markFailed(failed.item.packages, false);
+    update(failed.item.packages, (acc) => {
+      acc.failedWindows += 1;
+    });
   }
 
-  const data: Record<string, NPMDownloadCount[] | null> = {};
-  for (const [name, acc] of accumulator) {
-    if (acc.failed || !acc.sawData) {
-      data[name] = null;
-      continue;
-    }
-    data[name] = mergeDownloads(acc.downloads);
-  }
+  const resolved = [...accumulators].map(
+    ([name, acc]) => [name, resolvePackage(name, acc)] as const,
+  );
+  const data = Object.fromEntries(
+    resolved.map(([name, { downloads }]) => [name, downloads]),
+  );
+  const errors = Object.fromEntries(
+    resolved.flatMap(([name, { error }]) =>
+      error ? [[name, error] as const] : [],
+    ),
+  );
+  const hasNonNotFoundFailure = [...accumulators.values()].some(
+    (acc) => acc.failedWindows > 0,
+  );
 
   const hasAnyData = Object.values(data).some((value) => value !== null);
   if (!hasAnyData && hasNonNotFoundFailure) {

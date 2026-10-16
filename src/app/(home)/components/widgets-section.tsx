@@ -176,6 +176,7 @@ const WidgetCard = memo(
                       onClick={handleDownload}
                       disabled={isLoading}
                       className="rounded-r-none border-r border-border/50"
+                      aria-label="Download widget as PNG"
                     >
                       <DownloadIcon className="size-4" />
                     </Button>
@@ -187,6 +188,7 @@ const WidgetCard = memo(
                         size="sm"
                         disabled={isLoading}
                         className="rounded-l-none px-1"
+                        aria-label="Download a single project card"
                       >
                         <ChevronDownIcon className="size-3" />
                       </Button>
@@ -213,6 +215,7 @@ const WidgetCard = memo(
                     size="sm"
                     onClick={handleDownload}
                     disabled={isLoading}
+                    aria-label="Download widget as PNG"
                   >
                     <DownloadIcon className="size-4" />
                   </Button>
@@ -239,6 +242,7 @@ const WidgetCard = memo(
                         size="sm"
                         disabled={isLoading}
                         className="rounded-l-none px-1"
+                        aria-label="Download a single project card"
                       >
                         <ChevronDownIcon className="size-3" />
                       </Button>

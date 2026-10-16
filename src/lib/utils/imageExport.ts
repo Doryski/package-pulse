@@ -15,20 +15,21 @@ export async function convertHtmlToImage(element: HTMLElement) {
 export const downloadAsImage = async (
   element: HTMLElement,
   filename: string,
+  label = "Widget",
 ) => {
   try {
     const canvas = await convertHtmlToImage(element);
 
     downloadFile(`${filename}.png`, canvas.toDataURL());
 
-    toast.success("Widget downloaded as image");
+    toast.success(`${label} downloaded as image`);
   } catch (error) {
-    console.error("Error downloading widget:", error);
-    toast.error("Failed to download widget");
+    console.error(`Error downloading ${label.toLowerCase()}:`, error);
+    toast.error(`Failed to download ${label.toLowerCase()}`);
   }
 };
 
-export const copyAsImage = async (element: HTMLElement) => {
+export const copyAsImage = async (element: HTMLElement, label = "Widget") => {
   try {
     const canvas = await convertHtmlToImage(element);
 
@@ -38,15 +39,15 @@ export const copyAsImage = async (element: HTMLElement) => {
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob }),
           ]);
-          toast.success("Widget copied to clipboard");
+          toast.success(`${label} copied to clipboard`);
         } catch (error) {
           console.error("Error copying to clipboard:", error);
-          toast.error("Failed to copy widget");
+          toast.error(`Failed to copy ${label.toLowerCase()}`);
         }
       }
     });
   } catch (error) {
-    console.error("Error copying widget:", error);
-    toast.error("Failed to copy widget");
+    console.error(`Error copying ${label.toLowerCase()}:`, error);
+    toast.error(`Failed to copy ${label.toLowerCase()}`);
   }
 };

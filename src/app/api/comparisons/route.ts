@@ -11,6 +11,8 @@ import {
   PublicComparison,
 } from "@/lib/types/global-comparison";
 import getClientIp from "@/lib/utils/getClientIp";
+import isRateLimited from "@/lib/utils/rateLimit";
+import isValidPackageName from "@/lib/utils/isValidPackageName";
 import { NextRequest, NextResponse } from "next/server";
 
 type CreateComparisonResponse = PublicComparison & {
@@ -25,48 +27,13 @@ function toPublicComparison(comparison: GlobalComparison): PublicComparison {
   return rest;
 }
 
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 10;
-
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 10 } as const;
 
 const packageValidationCache = new Map<
   string,
   { isValid: boolean; timestamp: number }
 >();
 const VALIDATION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-function isRateLimited(clientIP: string): boolean {
-  const now = Date.now();
-  const clientData = requestCounts.get(clientIP);
-
-  if (!clientData || now > clientData.resetTime) {
-    requestCounts.set(clientIP, {
-      count: 1,
-      resetTime: now + RATE_LIMIT_WINDOW,
-    });
-    return false;
-  }
-
-  if (clientData.count >= MAX_REQUESTS_PER_WINDOW) {
-    return true;
-  }
-
-  clientData.count++;
-  return false;
-}
-
-function isValidPackageName(name: string): boolean {
-  const npmNameRegex =
-    /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
-
-  if (!name || typeof name !== "string") return false;
-  if (name.length < 1 || name.length > 214) return false;
-  if (name.startsWith(".") || name.startsWith("_")) return false;
-  if (!npmNameRegex.test(name.toLowerCase())) return false;
-
-  return true;
-}
 
 async function validatePackageExists(packageName: string): Promise<boolean> {
   try {
@@ -151,7 +118,7 @@ export async function POST(
   try {
     const clientIP = getClientIp(request.headers);
 
-    if (isRateLimited(clientIP)) {
+    if (isRateLimited(`comparisons:${clientIP}`, RATE_LIMIT)) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Too many requests." },
         { status: 429 },

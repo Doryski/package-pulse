@@ -26,13 +26,16 @@ import {
 import chartModes, { ChartMode } from "@/lib/enums/ChartMode";
 import chartScales, { ChartScale } from "@/lib/enums/ChartScale";
 import LocalStorageKey from "@/lib/enums/LocalStorageKey";
+import getLocalStorageValue from "@/lib/utils/getLocalStorageValue";
+import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 import timePeriods, { TimePeriod } from "@/lib/enums/TimePeriod";
 import useLocalStorage from "@/lib/hooks/useLocalStorage";
 import assertUnreachable from "@/lib/utils/assertUnreachable";
 import { cn } from "@/lib/utils/cn";
-import { exportCsv, downloadFile } from "@/lib/utils/exportUtils";
+import { exportCsv } from "@/lib/utils/exportUtils";
 import { formatLargeNumber } from "@/lib/utils/formatters";
-import { convertHtmlToImage } from "@/lib/utils/imageExport";
+import { copyAsImage, downloadAsImage } from "@/lib/utils/imageExport";
 import sortByVersion from "@/lib/utils/sortByVersion";
 import {
   ChevronDownIcon,
@@ -47,6 +50,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -108,6 +112,10 @@ type LineChartStore = {
   isHiddenElement: (key: string) => boolean;
 };
 
+const chartModeSchema = z.custom<ChartMode>((value) =>
+  chartModes.some((mode) => mode.value === value),
+);
+
 const createLineChartStore = (key: string) => {
   const storeName = `line-chart-${key}`;
   return create<LineChartStore>()(
@@ -168,10 +176,24 @@ function MultipleLineChart({
   const initialTimePeriod = useInitialTimePeriodFromSearchParams();
   const initialChartScale = useInitialChartScaleFromSearchParams();
   const initialChartMode = useInitialChartModeFromSearchParams();
+  const hasModeParam = useSearchParams().has("mode");
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialTimePeriod);
   const [chartScale, setChartScale] = useState<ChartScale>(initialChartScale);
   const [chartMode, setChartMode] = useState<ChartMode>(initialChartMode);
+
+  const hasRestoredMode = useRef(false);
+
+  useEffect(() => {
+    if (hasModeParam || hasRestoredMode.current) return;
+    hasRestoredMode.current = true;
+    const storedMode = getLocalStorageValue(
+      LocalStorageKey.CHART_MODE,
+      chartModeSchema,
+    );
+    if (storedMode) setChartMode(storedMode);
+  }, [hasModeParam]);
+
   const [isPending, startTransition] = useTransition();
   const { isHiddenElement } = useLineChart(chartKey)();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -289,36 +311,16 @@ function MultipleLineChart({
 
   const handleDownloadImage = useCallback(async () => {
     if (!chartRef.current) return;
-    try {
-      const canvas = await convertHtmlToImage(chartRef.current);
-      downloadFile(`package-pulse-chart-${Date.now()}.png`, canvas.toDataURL());
-      toast.success("Chart downloaded as image");
-    } catch (error) {
-      console.error("Error downloading chart:", error);
-      toast.error("Failed to download chart");
-    }
+    await downloadAsImage(
+      chartRef.current,
+      `package-pulse-chart-${Date.now()}`,
+      "Chart",
+    );
   }, []);
 
   const handleCopyImage = useCallback(async () => {
     if (!chartRef.current) return;
-    try {
-      const canvas = await convertHtmlToImage(chartRef.current);
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob }),
-          ]);
-          toast.success("Chart copied to clipboard");
-        } catch (error) {
-          console.error("Error copying chart:", error);
-          toast.error("Failed to copy chart");
-        }
-      });
-    } catch (error) {
-      console.error("Error copying chart:", error);
-      toast.error("Failed to copy chart");
-    }
+    await copyAsImage(chartRef.current, "Chart");
   }, []);
 
   const handleExportCsv = useCallback(() => {
@@ -441,7 +443,12 @@ function MultipleLineChart({
 
           <div className="flex items-center justify-end gap-1">
             <SimpleTooltip content="Download as PNG">
-              <Button variant="ghost" size="sm" onClick={handleDownloadImage}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDownloadImage}
+                aria-label="Download chart as PNG"
+              >
                 <DownloadIcon className="size-4" />
               </Button>
             </SimpleTooltip>

@@ -1,8 +1,12 @@
-import fetchNpmDownloadsAdaptive from "@/api/fetchNpmDownloadsAdaptive";
+import fetchNpmDownloadsAdaptive, {
+  notFoundMessage,
+} from "@/api/fetchNpmDownloadsAdaptive";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { colors } from "@/lib/theme/colors";
 import { formatLargeNumber } from "@/lib/utils/formatters";
 import getClientIp from "@/lib/utils/getClientIp";
+import isRateLimited from "@/lib/utils/rateLimit";
+import isValidPackageName from "@/lib/utils/isValidPackageName";
 import { groupByWeeks } from "@/lib/utils/groupByPeriod";
 import { isAppError } from "@/lib/utils/AppError";
 import { subWeeks } from "date-fns";
@@ -10,9 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 20;
-const RATE_LIMIT_SWEEP_THRESHOLD = 10_000;
+const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 20 } as const;
 
 const DEFAULT_WEEKS = 52;
 const MIN_WEEKS = 4;
@@ -29,47 +31,8 @@ const FONT_FAMILY =
 
 const palette = colors.chart.light;
 
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
-
-function sweepExpired(now: number): void {
-  if (requestCounts.size < RATE_LIMIT_SWEEP_THRESHOLD) return;
-  for (const [ip, data] of requestCounts) {
-    if (now > data.resetTime) requestCounts.delete(ip);
-  }
-}
-
-function isRateLimited(clientIP: string): boolean {
-  const now = Date.now();
-  const clientData = requestCounts.get(clientIP);
-
-  if (!clientData || now > clientData.resetTime) {
-    sweepExpired(now);
-    requestCounts.set(clientIP, {
-      count: 1,
-      resetTime: now + RATE_LIMIT_WINDOW,
-    });
-    return false;
-  }
-
-  if (clientData.count >= MAX_REQUESTS_PER_WINDOW) return true;
-
-  clientData.count++;
-  return false;
-}
-
-function isValidPackageName(name: string): boolean {
-  const npmNameRegex =
-    /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
-
-  if (!name || typeof name !== "string") return false;
-  if (name.length < 1 || name.length > 214) return false;
-  if (name.startsWith(".") || name.startsWith("_")) return false;
-  if (!npmNameRegex.test(name)) return false;
-
-  return true;
-}
-
 function parseWeeks(raw: string | null): number {
+  if (!raw) return DEFAULT_WEEKS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_WEEKS;
   return Math.min(MAX_WEEKS, Math.max(MIN_WEEKS, Math.trunc(parsed)));
@@ -183,22 +146,26 @@ function renderMessageSvg(message: string): string {
   </svg>`;
 }
 
-function svgResponse(svg: string, status: number): NextResponse {
+const PUBLIC_CACHE_CONTROL =
+  "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
+
+function svgResponse(
+  svg: string,
+  status: number,
+  isCacheable = status === 200,
+): NextResponse {
   return new NextResponse(svg, {
     status,
     headers: {
       "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control":
-        status === 200
-          ? "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400"
-          : "no-store",
+      "Cache-Control": isCacheable ? PUBLIC_CACHE_CONTROL : "no-store",
     },
   });
 }
 
 export async function GET(request: NextRequest) {
   const clientIP = getClientIp(request.headers);
-  if (isRateLimited(clientIP)) {
+  if (isRateLimited(`badge:${clientIP}`, RATE_LIMIT)) {
     return svgResponse(renderMessageSvg("Rate limit exceeded"), 429);
   }
 
@@ -231,7 +198,9 @@ export async function GET(request: NextRequest) {
   const startDate = subWeeks(new Date(), weeks);
 
   try {
-    const { data } = await fetchNpmDownloadsAdaptive(packages, { startDate });
+    const { data, errors } = await fetchNpmDownloadsAdaptive(packages, {
+      startDate,
+    });
 
     const series: BadgeSeries[] = packages.map((name, index) => {
       const downloads = data[name];
@@ -252,11 +221,14 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return svgResponse(renderBadgeSvg(series), 200);
+    const hasTransientError = Object.entries(errors).some(
+      ([name, message]) => message !== notFoundMessage(name),
+    );
+    return svgResponse(renderBadgeSvg(series), 200, !hasTransientError);
   } catch (error) {
     const message = isAppError(error)
       ? error.message
       : "Failed to load download data";
-    return svgResponse(renderMessageSvg(message), 200);
+    return svgResponse(renderMessageSvg(message), 502);
   }
 }

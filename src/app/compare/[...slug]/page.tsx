@@ -1,9 +1,15 @@
 import HomeShell from "@/app/(home)/components/home-shell";
-import { projectsToSlug, slugToProjects } from "@/lib/utils/slug";
+import Loading from "@/app/(home)/loading";
+import {
+  projectsToComparePath,
+  projectsToSlug,
+  slugToProjects,
+} from "@/lib/utils/slug";
 import StructuredData from "@/components/seo/structured-data";
 import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 const baseUrl = "https://www.package-pulse.com";
 
@@ -17,6 +23,10 @@ function formatProjectsList(projects: string[]): string {
   return projects.join(" vs ");
 }
 
+function getProjectsFromParams(params: ComparePageProps["params"]) {
+  return slugToProjects(params.slug.join("/"));
+}
+
 export function generateStaticParams() {
   return QUICK_COMPARISONS.map((preset) => ({
     slug: projectsToSlug([...preset.projects]).split("/"),
@@ -26,8 +36,7 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: ComparePageProps): Promise<Metadata> {
-  const slug = params.slug.join("/");
-  const projects = slugToProjects(slug);
+  const projects = getProjectsFromParams(params);
 
   if (projects.length === 0) {
     return {
@@ -41,7 +50,7 @@ export async function generateMetadata({
   const projectsLabel = formatProjectsList(projects);
   const title = `${projectsLabel} — npm download trends | Package Pulse`;
   const description = `Compare npm download trends and statistics for ${projectsLabel}. Analyze download patterns, growth rates, and popularity with interactive charts on Package Pulse.`;
-  const canonical = `/compare/${slug}`;
+  const canonical = projectsToComparePath(projects);
 
   return {
     title,
@@ -71,8 +80,7 @@ export async function generateMetadata({
 }
 
 export default function ComparePage({ params }: ComparePageProps) {
-  const slug = params.slug.join("/");
-  const projects = slugToProjects(slug);
+  const projects = getProjectsFromParams(params);
 
   if (projects.length === 0) notFound();
 
@@ -84,9 +92,11 @@ export default function ComparePage({ params }: ComparePageProps) {
         type="softwareApplication"
         name={`${projectsLabel} — npm download comparison`}
         description={`Compare npm download trends and statistics for ${projectsLabel} with interactive charts on Package Pulse.`}
-        url={`${baseUrl}/compare/${slug}`}
+        url={`${baseUrl}${projectsToComparePath(projects)}`}
       />
-      <HomeShell initialProjects={projects} persistSelection={false} />
+      <Suspense fallback={<Loading />}>
+        <HomeShell initialProjects={projects} persistSelection={false} />
+      </Suspense>
     </>
   );
 }

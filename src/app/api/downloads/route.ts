@@ -2,60 +2,17 @@ import fetchNpmDownloadsAdaptive from "@/api/fetchNpmDownloadsAdaptive";
 import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { isAppError } from "@/lib/utils/AppError";
 import getClientIp from "@/lib/utils/getClientIp";
+import isRateLimited from "@/lib/utils/rateLimit";
+import isValidPackageName from "@/lib/utils/isValidPackageName";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 20;
-
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
-
-const RATE_LIMIT_SWEEP_THRESHOLD = 10_000;
-
-function sweepExpired(now: number): void {
-  if (requestCounts.size < RATE_LIMIT_SWEEP_THRESHOLD) return;
-  for (const [ip, data] of requestCounts) {
-    if (now > data.resetTime) requestCounts.delete(ip);
-  }
-}
-
-function isRateLimited(clientIP: string): boolean {
-  const now = Date.now();
-  const clientData = requestCounts.get(clientIP);
-
-  if (!clientData || now > clientData.resetTime) {
-    sweepExpired(now);
-    requestCounts.set(clientIP, {
-      count: 1,
-      resetTime: now + RATE_LIMIT_WINDOW,
-    });
-    return false;
-  }
-
-  if (clientData.count >= MAX_REQUESTS_PER_WINDOW) {
-    return true;
-  }
-
-  clientData.count++;
-  return false;
-}
-
-function isValidPackageName(name: string): boolean {
-  const npmNameRegex =
-    /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
-
-  if (!name || typeof name !== "string") return false;
-  if (name.length < 1 || name.length > 214) return false;
-  if (name.startsWith(".") || name.startsWith("_")) return false;
-  if (!npmNameRegex.test(name)) return false;
-
-  return true;
-}
+const RATE_LIMIT = { windowMs: 60 * 1000, maxRequests: 20 } as const;
 
 export async function GET(request: NextRequest) {
   const clientIP = getClientIp(request.headers);
-  if (isRateLimited(clientIP)) {
+  if (isRateLimited(`downloads:${clientIP}`, RATE_LIMIT)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Too many requests." },
       { status: 429 },

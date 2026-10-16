@@ -53,6 +53,9 @@ export default function useProjectsStats(
               );
             }
 
+            const partialError = batch.errors[projectName];
+            if (partialError) toast.warning(partialError, { id: partialError });
+
             const sortedDownloads = sortByDate(
               downloads,
               (download) => new Date(download.date),

@@ -5,7 +5,13 @@ import {
 import { ChartMode } from "@/lib/enums/ChartMode";
 import { ChartScale } from "@/lib/enums/ChartScale";
 import { TimePeriod } from "@/lib/enums/TimePeriod";
-import { decodeProjectName, encodeProjectName } from "@/lib/utils/slug";
+import {
+  COMPARE_PATH_PREFIX,
+  decodeProjectName,
+  encodeProjectName,
+  projectsToComparePath,
+  slugToProjects,
+} from "@/lib/utils/slug";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import LocalStorageKey from "../../../lib/enums/LocalStorageKey";
@@ -18,6 +24,9 @@ export {
   projectsToSlug,
   slugToProjects,
 } from "@/lib/utils/slug";
+
+const MANAGED_PARAM_KEYS = ["projects", "period", "scale", "mode"] as const;
+const EMPTY_SELECTION_URL = "/?projects=";
 
 export function getInitialProjects(
   projectsParam: string | null,
@@ -116,7 +125,7 @@ export function useInitialChartModeFromSearchParams() {
 
 export function getOtherParamsString(
   searchParams: URLSearchParams,
-  excludeKeys: string[],
+  excludeKeys: readonly string[],
 ): string {
   return Array.from(searchParams.entries())
     .filter(([key]) => !excludeKeys.includes(key))
@@ -181,12 +190,7 @@ function getComparableCurrentUrl(
   searchParams: URLSearchParams,
   delimiter: string,
 ): string {
-  const otherParams = getOtherParamsString(searchParams, [
-    "projects",
-    "period",
-    "scale",
-    "mode",
-  ]);
+  const otherParams = getOtherParamsString(searchParams, MANAGED_PARAM_KEYS);
   return constructNewUrl(
     pathname,
     getCurrentProjects(searchParams, delimiter),
@@ -198,6 +202,108 @@ function getComparableCurrentUrl(
   );
 }
 
+function stripQueryPrefix(url: string): string {
+  return url.replace(/^\?/, "");
+}
+
+function joinPathAndQuery(path: string, query: string): string {
+  return query ? `${path}?${query}` : path;
+}
+
+function getPreservedQuery(
+  searchParams: URLSearchParams,
+  delimiter: string,
+): string {
+  return stripQueryPrefix(
+    constructNewUrl(
+      "",
+      [],
+      getInitialTimePeriod(searchParams.get("period")),
+      getInitialChartScale(searchParams.get("scale")),
+      getOtherParamsString(searchParams, MANAGED_PARAM_KEYS),
+      delimiter,
+      getInitialChartMode(searchParams.get("mode")),
+    ),
+  );
+}
+
+export function isComparePathname(pathname: string): boolean {
+  return pathname.startsWith(COMPARE_PATH_PREFIX);
+}
+
+export function constructCompareUrl(
+  selectedProjects: string[],
+  searchParams: URLSearchParams,
+  delimiter: string,
+): string {
+  const query = getPreservedQuery(searchParams, delimiter);
+
+  if (selectedProjects.length === 0)
+    return [EMPTY_SELECTION_URL, query].filter(Boolean).join("&");
+
+  return joinPathAndQuery(projectsToComparePath(selectedProjects), query);
+}
+
+function getComparableCurrentCompareUrl(
+  pathname: string,
+  searchParams: URLSearchParams,
+  delimiter: string,
+): string {
+  const currentProjects = slugToProjects(
+    pathname.slice(COMPARE_PATH_PREFIX.length),
+  );
+  const query = stripQueryPrefix(
+    getComparableCurrentUrl("", searchParams, delimiter),
+  );
+  return joinPathAndQuery(projectsToComparePath(currentProjects), query);
+}
+
+function getProjectsUrlCandidates(
+  pathname: string,
+  searchParams: URLSearchParams,
+  selectedProjects: string[],
+  delimiter: string,
+) {
+  if (isComparePathname(pathname)) {
+    return {
+      current: getComparableCurrentCompareUrl(
+        pathname,
+        searchParams,
+        delimiter,
+      ),
+      target: constructCompareUrl(selectedProjects, searchParams, delimiter),
+    };
+  }
+
+  return {
+    current: getComparableCurrentUrl(pathname, searchParams, delimiter),
+    target: constructNewUrl(
+      pathname,
+      selectedProjects,
+      getInitialTimePeriod(searchParams.get("period")),
+      getInitialChartScale(searchParams.get("scale")),
+      getOtherParamsString(searchParams, MANAGED_PARAM_KEYS),
+      delimiter,
+      getInitialChartMode(searchParams.get("mode")),
+    ),
+  };
+}
+
+export function getProjectsUrlUpdate(
+  pathname: string,
+  searchParams: URLSearchParams,
+  selectedProjects: string[],
+  delimiter: string,
+): string | null {
+  const { current, target } = getProjectsUrlCandidates(
+    pathname,
+    searchParams,
+    selectedProjects,
+    delimiter,
+  );
+  return current === target ? null : target;
+}
+
 export function useUpdateSearchParamsProjects(
   selectedProjects: string[],
   delimiter: string,
@@ -207,29 +313,14 @@ export function useUpdateSearchParamsProjects(
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const currentTimePeriod = getInitialTimePeriod(searchParams.get("period"));
-    const currentChartScale = getInitialChartScale(searchParams.get("scale"));
-    const currentChartMode = getInitialChartMode(searchParams.get("mode"));
-
-    const otherParams = getOtherParamsString(searchParams, [
-      "projects",
-      "period",
-      "scale",
-      "mode",
-    ]);
-    const newUrl = constructNewUrl(
+    const newUrl = getProjectsUrlUpdate(
       pathname,
+      searchParams,
       selectedProjects,
-      currentTimePeriod,
-      currentChartScale,
-      otherParams,
       delimiter,
-      currentChartMode,
     );
 
-    if (getComparableCurrentUrl(pathname, searchParams, delimiter) !== newUrl) {
-      router.replace(newUrl, { scroll: false });
-    }
+    if (newUrl) router.replace(newUrl, { scroll: false });
   }, [selectedProjects, router, searchParams, delimiter, pathname]);
 }
 
@@ -245,12 +336,7 @@ export function useUpdateSearchParams(
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const otherParams = getOtherParamsString(searchParams, [
-      "projects",
-      "period",
-      "scale",
-      "mode",
-    ]);
+    const otherParams = getOtherParamsString(searchParams, MANAGED_PARAM_KEYS);
     const newUrl = constructNewUrl(
       pathname,
       selectedProjects,
@@ -283,12 +369,7 @@ export function useUpdateSearchParamsChart(
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const otherParams = getOtherParamsString(searchParams, [
-      "projects",
-      "period",
-      "scale",
-      "mode",
-    ]);
+    const otherParams = getOtherParamsString(searchParams, MANAGED_PARAM_KEYS);
     const newUrl = constructNewUrl(
       pathname,
       getCurrentProjects(searchParams, MULTI_SEARCH_DELIMITER),

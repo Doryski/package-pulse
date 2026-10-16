@@ -1,10 +1,6 @@
-import { projectsToSlug } from "@/lib/utils/slug";
+import { projectsToComparePath, slugifyTitle } from "@/lib/utils/slug";
 import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import type { MetadataRoute } from "next";
-
-function slugifyTitle(title: string): string {
-  return title.toLowerCase().replace(/&/g, "").trim().replace(/\s+/g, "-");
-}
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://www.package-pulse.com";
@@ -12,7 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const comparePages: MetadataRoute.Sitemap = QUICK_COMPARISONS.map(
     (preset) => ({
-      url: `${baseUrl}/compare/${projectsToSlug([...preset.projects])}`,
+      url: `${baseUrl}${projectsToComparePath([...preset.projects])}`,
       lastModified,
       changeFrequency: "weekly",
       priority: 0.8,

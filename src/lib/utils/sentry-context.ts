@@ -3,7 +3,12 @@ import * as Sentry from "@sentry/nextjs";
 type CaptureExceptionOptions = Parameters<typeof Sentry.captureException>[1];
 type CaptureMessageOptions = Parameters<typeof Sentry.captureMessage>[1];
 
-const ALLOWED_SEARCH_PARAM_KEYS = ["projects", "period", "scale"] as const;
+const ALLOWED_SEARCH_PARAM_KEYS = [
+  "projects",
+  "period",
+  "scale",
+  "mode",
+] as const;
 
 function pickAllowedSearchParams(
   searchParams: URLSearchParams,

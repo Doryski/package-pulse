@@ -16,8 +16,8 @@ export default function useDepsDev(selectedProjects: string[]) {
         queryKey: ["depsDev", project, todaysUtcDateString],
         queryFn: () =>
           version ? fetchDepsDev(project, version) : Promise.resolve(null),
-        staleTime: 10 * 60 * 1000, // 10 minutes
-        gcTime: 30 * 60 * 1000, // 30 minutes
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
         enabled: !!project && !!version,
       };
     }),

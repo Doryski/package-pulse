@@ -258,7 +258,7 @@ describe("fetchNpmDownloadsAdaptive - partial-failure isolation", () => {
     expect(result.errors["ghost-pkg"]).toBe('Package "ghost-pkg" not found');
   });
 
-  test("a package with one failing window is nulled instead of returning a gapped series", async () => {
+  test("a bulk package with one not-found window keeps data from successful windows", async () => {
     const today = getToday();
     const startDate = daysAgo(400);
     const windows = getTimePeriods(
@@ -289,8 +289,110 @@ describe("fetchNpmDownloadsAdaptive - partial-failure isolation", () => {
     });
 
     expect(windows).toHaveLength(2);
-    expect(result.data.react).toBeNull();
-    expect(result.errors.react).toBeDefined();
+    expect(result.data.react).toEqual([{ date: "2024-01-02", count: 42 }]);
+    expect(result.errors.react).toBeUndefined();
+  });
+});
+
+describe("fetchNpmDownloadsAdaptive - multi-window scoped packages", () => {
+  const SCOPED = "@scope/young";
+  const startDate = () => daysAgo(800);
+  const monthWindows = () =>
+    getTimePeriods(
+      startDate(),
+      getToday(),
+      NPM_RANGE_API_PERIOD_MONTHS,
+      "months",
+    );
+  const isNewestWindow = (url: string) =>
+    startOf(url) === formatDate(monthWindows()[0]!.start);
+  const successResponse = () =>
+    makeResponse(200, flatBody(SCOPED, [{ day: "2024-02-01", downloads: 9 }]));
+  const noStatsResponse = () =>
+    makeResponse(200, {
+      error: `no stats for this package for this period (0002)`,
+    });
+
+  test("keeps data when early windows return no-stats bodies and a later window succeeds", async () => {
+    const fetchImpl = vi.fn((url: string) =>
+      Promise.resolve(
+        isNewestWindow(url) ? successResponse() : noStatsResponse(),
+      ),
+    );
+
+    const result = await fetchNpmDownloadsAdaptive([SCOPED], {
+      startDate: startDate(),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(monthWindows().length).toBeGreaterThan(1);
+    expect(result.data[SCOPED]).toEqual([{ date: "2024-02-01", count: 9 }]);
+    expect(result.errors[SCOPED]).toBeUndefined();
+  });
+
+  test("reports the package as not found when every window is not found", async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(noStatsResponse()));
+
+    const result = await fetchNpmDownloadsAdaptive([SCOPED], {
+      startDate: startDate(),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(monthWindows().length);
+    expect(result.data[SCOPED]).toBeNull();
+    expect(result.errors[SCOPED]).toBe(`Package "${SCOPED}" not found`);
+  });
+
+  test("keeps data and reports a partial error when one window keeps failing with 5xx", async () => {
+    vi.useRealTimers();
+    const fetchImpl = vi.fn((url: string) =>
+      Promise.resolve(
+        isNewestWindow(url) ? successResponse() : makeResponse(503),
+      ),
+    );
+
+    const result = await fetchNpmDownloadsAdaptive([SCOPED], {
+      startDate: startDate(),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(fetchImpl.mock.calls.length).toBeGreaterThan(monthWindows().length);
+    expect(result.data[SCOPED]).toEqual([{ date: "2024-02-01", count: 9 }]);
+    expect(result.errors[SCOPED]).toBe(
+      `Some download data for "${SCOPED}" could not be loaded`,
+    );
+  });
+
+  test("reports a load failure when windows mix not-found and 5xx with no data", async () => {
+    vi.useRealTimers();
+    const fetchImpl = vi.fn((url: string) => {
+      if (!url.includes(SCOPED)) {
+        return Promise.resolve(
+          makeResponse(
+            200,
+            flatBody("react", [{ day: "2024-01-01", downloads: 1 }]),
+          ),
+        );
+      }
+      return Promise.resolve(
+        isNewestWindow(url) ? makeResponse(503) : noStatsResponse(),
+      );
+    });
+
+    const result = await fetchNpmDownloadsAdaptive(["react", SCOPED], {
+      startDate: startDate(),
+      fetchImpl: asFetch(fetchImpl),
+      retry: FAST_RETRY,
+    });
+
+    expect(result.data[SCOPED]).toBeNull();
+    expect(result.errors[SCOPED]).toBe(
+      `Failed to load downloads for "${SCOPED}"`,
+    );
+    expect(result.data.react).not.toBeNull();
   });
 });
 

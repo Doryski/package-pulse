@@ -88,14 +88,11 @@ describe("GET /api/downloads", () => {
     });
   });
 
-  test("rejects a non-lowercase package name with 400", async () => {
-    const response = await GET(buildRequest({ packages: ["React"] }));
+  test("accepts legacy mixed-case package names like JSONStream", async () => {
+    const response = await GET(buildRequest({ packages: ["JSONStream"] }));
 
-    expect(response.status).toBe(400);
-    expect(fetchAdaptiveMock).not.toHaveBeenCalled();
-    await expect(response.json()).resolves.toEqual({
-      error: "Invalid package names: React",
-    });
+    expect(response.status).toBe(200);
+    expect(fetchAdaptiveMock).toHaveBeenCalledWith(["JSONStream"]);
   });
 
   test("accepts valid lowercase, scoped, and punctuated names", async () => {

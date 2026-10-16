@@ -1,4 +1,9 @@
-import { projectsToSlug, slugToProjects } from "@/lib/utils/slug";
+import {
+  projectsToComparePath,
+  projectsToSlug,
+  slugifyTitle,
+  slugToProjects,
+} from "@/lib/utils/slug";
 import { QUICK_COMPARISONS } from "@/lib/config/comparison-presets";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -9,10 +14,6 @@ const baseUrl = "https://www.package-pulse.com";
 type CategoryPageProps = {
   params: { category: string };
 };
-
-function slugifyTitle(title: string): string {
-  return title.toLowerCase().replace(/&/g, "").trim().replace(/\s+/g, "-");
-}
 
 function findPresetByCategory(category: string) {
   return QUICK_COMPARISONS.find(
@@ -107,7 +108,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
 
       <div className="flex flex-wrap gap-4">
         <Link
-          href={`/compare/${compareSlug}`}
+          href={projectsToComparePath(projects)}
           className="inline-flex items-center rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground"
         >
           Compare {preset.title} downloads

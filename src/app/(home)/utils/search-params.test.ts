@@ -2,6 +2,7 @@ import { SELECTED_PROJECTS_LIMIT } from "@/lib/config/constants";
 import { describe, expect, it, vi } from "vitest";
 import getLocalStorageValue from "../../../lib/utils/getLocalStorageValue";
 import {
+  constructCompareUrl,
   constructNewUrl,
   decodeProjectName,
   encodeProjectName,
@@ -11,6 +12,8 @@ import {
   getInitialTimePeriod,
   getOtherParamsString,
   getProjectsQueryString,
+  getProjectsUrlUpdate,
+  isComparePathname,
   projectsToSlug,
   slugToProjects,
 } from "./search-params";
@@ -125,6 +128,159 @@ describe("projectsToSlug / slugToProjects round-trip", () => {
     const projects = ["react", "@angular/core"];
     const slugSegments = projectsToSlug(projects).split("/");
     expect(slugToProjects(slugSegments.join("/"))).toEqual(projects);
+  });
+
+  it("does not throw on a lone percent sign and returns an empty array", () => {
+    expect(() => slugToProjects("100%")).not.toThrow();
+    expect(slugToProjects("100%")).toEqual([]);
+    expect(slugToProjects("100%25")).toEqual([]);
+  });
+
+  it("returns an empty array when any name is invalid", () => {
+    expect(slugToProjects("arbitrary text")).toEqual([]);
+    expect(slugToProjects("react-vs-<script>")).toEqual([]);
+    expect(slugToProjects("react-vs-")).toEqual([]);
+  });
+
+  it("accepts already-decoded input", () => {
+    expect(slugToProjects("date-fns-vs-moment")).toEqual([
+      "date-fns",
+      "moment",
+    ]);
+    expect(slugToProjects("@angular/core-vs-react")).toEqual([
+      "@angular/core",
+      "react",
+    ]);
+  });
+
+  it("accepts segments re-encoded by Next.js", () => {
+    expect(slugToProjects("%40angular/core-vs-react")).toEqual([
+      "@angular/core",
+      "react",
+    ]);
+    expect(slugToProjects("date%252Dfns-vs-moment")).toEqual([
+      "date-fns",
+      "moment",
+    ]);
+  });
+});
+
+describe("decodeProjectName safety", () => {
+  it("falls back to the raw value on malformed input", () => {
+    expect(decodeProjectName("100%")).toBe("100%");
+  });
+});
+
+describe("isComparePathname", () => {
+  it("detects compare routes only", () => {
+    expect(isComparePathname("/compare/react-vs-vue")).toBe(true);
+    expect(isComparePathname("/")).toBe(false);
+    expect(isComparePathname("/categories/frameworks")).toBe(false);
+  });
+});
+
+describe("constructCompareUrl", () => {
+  it("builds a compare path without a projects param, keeping other params", () => {
+    const searchParams = new URLSearchParams(
+      "projects=react,vue&period=years-1&scale=logarithmic&mode=normalized&ref=x",
+    );
+    expect(constructCompareUrl(["react", "date-fns"], searchParams, ",")).toBe(
+      "/compare/react-vs-date%2Dfns?period=years-1&scale=logarithmic&mode=normalized&ref=x",
+    );
+  });
+
+  it("builds a bare compare path when there are no params", () => {
+    expect(
+      constructCompareUrl(["react", "vue"], new URLSearchParams(), ","),
+    ).toBe("/compare/react-vs-vue");
+  });
+
+  it("navigates home with an explicit empty selection when nothing is selected", () => {
+    expect(constructCompareUrl([], new URLSearchParams(), ",")).toBe(
+      "/?projects=",
+    );
+    expect(
+      constructCompareUrl([], new URLSearchParams("period=years-1"), ","),
+    ).toBe("/?projects=&period=years-1");
+  });
+});
+
+describe("getProjectsUrlUpdate", () => {
+  it("returns null on initial compare load when the URL already matches", () => {
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/react-vs-date%2Dfns",
+        new URLSearchParams("period=years-1"),
+        ["react", "date-fns"],
+        ",",
+      ),
+    ).toBeNull();
+  });
+
+  it("treats decoded and encoded compare paths as equal", () => {
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/react-vs-date-fns",
+        new URLSearchParams(),
+        ["react", "date-fns"],
+        ",",
+      ),
+    ).toBeNull();
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/%40angular/core-vs-react",
+        new URLSearchParams(),
+        ["@angular/core", "react"],
+        ",",
+      ),
+    ).toBeNull();
+  });
+
+  it("updates the compare path when a package is removed", () => {
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/react-vs-vue-vs-svelte",
+        new URLSearchParams("scale=logarithmic"),
+        ["react", "svelte"],
+        ",",
+      ),
+    ).toBe("/compare/react-vs-svelte?scale=logarithmic");
+  });
+
+  it("drops a stale projects param on compare pages", () => {
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/react-vs-vue",
+        new URLSearchParams("projects=react"),
+        ["react", "vue"],
+        ",",
+      ),
+    ).toBe("/compare/react-vs-vue");
+  });
+
+  it("navigates home when the compare selection becomes empty", () => {
+    expect(
+      getProjectsUrlUpdate(
+        "/compare/react-vs-vue",
+        new URLSearchParams(),
+        [],
+        ",",
+      ),
+    ).toBe("/?projects=");
+  });
+
+  it("keeps home-page query behavior", () => {
+    expect(
+      getProjectsUrlUpdate("/", new URLSearchParams(), ["react", "vue"], ","),
+    ).toBe("/?projects=react,vue");
+    expect(
+      getProjectsUrlUpdate(
+        "/",
+        new URLSearchParams("projects=react,vue"),
+        ["react", "vue"],
+        ",",
+      ),
+    ).toBeNull();
   });
 });
 
