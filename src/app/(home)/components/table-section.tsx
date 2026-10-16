@@ -198,11 +198,11 @@ const TableSection = memo(({ projectsStats }: TableSectionProps) => {
         projectsStats.length === 0 && "hidden",
       )}
     >
-      <div className="relative flex w-full items-center justify-between sm:justify-end">
-        <h3 className="text-center text-sm sm:absolute sm:top-0 sm:left-1/2 sm:-translate-x-1/2 sm:text-lg">
+      <div className="relative flex w-full flex-wrap items-center justify-between gap-2 lg:justify-end">
+        <h3 className="text-center text-sm sm:text-lg lg:absolute lg:top-0 lg:left-1/2 lg:-translate-x-1/2">
           Downloads by project
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <Button
             variant="outline"
             className="flex items-center gap-2"

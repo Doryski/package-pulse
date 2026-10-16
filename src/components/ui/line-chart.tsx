@@ -359,7 +359,7 @@ function MultipleLineChart({
         data.length === 0 && "hidden",
       )}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <label
             htmlFor="time-period-select"
@@ -392,8 +392,8 @@ function MultipleLineChart({
           </Select>
         </div>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center justify-between gap-2 sm:justify-start">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
             <label className="text-sm font-medium text-nowrap">Scale</label>
             <ToggleGroup
               type="single"
@@ -419,7 +419,7 @@ function MultipleLineChart({
             </ToggleGroup>
           </div>
 
-          <div className="flex items-center justify-between gap-2 sm:justify-start">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
             <label className="text-sm font-medium text-nowrap">Timeline</label>
             <ToggleGroup
               type="single"
@@ -499,7 +499,10 @@ function MultipleLineChart({
       </div>
 
       <div ref={chartRef} className={cn("relative mx-auto size-full")}>
-        <ChartContainer config={config} className="max-h-[450px] w-full">
+        <ChartContainer
+          config={config}
+          className="aspect-square max-h-[450px] w-full sm:aspect-video"
+        >
           <LineChart
             accessibilityLayer
             data={transformedData}
